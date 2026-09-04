@@ -15,7 +15,15 @@ export interface SaveSchema<T> {
 export interface SaveLoadResult<T> {
     readonly value: T;
     readonly source: "stored" | "migrated" | "default";
+    readonly recovery?: SaveRecoveryReason;
 }
+
+export type SaveRecoveryReason =
+    | "invalid-json"
+    | "invalid-envelope"
+    | "missing-migration"
+    | "migration-failed"
+    | "invalid-data";
 
 interface SaveEnvelope {
     version: number;
@@ -42,18 +50,18 @@ export class SaveStore<T> {
     load(): SaveLoadResult<T> {
         const raw = this.driver.getItem(this.schema.key);
         if (raw === null) {
-            return this.createAndPersistDefault();
+            return this.createDefault(true);
         }
 
         let envelope: SaveEnvelope;
         try {
             const parsed: unknown = JSON.parse(raw);
             if (!this.isEnvelope(parsed)) {
-                return this.createAndPersistDefault();
+                return this.createDefault(false, "invalid-envelope");
             }
             envelope = parsed;
         } catch {
-            return this.createAndPersistDefault();
+            return this.createDefault(false, "invalid-json");
         }
 
         if (envelope.version > this.schema.currentVersion) {
@@ -65,14 +73,18 @@ export class SaveStore<T> {
         while (version < this.schema.currentVersion) {
             const migration = this.schema.migrations?.[version];
             if (!migration) {
-                return this.createAndPersistDefault();
+                return this.createDefault(false, "missing-migration");
             }
-            value = migration(value);
+            try {
+                value = migration(value);
+            } catch {
+                return this.createDefault(false, "migration-failed");
+            }
             version += 1;
         }
 
         if (!this.schema.validate(value)) {
-            return this.createAndPersistDefault();
+            return this.createDefault(false, "invalid-data");
         }
 
         if (version !== envelope.version) {
@@ -97,10 +109,17 @@ export class SaveStore<T> {
         this.driver.removeItem(this.schema.key);
     }
 
-    private createAndPersistDefault(): SaveLoadResult<T> {
+    private createDefault(persist: boolean, recovery?: SaveRecoveryReason): SaveLoadResult<T> {
         const value = this.schema.createDefault();
-        this.save(value);
-        return { value, source: "default" };
+        if (!this.schema.validate(value)) {
+            throw new Error(`Save schema '${this.schema.key}' produced invalid default data.`);
+        }
+        if (persist) {
+            this.save(value);
+        }
+        return recovery
+            ? { value, source: "default", recovery }
+            : { value, source: "default" };
     }
 
     private isEnvelope(value: unknown): value is SaveEnvelope {

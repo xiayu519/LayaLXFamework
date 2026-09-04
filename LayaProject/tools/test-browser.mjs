@@ -147,6 +147,7 @@ try {
         || !runtimeState.configReady
         || runtimeState.configValue !== "LXFamework"
         || !runtimeState.spineReady
+        || runtimeState.spineVersion !== "4.2"
         || !runtimeState.performanceReady
         || !runtimeState.ownershipReady
         || runtimeState.statusText !== "READY"
@@ -203,7 +204,7 @@ try {
     }
     console.log(
         `Browser OK: ${runtimeState.title}, LayaAir ${runtimeState.engineVersion}, pure 2D, `
-        + `config=${runtimeState.configValue}, UI/Spine module/performance ready, status=${runtimeState.statusText}, `
+        + `config=${runtimeState.configValue}, UI/Spine ${runtimeState.spineVersion}/performance ready, status=${runtimeState.statusText}, `
         + `Timer/GLoader/shared-texture/PrefabPool/UI-modal probes passed, clean scene shutdown, no errors.`,
     );
 } finally {
@@ -524,6 +525,7 @@ async function waitForRuntime(cdp, timeoutMs) {
                     configReady,
                     configValue,
                     spineReady: ready && typeof globalThis.Laya.Spine2DRenderNode === "function",
+                    spineVersion: globalThis.Laya?.PlayerConfig?.spineVersion ?? null,
                     performanceReady: render !== null
                         && Number.isFinite(render.drawCalls2D)
                         && Number.isFinite(render.drawCalls)

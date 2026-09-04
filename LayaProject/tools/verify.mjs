@@ -7,6 +7,7 @@ const staticChecks = [
     "check:architecture",
     "check:engine-source",
     "validate:assets",
+    "validate:content-assets",
     "validate:resource-layout",
     "check:skills",
     "check:memory",

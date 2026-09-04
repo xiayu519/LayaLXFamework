@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "spineRuntime": "4.2",
+  "texture": {
+    "sourceExtensions": [".png", ".jpg", ".jpeg", ".webp"],
+    "maxDimension": 4096,
+    "atlasMaxDimension": 2048,
+    "atlasMaxEntryDimension": 512
+  },
+  "audio": {
+    "bgmExtensions": [".mp3"],
+    "sfxExtensions": [".wav", ".mp3"],
+    "voiceExtensions": [".mp3"],
+    "maxMp3BitrateKbps": 128,
+    "maxSampleRateHz": 44100,
+    "wavBitDepth": 16
+  },
+  "exceptions": {
+    "linearTextures": [],
+    "mipmappedTextures": [],
+    "readableTextures": [],
+    "straightAlphaSpriteTextures": [],
+    "compressedSpriteTextures": [],
+    "jsonSpine": []
+  }
+}

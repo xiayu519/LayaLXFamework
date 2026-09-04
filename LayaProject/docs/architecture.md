@@ -48,6 +48,16 @@ Laya.loader.load(.lh, HIERARCHY)
 
 `SoundManager` 的解码缓存由 `AudioDataCache` 管理，不属于普通 Loader group。`AudioService` 只增加业务声道语义，不宣称统一卸载音频缓存。
 
+## 存档与网络失败边界
+
+`SaveStore` 只在键不存在时持久化默认值。损坏 JSON、非法 envelope、缺失/失败迁移和非法数据返回带 `recovery` 原因的默认值，但保留原始存档；未来版本继续抛出 `UnsupportedSaveVersionError`，禁止降级覆盖。
+
+`HttpTransportError` 提供 `kind/status/retryable/attempt/maxAttempts`。默认不重试；GET/HEAD 或带显式 `idempotencyKey` 的 POST 才能启用最多 5 次尝试，并只重试网络、超时和配置的瞬时 HTTP 状态。取消、参数、初始化和同步派发错误不重试。
+
+## 内容资产门禁
+
+`AssetImportPolicy.json` 固定 2D 纹理、图集、音频和 Spine 4.2 导入规格。`validate:content-assets` 校验真实 `.meta` 与文件头；它不替代目标设备的压缩纹理、音频解码、Spine 动画和性能验收。详细规则见 [asset-import.md](asset-import.md)。
+
 ## 启动与停止
 
 `AppBootstrap` 顺序启动并逆序停止。业务服务先停；共享清理依次处理 UI（含晚到加载重试）、Prefab pool（含晚到加载重试）、Audio，最后执行 `Laya.Scene.gc()`。每一步独立执行并汇总错误。
@@ -56,4 +66,4 @@ Laya.loader.load(.lh, HIERARCHY)
 
 `settings/LayaSourceBaseline.json` 固定官方 `v3.4.1` commit 和 22 个关键 TypeScript 文件的哈希。`npm run check:engine-source` 从本机 CLI 的 `.js.map` 提取完整源码离线比对。
 
-Headless Chromium 真实探针覆盖：`Laya.timer.clearAll`、`GLoader` 晚到请求、共享纹理双持有者引用、Prefab 池复用/排空、UI modal 层与 Destroy 重入、Startup Scene 销毁触发 runtime 停机。代表性 Spine 动画、真实音频解码与目标机性能必须在业务提供对应资产后另做专项验收。
+Headless Chromium 真实探针覆盖：`Laya.timer.clearAll`、`GLoader` 晚到请求、共享纹理双持有者引用、Prefab 池复用/排空、UI modal 层与 Destroy 重入、Startup Scene 销毁触发 runtime 停机。图片/音频/Spine 静态策略另由 `validate:content-assets` 覆盖；代表性 Spine 动画、真实音频解码、纹理压缩与目标机性能必须在业务提供对应资产后另做专项验收。

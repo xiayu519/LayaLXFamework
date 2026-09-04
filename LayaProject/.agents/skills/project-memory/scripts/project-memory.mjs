@@ -138,7 +138,7 @@ function search(rawArguments) {
         limit = Number(argumentsCopy[limitIndex + 1]);
         argumentsCopy.splice(limitIndex, 2);
     }
-    const terms = argumentsCopy.map((item) => item.trim().toLowerCase()).filter(Boolean);
+    const terms = [...new Set(argumentsCopy.flatMap(tokenize))];
     if (terms.length === 0 || !Number.isInteger(limit) || limit < 1 || limit > 10) {
         console.error("Usage: project-memory.mjs search <keyword...> [--limit 1..10]");
         process.exitCode = 2;
@@ -174,6 +174,10 @@ function search(rawArguments) {
             `${metadata.description} | trigger: ${metadata.trigger}`,
         );
     }
+}
+
+function tokenize(value) {
+    return value.normalize("NFKC").toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
 }
 
 const command = process.argv[2];

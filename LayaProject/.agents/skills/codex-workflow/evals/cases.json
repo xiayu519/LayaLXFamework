@@ -119,6 +119,31 @@
       "id": "minigame_resource_packages",
       "request": "给新游戏规划 Laya 小游戏首包和功能资源分包，约束 battle 的 UI、Scene、Spine 共置并检查包体。",
       "expected": ["laya-minigame-packaging"]
+    },
+    {
+      "id": "texture_import_profile",
+      "request": "审查新 UI 图片的 Laya .meta：textureType、sRGB、PMA、mipmap、readWrite、图集和 ASTC 设置是否符合项目规格。",
+      "expected": ["laya-texture"]
+    },
+    {
+      "id": "texture_uuid_boundary",
+      "request": "一个 PNG 能显示，但引用它的 .lh 中 res:// UUID 无法解析；只修复序列化引用和 .meta UUID。",
+      "expected": ["laya-assets"]
+    },
+    {
+      "id": "texture_runtime_boundary",
+      "request": "动态头像换图后旧 Texture 仍被显示节点持有，检查 GLoader.src、Laya.loader 缓存和 Scene.gc 释放时序。",
+      "expected": ["laya-resource"]
+    },
+    {
+      "id": "audio_encoding_profile",
+      "request": "为 BGM、短音效和语音确定 Laya 运行时的 MP3/WAV、采样率、码率和目录规范，并验证导入资产。",
+      "expected": ["laya-audio"]
+    },
+    {
+      "id": "spine_export_profile",
+      "request": "检查 Spine 4.2 导出的 skel、atlas、页图直通 Alpha 和 Laya Spine2DRenderNode 导入规格。",
+      "expected": ["laya-spine"]
     }
   ]
 }

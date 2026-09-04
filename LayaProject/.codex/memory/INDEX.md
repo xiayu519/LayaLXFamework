@@ -8,6 +8,7 @@
 - [Laya Loader.BUFFER TextResource](problems/laya-buffer-text-resource.md)：LayaAir 3.4 二进制加载结果需从 `TextResource.data` 取出。
 - [Laya Loader group membership persists](problems/laya-loader-group-membership-persists.md)：group 清理不会移除 URL 成员；旧 ResourcePolicy 规避方案已被原生资源边界替代。
 - [ui2 default skins in bootstrap](problems/ui2-default-skins-in-bootstrap.md)：关闭默认皮肤开关后仍需清空组件引用，防止 `internal/UI` 扩大首包。
+- [Corrupt save preservation](problems/corrupt-save-preservation.md)：损坏存档恢复默认值时必须保留原始数据并暴露恢复原因。
 
 ## Decisions
 
@@ -19,6 +20,8 @@
 - [Luban source of truth](decisions/luban-source-of-truth.md)：已被 bootstrap 输出路径的新版本替代。
 - [Luban source of truth v2](decisions/luban-source-of-truth-v2.md)：外层 Design 是表源，生成到 bootstrap，framework 不依赖表结构。
 - [Laya resource package layout](decisions/resource-package-layout.md)：以首次可交互为 bootstrap 边界，按功能包组织完整资源依赖。
+- [Content asset import policy](decisions/content-asset-import-policy.md)：图片、音频和 Spine 使用固定可执行导入规格与精确例外。
+- [HTTP retry idempotency](decisions/http-retry-idempotency.md)：默认不重试；只有幂等请求可进行有限瞬时失败重试。
 
 ## Feedback
 

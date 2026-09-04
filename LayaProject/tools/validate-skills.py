@@ -35,9 +35,7 @@ def local_markdown_links_resolve(markdown: Path) -> list[str]:
 
 def main() -> int:
     errors = []
-    if not VALIDATOR.is_file():
-        print(f"Skill validator is missing: {VALIDATOR}", file=sys.stderr)
-        return 1
+    uses_system_validator = VALIDATOR.is_file()
 
     skills = sorted(path.parent for path in SKILLS_ROOT.glob("*/SKILL.md"))
     if not skills:
@@ -47,14 +45,15 @@ def main() -> int:
     environment = os.environ.copy()
     environment["PYTHONUTF8"] = "1"
     for skill in skills:
-        result = subprocess.run(
-            [sys.executable, str(VALIDATOR), str(skill)],
-            check=False,
-            env=environment,
-        )
-        if result.returncode != 0:
-            errors.append(f"quick_validate failed: {skill.name}")
-            continue
+        if uses_system_validator:
+            result = subprocess.run(
+                [sys.executable, str(VALIDATOR), str(skill)],
+                check=False,
+                env=environment,
+            )
+            if result.returncode != 0:
+                errors.append(f"quick_validate failed: {skill.name}")
+                continue
 
         skill_file = skill / "SKILL.md"
         source = skill_file.read_text(encoding="utf-8")
@@ -64,10 +63,21 @@ def main() -> int:
             continue
         name = field(match.group(1), "name")
         description = field(match.group(1), "description")
+        unknown_fields = sorted(
+            line.split(":", 1)[0].strip()
+            for line in match.group(1).splitlines()
+            if ":" in line and line.split(":", 1)[0].strip() not in {"name", "description"}
+        )
         if name != skill.name:
             errors.append(f"{skill.name}: frontmatter name must match directory")
+        if not re.fullmatch(r"[a-z][a-z0-9-]*", name):
+            errors.append(f"{skill.name}: invalid skill name")
+        if not description:
+            errors.append(f"{skill.name}: description is required")
         if len(description) > 240:
             errors.append(f"{skill.name}: description exceeds 240 characters")
+        if unknown_fields:
+            errors.append(f"{skill.name}: unsupported frontmatter fields {unknown_fields}")
         descriptions.append(description)
 
         openai_yaml = skill / "agents" / "openai.yaml"
@@ -113,7 +123,8 @@ def main() -> int:
 
     print(
         f"Skills OK: {len(skills)} discovered dynamically; "
-        f"description budget {sum(len(item) for item in descriptions)}/2500 characters."
+        f"description budget {sum(len(item) for item in descriptions)}/2500 characters; "
+        f"validator={'system+project' if uses_system_validator else 'project-portable'}."
     )
     return 0
 

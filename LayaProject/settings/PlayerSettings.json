@@ -14,6 +14,7 @@
   "addons": {
     "laya.ui": "ui2"
   },
+  "spineVersion": "4.2",
   "UI": {
     "alwaysIncludeDefaultSkin": false,
     "horizontalScrollBar": null,

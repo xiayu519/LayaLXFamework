@@ -107,6 +107,17 @@ try {
             # Progress lines are ignored; the final response is schema-validated.
         }
     }
+    if (-not $usage) {
+        Write-Error "Skill routing eval did not report token usage."
+    }
+    $inputTokens = if ($usage.PSObject.Properties.Name -contains "input_tokens") { [int]$usage.input_tokens } else { 0 }
+    $outputTokens = if ($usage.PSObject.Properties.Name -contains "output_tokens") { [int]$usage.output_tokens } else { 0 }
+    if ($inputTokens -gt 25000) {
+        Write-Error "Skill routing input token budget exceeded: $inputTokens > 25000."
+    }
+    if ($outputTokens -gt 2500) {
+        Write-Error "Skill routing output token budget exceeded: $outputTokens > 2500."
+    }
     $usageText = if ($usage) { " Usage: $($usage | ConvertTo-Json -Compress)." } else { "" }
     Write-Output "Skill routing OK: $($cases.Count) semantic cases, one ephemeral read-only Codex run.$usageText"
 } finally {

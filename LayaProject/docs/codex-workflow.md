@@ -15,11 +15,14 @@ npm run check:engine-source
 npm run typecheck
 npm test
 npm run check:architecture
+npm run validate:content-assets
 npm run test:headless
 npm run verify
 ```
 
 `npm run verify` 先执行环境检查和可并行静态门禁，全部通过后只执行一次完整 Headless 发布链路。`test:headless` 直接调用 LayaAir 3.4.1 CLI 构建当前项目，再由 CDP Headless Chromium + SwiftShader 验证真实 `Laya.init()`、ui2、资源引用、Luban、渲染预算与停机清理。
+
+GitHub Actions 只执行无需本机 LayaAir CLI 的可移植静态门禁；最终交付仍以开发机原地 `npm run verify` 的源码基线和真实发布包 Headless 结果为准。语义路由使用一次隔离的 `gpt-5.6-sol/high` 评测，并约束输入/输出 token 上限。
 
 ## Git
 

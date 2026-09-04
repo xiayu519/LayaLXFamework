@@ -1,0 +1,5 @@
+interface:
+  display_name: "LayaAir Texture"
+  short_description: "Validate 2D texture imports, atlases, and compression"
+policy:
+  allow_implicit_invocation: true
