@@ -9,6 +9,7 @@
 - [Laya Loader group membership persists](problems/laya-loader-group-membership-persists.md)：group 清理不会移除 URL 成员；旧 ResourcePolicy 规避方案已被原生资源边界替代。
 - [ui2 default skins in bootstrap](problems/ui2-default-skins-in-bootstrap.md)：关闭默认皮肤开关后仍需清空组件引用，防止 `internal/UI` 扩大首包。
 - [Corrupt save preservation](problems/corrupt-save-preservation.md)：损坏存档恢复默认值时必须保留原始数据并暴露恢复原因。
+- [Luban meta line endings](problems/luban-meta-line-endings.md)：生成 `.meta` 的陈旧检查必须忽略 Git 跨平台换行转换。
 
 ## Decisions
 

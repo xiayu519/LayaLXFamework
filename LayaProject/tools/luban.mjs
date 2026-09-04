@@ -138,7 +138,11 @@ function compareGeneratedDirectory(source, destination) {
         const actualPath = join(destination, local);
         if (!actual.has(local)) {
             differences.push(`missing ${relative(projectRoot, actualPath)}`);
-        } else if (!readFileSync(actualPath).equals(Buffer.isBuffer(content) ? content : Buffer.from(content))) {
+        } else if (!generatedContentEquals(
+            local,
+            readFileSync(actualPath),
+            Buffer.isBuffer(content) ? content : Buffer.from(content),
+        )) {
             differences.push(`changed ${relative(projectRoot, actualPath)}`);
         }
         actual.delete(local);
@@ -149,6 +153,17 @@ function compareGeneratedDirectory(source, destination) {
     if (differences.length > 0) {
         throw new Error(`Luban outputs are stale:\n- ${differences.join("\n- ")}\nRun 'npm run config:generate'.`);
     }
+}
+
+function generatedContentEquals(local, actual, expected) {
+    if (!local.endsWith(".meta")) {
+        return actual.equals(expected);
+    }
+    return normalizeLineEndings(actual).equals(normalizeLineEndings(expected));
+}
+
+function normalizeLineEndings(content) {
+    return Buffer.from(content.toString("utf8").replace(/\r\n?/g, "\n"), "utf8");
 }
 
 function listFiles(root) {
