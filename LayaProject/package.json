@@ -15,6 +15,7 @@
     "typecheck": "node tools/typecheck.mjs",
     "test": "vitest run",
     "check:architecture": "node tools/check-architecture.mjs",
+    "check:engine-source": "node tools/check-engine-source.mjs",
     "validate:assets": "node tools/validate-assets.mjs",
     "validate:resource-layout": "node tools/validate-resource-layout.mjs",
     "analyze:packages": "node .agents/skills/laya-minigame-packaging/scripts/analyze-package-size.mjs",

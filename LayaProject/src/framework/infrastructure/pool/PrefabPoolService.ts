@@ -1,12 +1,6 @@
-import type {
-    ResourceGroupController,
-    ResourceLease,
-} from "../../application/resource/ResourceGroup";
-
 export interface PrefabPoolDefinition<TNode extends Laya.Node = Laya.Node> {
     readonly id: string;
     readonly url: string;
-    readonly group: string;
     readonly maxIdle: number;
     readonly maxActive?: number;
     create?(prefab: Laya.Prefab): TNode;
@@ -20,17 +14,14 @@ export interface PrefabPoolSnapshot {
     readonly pending: number;
     readonly idle: number;
     readonly loading: boolean;
-    readonly resourceHeld: boolean;
 }
 
 interface PoolRecord {
     readonly definition: PrefabPoolDefinition;
-    readonly idle: Laya.Node[];
+    readonly sign: string;
     readonly active: Set<Laya.Node>;
     pendingAcquires: number;
-    prefab?: Laya.Prefab;
     loading?: Promise<Laya.Prefab>;
-    lease?: ResourceLease;
 }
 
 interface NodeOwnership {
@@ -38,17 +29,19 @@ interface NodeOwnership {
     active: boolean;
 }
 
+let serviceSequence = 0;
+
 export class PrefabPoolService {
     private readonly pools = new Map<string, PoolRecord>();
     private readonly ownership = new WeakMap<Laya.Node, NodeOwnership>();
+    private readonly pendingLoads = new Set<Promise<unknown>>();
+    private readonly serviceId = ++serviceSequence;
     private disposed = false;
-
-    constructor(private readonly resources: ResourceGroupController) {}
 
     register<TNode extends Laya.Node>(definition: PrefabPoolDefinition<TNode>): void {
         this.requireActive();
-        if (!definition.id || !definition.url || !definition.group) {
-            throw new Error("Prefab pool id, url and group are required.");
+        if (!definition.id || !definition.url) {
+            throw new Error("Prefab pool id and url are required.");
         }
         if (!Number.isInteger(definition.maxIdle) || definition.maxIdle < 0) {
             throw new Error("Prefab pool maxIdle must be a non-negative integer.");
@@ -60,10 +53,9 @@ export class PrefabPoolService {
         if (this.pools.has(definition.id)) {
             throw new Error(`Duplicate prefab pool '${definition.id}'.`);
         }
-        this.resources.assign(definition.url, definition.group);
         this.pools.set(definition.id, {
             definition: definition as PrefabPoolDefinition,
-            idle: [],
+            sign: `lx.prefab:${this.serviceId}:${definition.id}`,
             active: new Set<Laya.Node>(),
             pendingAcquires: 0,
         });
@@ -134,11 +126,11 @@ export class PrefabPoolService {
             throw error;
         }
         node.active = false;
-        if (pool.idle.length >= pool.definition.maxIdle) {
+        if (Laya.Pool.getPoolBySign(pool.sign).length >= pool.definition.maxIdle) {
             node.destroy();
             return;
         }
-        pool.idle.push(node);
+        Laya.Pool.recover(pool.sign, node);
     }
 
     drain(id: string): void {
@@ -150,7 +142,7 @@ export class PrefabPoolService {
                 + `${pool.pendingAcquires} pending node(s).`,
             );
         }
-        this.releasePoolResources(pool);
+        this.destroyIdle(pool);
     }
 
     snapshot(): readonly PrefabPoolSnapshot[] {
@@ -159,11 +151,16 @@ export class PrefabPoolService {
                 id: pool.definition.id,
                 active: pool.active.size,
                 pending: pool.pendingAcquires,
-                idle: pool.idle.length,
+                idle: Laya.Pool.getPoolBySign(pool.sign).length,
                 loading: pool.loading !== undefined,
-                resourceHeld: pool.lease !== undefined,
             }))
             .sort((left, right) => left.id.localeCompare(right.id));
+    }
+
+    async waitForPendingLoads(): Promise<void> {
+        while (this.pendingLoads.size > 0) {
+            await Promise.allSettled(Array.from(this.pendingLoads));
+        }
     }
 
     dispose(): void {
@@ -178,70 +175,50 @@ export class PrefabPoolService {
                 }
             }
             pool.active.clear();
-            this.releasePoolResources(pool);
+            this.destroyIdle(pool);
         }
         this.pools.clear();
     }
 
     private takeIdle(pool: PoolRecord): Laya.Node | undefined {
-        while (pool.idle.length > 0) {
-            const node = pool.idle.pop();
-            if (node && !node.destroyed) {
-                return node;
-            }
+        let node = Laya.Pool.getItem(pool.sign) as Laya.Node | null;
+        while (node?.destroyed) {
+            node = Laya.Pool.getItem(pool.sign) as Laya.Node | null;
         }
-        return undefined;
+        return node ?? undefined;
     }
 
-    private async loadPrefab(pool: PoolRecord): Promise<Laya.Prefab> {
-        if (pool.prefab) {
-            return pool.prefab;
-        }
+    private loadPrefab(pool: PoolRecord): Promise<Laya.Prefab> {
         if (pool.loading) {
             return pool.loading;
         }
-        pool.lease ??= this.resources.acquire(pool.definition.group);
-        const operation = Laya.loader.load(pool.definition.url, {
+        const operation = (Laya.loader.load(pool.definition.url, {
             type: Laya.Loader.HIERARCHY,
-            group: pool.definition.group,
-        }) as Promise<Laya.Prefab | null>;
-        const loading = operation.then((prefab) => {
+        }) as Promise<Laya.Prefab | null>).then((prefab) => {
             if (!prefab) {
                 throw new Error(`Prefab pool asset '${pool.definition.url}' did not load as a Prefab.`);
             }
-            if (this.disposed) {
-                this.resources.releaseGroupIfUnused(pool.definition.group);
-                throw new Error("PrefabPoolService was disposed while loading.");
-            }
-            pool.prefab = prefab;
             return prefab;
         });
-        pool.loading = loading;
-        try {
-            return await loading;
-        } catch (error) {
-            pool.lease?.release();
-            pool.lease = undefined;
-            this.resources.releaseGroupIfUnused(pool.definition.group);
-            throw error;
-        } finally {
-            if (pool.loading === loading) {
+        pool.loading = operation;
+        this.pendingLoads.add(operation);
+        operation.finally(() => {
+            this.pendingLoads.delete(operation);
+            if (pool.loading === operation) {
                 pool.loading = undefined;
             }
-        }
+        }).catch(() => {});
+        return operation;
     }
 
-    private releasePoolResources(pool: PoolRecord): void {
-        for (const node of pool.idle) {
+    private destroyIdle(pool: PoolRecord): void {
+        const idle = Laya.Pool.getPoolBySign(pool.sign) as Laya.Node[];
+        for (const node of idle) {
             if (!node.destroyed) {
                 node.destroy();
             }
         }
-        pool.idle.length = 0;
-        pool.prefab = undefined;
-        pool.lease?.release();
-        pool.lease = undefined;
-        this.resources.releaseGroupIfUnused(pool.definition.group);
+        Laya.Pool.clearBySign(pool.sign);
     }
 
     private requirePool(id: string): PoolRecord {

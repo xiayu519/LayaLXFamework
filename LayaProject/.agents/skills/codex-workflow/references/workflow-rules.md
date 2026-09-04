@@ -1,34 +1,30 @@
-# Workflow rules
+# Workflow Rules
 
-## Source hierarchy
+## Source order
 
 1. 当前用户目标与明确约束。
 2. 当前目录生效的 `AGENTS.md`。
-3. 被语义触发 Skill 的 `SKILL.md`，再按任务需要读取其 reference。
-4. 现有代码、测试、本地引擎声明与目标平台官方文档。
-5. 外部参考项目只提供可选择的模式，不覆盖本项目已验证的 LayaAir 3.4.1 本土化行为。
+3. 语义命中的最窄 Skill；只读任务所需 reference。
+4. 当前代码、测试、本地固定版本源码与官方文档。
+5. 外部参考只提供候选模式，不覆盖已验证的 LayaAir 3.4.1 本地行为。
 
-## 精度与 token 预算
+## Precision and token budget
 
-- 指令只写一次，放在最接近其作用域的位置。
-- `AGENTS.md` 目标不超过 2048 bytes；项目 Skill `description` 总量不超过 2500 字符。
-- 描述先写主要使用场景，再写最重要的相邻排除项；不依赖关键词表或显式名称调用。
-- 主 Skill 只包含执行路径；详细领域知识、模板和确定性工具分别放入 `references/`、`assets/`、`scripts/`。
-- 以代表性路由评测和真实任务验证调整描述，不能仅凭措辞自评。
-- 主线程和任务门禁使用 `gpt-5.6-sol/high`；只有已确认边界的低风险小任务才可交给低成本执行代理，复杂决策和最终验收仍由主线程负责。
+- 规则只写一次，放在最近作用域。
+- `AGENTS.md` 不超过 2048 bytes；Skill description 总计不超过 2500 字符。
+- 不使用关键词表或硬编码路由；以代表性语义 eval 验证 description。
+- 主线和质量门禁为 `gpt-5.6-sol/high`。明确、低风险小任务可用 `sol/medium` 或 `terra/medium`，公共契约与最终验收不降级。
+- 静态检查可并行；一次完整发布验证足够，不重复无相关变化的通过项。
 
-## 小团队协作
+## Collaboration
 
-- 写入前重新读取目标文件；保留其他成员和并行任务的改动。
-- 同一语义区域在检查后发生变化时停止，不自动选择一方覆盖或扩大已批准范围。
-- 业务中途出现纠正或共享变更候选时重新判断边界；局部需求先留在 game，只有稳定跨业务语义才进入 framework。
-- Git 分支/worktree 是并发隔离手段；`git init`、commit 和 push 仅在开发者明确要求时执行。
+- 写前重读目标，保留其他成员改动；检测到同一区域并发变化就停止报告。
+- 公共候选先证明跨业务复用、稳定语义、Laya 无等价能力、失败边界与验证；否则留在 game。
+- Git 操作仅在开发者明确要求时执行。
 
-## 官方依据
+## References
 
-- [OpenAI model guidance](https://developers.openai.com/api/docs/guides/prompt-guidance-gpt-5p6)：保持提示精简、避免重复，并以 eval 验证质量。
-- [Codex AGENTS.md](https://learn.chatgpt.com/docs/agent-configuration/agents-md)：按目录层级加载项目指令。
-- [Codex Subagents](https://learn.chatgpt.com/docs/agent-configuration/subagents)：项目或 Skill 可触发子代理，并为不同任务指定模型与 reasoning。
-- [Codex Build Skills](https://learn.chatgpt.com/zh-Hant/docs/build-skills)：先加载名称与描述，语义命中后再读取完整 Skill。
-
-外部工作流参考：`D:\gitframework\Tyou`。领域设计参考：`D:\layapro\esengine` 与 `D:\layapro\GameFrameX.LayaBox`。整合时只提取经当前项目需求证明有用的边界与流程，不复制框架层或引擎封装。
+- OpenAI GPT-5.6 Prompt Guidance: https://developers.openai.com/api/docs/guides/prompt-guidance-gpt-5p6
+- Codex AGENTS.md: https://developers.openai.com/codex/guides/agents-md#layer-project-instructions
+- Tyou workflow: `D:\gitframework\Tyou\Books\AI-Development-Workflow.md`
+- Domain references: `D:\layapro\esengine`, `D:\layapro\GameFrameX.LayaBox`

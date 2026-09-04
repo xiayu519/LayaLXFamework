@@ -1,0 +1,29 @@
+{
+  "version": "3.4.1",
+  "officialCommit": "f368b43098fe6bde7b961546114e71907c5f8a98",
+  "normalization": "crlf-to-lf-trim-line-end-and-final-newline",
+  "sources": [
+    { "library": "laya.core.js.map", "source": "src/layaAir/laya/utils/Timer.ts", "sha256": "2d106adb8b2f776b11bf940e3bf25d3a158ae325797a79e309fbd306fa5a6ca6" },
+    { "library": "laya.core.js.map", "source": "src/layaAir/laya/events/EventDispatcher.ts", "sha256": "b567b3fdd0f68e69ae8750581d2115facedb6ffe62beab53c52f2d24bf32bca6" },
+    { "library": "laya.core.js.map", "source": "src/layaAir/laya/tween/Tween.ts", "sha256": "b9652135f839a914971ed754c0a38347e684aa83271ee445c38c06d004ad440f" },
+    { "library": "laya.core.js.map", "source": "src/layaAir/laya/utils/Pool.ts", "sha256": "a3f68ef73c3b10e1bbd7ef31be35a73d7811057fae7a9c5deb6263c5e433f5b5" },
+    { "library": "laya.core.js.map", "source": "src/layaAir/laya/net/Loader.ts", "sha256": "5e150d3153e2b4e17c26cecf536e135f907e6ce8b3652cb3558c93c03efab4c7" },
+    { "library": "laya.core.js.map", "source": "src/layaAir/laya/resource/Resource.ts", "sha256": "c9b3f87568f7c857669f2bf9fafc3ebbb5e5edce256bfbc3b56bb503861e696f" },
+    { "library": "laya.core.js.map", "source": "src/layaAir/laya/resource/PrefabImpl.ts", "sha256": "a6b4b573d77d049e6a4aad8d7d5e31f2d616feb09ce52313b618778c28651c1a" },
+    { "library": "laya.core.js.map", "source": "src/layaAir/laya/loaders/HierarchyLoader.ts", "sha256": "e807030eb6e89d81190e14fe26a8be2fbe8cde22663d571357e49e6efc0afabe" },
+    { "library": "laya.core.js.map", "source": "src/layaAir/laya/display/Scene.ts", "sha256": "128d305d4378bed21803820fa273b51af0f4947f8db11526223d7e3617298a3b" },
+    { "library": "laya.core.js.map", "source": "src/layaAir/laya/net/HttpRequest.ts", "sha256": "789cd33fba9d6735f3080757b80c0024cc3b9173336130482f5f497d99900c59" },
+    { "library": "laya.core.js.map", "source": "src/layaAir/laya/net/LocalStorage.ts", "sha256": "119e223189062ae22dd8f0d0f3db6717504401d27a5c862a7d5560941f570c1f" },
+    { "library": "laya.core.js.map", "source": "src/layaAir/laya/media/SoundManager.ts", "sha256": "ef6a1090338bd3e35f5c8f5a4e74538847bcd57e11c1d18ceb2b8afa42f33fc6" },
+    { "library": "laya.core.js.map", "source": "src/layaAir/laya/media/SoundChannel.ts", "sha256": "2037a00f3e8767ef0939306b1723c30adb261004d0530276b55998acc8caae26" },
+    { "library": "laya.core.js.map", "source": "src/layaAir/laya/media/AudioDataCache.ts", "sha256": "756e897921cfa77c5831cd2fdc961a927bd5e0b60d2cb3c3161d82fca855ac5b" },
+    { "library": "laya.ui2.js.map", "source": "src/layaAir/laya/ui2/GWindow.ts", "sha256": "220d37d050afe934164edb0514eb5533a28cb5c9cfa017b8105f0849f399a53e" },
+    { "library": "laya.ui2.js.map", "source": "src/layaAir/laya/ui2/GRoot.ts", "sha256": "0ddfa26c6f0b8af761cba29bf82c3e600a0daadc3f8fb4fb396da6b0fed8eaa7" },
+    { "library": "laya.ui2.js.map", "source": "src/layaAir/laya/ui2/GLoader.ts", "sha256": "31897ba7cfabe7bbfbe91160e2d585eb3916717ea9622c1c24744d97fb3d7da2" },
+    { "library": "laya.ui2.js.map", "source": "src/layaAir/laya/ui2/ImageRenderer.ts", "sha256": "b64b2556c9b188f1f01111e611d07661010af1e6320d0ab854d47ba78c22fa69" },
+    { "library": "laya.ui2.js.map", "source": "src/layaAir/laya/ui2/WidgetPool.ts", "sha256": "19267cb5ea7b204657711c4fe4ae16cf77dfd9dc89c84428883e468183d69c89" },
+    { "library": "laya.spine.js.map", "source": "src/layaAir/laya/spine/Spine2DRenderNode.ts", "sha256": "a26c81f75c139566225aea4cf291ac791be76bf4c5ebc4dc80d78d2177a91b60" },
+    { "library": "laya.spine.js.map", "source": "src/layaAir/laya/spine/SpineTemplet.ts", "sha256": "3060fe361f642f98197c575849425fbbafb3e87b117c9d78da9c5bcc54edbe92" },
+    { "library": "laya.spine.js.map", "source": "src/layaAir/laya/spine/SpineTempletLoader.ts", "sha256": "075692bd45cdf63dc6f722c1df901f783a842cad29bb922a160b519c4c3106e8" }
+  ]
+}

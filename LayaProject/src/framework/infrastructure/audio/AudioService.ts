@@ -1,8 +1,3 @@
-import type {
-    ResourceGroupController,
-    ResourceLease,
-} from "../../application/resource/ResourceGroup";
-
 export interface AudioSettings {
     readonly muted: boolean;
     readonly musicVolume: number;
@@ -36,8 +31,6 @@ export interface AudioHandle {
 interface ActiveAudio {
     readonly handle: MutableAudioHandle;
     readonly channel: AudioChannel;
-    readonly lease?: ResourceLease;
-    readonly group?: string;
 }
 
 interface MutableAudioHandle extends AudioHandle {
@@ -55,10 +48,7 @@ export class AudioService {
     private bgmId: number | undefined;
     private disposed = false;
 
-    constructor(
-        private readonly resources?: ResourceGroupController,
-        private readonly backend: AudioBackend = new LayaAudioBackend(),
-    ) {}
+    constructor(private readonly backend: AudioBackend = new LayaAudioBackend()) {}
 
     applySettings(settings: AudioSettings): void {
         this.requireActive();
@@ -75,10 +65,10 @@ export class AudioService {
         };
     }
 
-    playBgm(url: string, loops = 0, group = "audio:bgm"): AudioHandle {
+    playBgm(url: string, loops = 0): AudioHandle {
         this.requireActive();
         this.stopBgm();
-        const handle = this.play("bgm", url, loops, group);
+        const handle = this.play("bgm", url, loops);
         if (!handle.stopped) {
             this.bgmId = handle.id;
         }
@@ -98,10 +88,9 @@ export class AudioService {
         url: string,
         loops = 1,
         owner?: object | string,
-        group = "audio:sfx",
     ): AudioHandle {
         this.requireActive();
-        return this.play("sfx", url, loops, group, owner);
+        return this.play("sfx", url, loops, owner);
     }
 
     stopOwner(owner: object | string): void {
@@ -146,46 +135,37 @@ export class AudioService {
         kind: "bgm" | "sfx",
         url: string,
         loops: number,
-        group: string,
         owner?: object | string,
     ): AudioHandle {
-        if (!url || !group) {
-            throw new Error("Audio url and group are required.");
+        if (!url) {
+            throw new Error("Audio url is required.");
         }
         if (!Number.isInteger(loops) || loops < 0) {
             throw new Error("Audio loops must be a non-negative integer.");
         }
-        this.resources?.assign(url, group);
-        const lease = this.resources?.acquire(group);
         const id = ++this.sequence;
         let completed = false;
         const complete = (): void => {
             completed = true;
             this.finish(id, false);
         };
-        try {
-            const channel = kind === "bgm"
-                ? this.backend.playMusic(url, loops, complete)
-                : this.backend.playSound(url, loops, complete);
-            const handle: MutableAudioHandle = {
-                id,
-                kind,
-                url,
-                owner,
-                stoppedValue: false,
-                get stopped() { return this.stoppedValue; },
-                stop: () => this.finish(id, true),
-            };
-            this.active.set(id, { handle, channel, lease, group });
-            if (completed) {
-                this.finish(id, false);
-            }
-            return handle;
-        } catch (error) {
-            lease?.release();
-            this.resources?.releaseGroupIfUnused(group);
-            throw error;
+        const channel = kind === "bgm"
+            ? this.backend.playMusic(url, loops, complete)
+            : this.backend.playSound(url, loops, complete);
+        const handle: MutableAudioHandle = {
+            id,
+            kind,
+            url,
+            owner,
+            stoppedValue: false,
+            get stopped() { return this.stoppedValue; },
+            stop: () => this.finish(id, true),
+        };
+        this.active.set(id, { handle, channel });
+        if (completed) {
+            this.finish(id, false);
         }
+        return handle;
     }
 
     private finish(id: number, stopChannel: boolean): void {
@@ -200,10 +180,6 @@ export class AudioService {
         }
         if (stopChannel && !entry.channel.isStopped) {
             entry.channel.stop();
-        }
-        entry.lease?.release();
-        if (entry.group) {
-            this.resources?.releaseGroupIfUnused(entry.group);
         }
     }
 

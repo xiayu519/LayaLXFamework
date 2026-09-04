@@ -6,18 +6,21 @@ $projectRoot = [IO.Path]::GetFullPath((Join-Path $skillRoot "..\..\.."))
 $casesPath = Join-Path $skillRoot "evals\cases.json"
 $schemaPath = Join-Path $skillRoot "evals\routing-output.schema.json"
 $cases = (Get-Content -LiteralPath $casesPath -Raw -Encoding utf8 | ConvertFrom-Json).cases
-$requests = @($cases | ForEach-Object { [ordered]@{ id = $_.id; request = $_.request } }) | ConvertTo-Json -Depth 4 -Compress
+$requests = @($cases | ForEach-Object { [ordered]@{ id = $_.id; request = $_.request } }) |
+    ConvertTo-Json -Depth 4 -Compress
 $minimumCliVersion = [Version]"0.153.2"
 $installedVersionText = (& codex --version 2>$null) -join ""
 $installedVersionMatch = [regex]::Match($installedVersionText, "(\d+\.\d+\.\d+)")
-$installedVersion = if ($installedVersionMatch.Success) { [Version]$installedVersionMatch.Groups[1].Value } else { [Version]"0.0.0" }
+$installedVersion = if ($installedVersionMatch.Success) {
+    [Version]$installedVersionMatch.Groups[1].Value
+} else {
+    [Version]"0.0.0"
+}
 $usePinnedCli = $installedVersion -lt $minimumCliVersion
 
 $prompt = @"
-这是 LXFamework 项目 Skill 的语义路由评测。不要调用工具，不要打开 SKILL.md，不要执行或分析任务本身；仅依据本次 Codex 启动时已提供的项目 Skill 名称与 description 分类。
-
-对每个 case 返回完成请求所需的最小项目 Skill 集合。只有语义确实跨越独立边界才返回多个；不要返回系统 Skill、相邻但不需要的 Skill 或解释。保留 case id。
-
+这是 LXFamework 项目 Skill 的语义路由评测。不要调用工具、打开文件、执行或分析任务本身；只根据本次启动时提供的项目 Skill 名称和 description 分类。
+为每个 case 返回完成请求所需的最小项目 Skill 集合。仅在语义确实跨独立边界时返回多个；不要返回系统 Skill、相邻但不需要的 Skill 或解释。保留 case id。
 cases: $requests
 "@
 
@@ -50,8 +53,7 @@ try {
         if ($usePinnedCli) {
             Write-Output "Installed Codex CLI $installedVersion is too old; using pinned @openai/codex@$minimumCliVersion for this eval."
             $events = @($prompt | & npx --yes --package "@openai/codex@$minimumCliVersion" codex @execArguments)
-        }
-        else {
+        } else {
             $events = @($prompt | & codex @execArguments)
         }
         if ($LASTEXITCODE -ne 0) {
@@ -60,8 +62,7 @@ try {
             }
             throw "codex exec failed with exit code $LASTEXITCODE."
         }
-    }
-    finally {
+    } finally {
         Pop-Location
     }
 
@@ -91,7 +92,6 @@ try {
             $failures += "$id`: unexpected result"
         }
     }
-
     if ($failures.Count -gt 0) {
         Write-Error ("Skill routing eval failed:`n- " + ($failures -join "`n- "))
     }
@@ -103,17 +103,16 @@ try {
             if ($event.type -eq "turn.completed") {
                 $usage = $event.usage
             }
-        }
-        catch {
-            # stderr/progress lines are intentionally ignored; the final message is schema-validated.
+        } catch {
+            # Progress lines are ignored; the final response is schema-validated.
         }
     }
     $usageText = if ($usage) { " Usage: $($usage | ConvertTo-Json -Compress)." } else { "" }
     Write-Output "Skill routing OK: $($cases.Count) semantic cases, one ephemeral read-only Codex run.$usageText"
-}
-finally {
+} finally {
     $resolvedTemp = [IO.Path]::GetFullPath($tempRoot)
-    if ($resolvedTemp.StartsWith($tempBase, [StringComparison]::OrdinalIgnoreCase) -and (Test-Path -LiteralPath $resolvedTemp)) {
+    if ($resolvedTemp.StartsWith($tempBase, [StringComparison]::OrdinalIgnoreCase) -and
+        (Test-Path -LiteralPath $resolvedTemp)) {
         Remove-Item -LiteralPath $resolvedTemp -Recurse -Force
     }
 }

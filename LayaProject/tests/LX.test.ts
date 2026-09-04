@@ -1,19 +1,23 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 import { LX } from "../src/framework/LX";
-import {
-    bindLXRuntime,
-    unbindLXRuntime,
-} from "../src/framework/bootstrap/LXRuntimeHost";
+import { bindLXRuntime, unbindLXRuntime } from "../src/framework/bootstrap/LXRuntimeHost";
 import type { ApplicationRuntime } from "../src/framework/bootstrap/createRuntime";
+
+const loader = { id: "laya-loader" };
+class FakeScene {}
+vi.stubGlobal("Laya", { loader, Scene: FakeScene });
+
+afterAll(() => vi.unstubAllGlobals());
 
 function createRuntime(): ApplicationRuntime {
     return {
         ui: { id: "ui" },
-        resources: { id: "resources" },
         content: { id: "content" },
+        config: { id: "config" },
         settings: { id: "settings" },
         audio: { id: "audio" },
-        scenes: { id: "scenes" },
+        pool: { id: "pool" },
+        performance: { id: "performance" },
         http: { id: "http" },
         platform: { id: "platform" },
         purchase: { id: "purchase" },
@@ -24,23 +28,24 @@ function createRuntime(): ApplicationRuntime {
 }
 
 describe("LX", () => {
-    it("exposes the attached runtime through LX.*", () => {
+    it("exposes framework services and exact Laya loader/scene entry points", () => {
         const runtime = createRuntime();
         bindLXRuntime(runtime);
         try {
             expect(globalThis.LX).toBe(LX);
             expect(LX.Ready).toBe(true);
-            expect(LX.App).toBe(runtime);
             expect(LX.UI).toBe(runtime.ui);
-            expect(LX.Res).toBe(runtime.resources);
+            expect(LX.Res).toBe(loader);
+            expect(LX.Scene).toBe(FakeScene);
             expect(LX.Audio).toBe(runtime.audio);
             expect(LX.Net).toBe(runtime.http);
-            expect(LX.Platform).toBe(runtime.platform);
+            expect("App" in LX).toBe(false);
+            expect("Spine" in LX).toBe(false);
         } finally {
             unbindLXRuntime(runtime);
         }
         expect(LX.Ready).toBe(false);
-        expect(() => LX.UI).toThrow("runtime is not attached");
+        expect(() => LX.Res).toThrow("runtime is not attached");
     });
 
     it("rejects a second runtime until the first is detached", () => {

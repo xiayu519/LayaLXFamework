@@ -1,12 +1,12 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { BindingToken } from "../src/framework/application/ui/AsyncBindingGuard";
 import type { BaseGameWindow as BaseGameWindowType } from "../src/framework/presentation/ui/BaseGameWindow";
-import type { ResourceGroupController } from "../src/framework/application/resource/ResourceGroup";
 import type { UIRoute, UIRouter as UIRouterType } from "../src/framework/presentation/ui/UIRouter";
 import { UILayer } from "../src/framework/presentation/ui/UILayer";
 
 class FakeGWidget {
     destroyed = false;
+    zOrder = 0;
 
     destroy(): void {
         this.destroyed = true;
@@ -16,12 +16,15 @@ class FakeGWidget {
 class FakeGWindow extends FakeGWidget {
     contentPane!: FakeGWidget;
     isShowing = false;
+    modal = false;
+    parent?: { getChildIndex(child: unknown): number };
 
     show(): void {
         this.isShowing = true;
     }
 
     hide(): void {
+        if (!this.isShowing) return;
         this.isShowing = false;
         (this as unknown as { onHide(): void }).onHide();
     }
@@ -29,15 +32,19 @@ class FakeGWindow extends FakeGWidget {
     protected onHide(): void {}
 
     override destroy(): void {
+        if (this.destroyed) return;
+        this.hide();
         this.contentPane?.destroy();
         super.destroy();
     }
 }
 
 const loaderLoad = vi.fn();
+const root = { modalLayer: new FakeGWidget() };
 vi.stubGlobal("Laya", {
     GWidget: FakeGWidget,
     GWindow: FakeGWindow,
+    GRoot: { inst: root },
     Loader: { HIERARCHY: "HIERARCHY" },
     loader: { load: loaderLoad },
 });
@@ -48,11 +55,10 @@ const { BaseGameWindow } = await import("../src/framework/presentation/ui/BaseGa
 
 beforeEach(() => {
     loaderLoad.mockReset();
+    root.modalLayer.zOrder = 0;
 });
 
-afterAll(() => {
-    vi.unstubAllGlobals();
-});
+afterAll(() => vi.unstubAllGlobals());
 
 class TestWindow extends BaseGameWindow<string> {
     constructor(
@@ -67,6 +73,18 @@ class TestWindow extends BaseGameWindow<string> {
     }
 }
 
+class RetryDestroyWindow extends TestWindow {
+    destroyAttempts = 0;
+
+    override destroy(): void {
+        this.destroyAttempts += 1;
+        if (this.destroyAttempts === 1) {
+            throw new Error("destroy failed");
+        }
+        super.destroy();
+    }
+}
+
 function route(
     id: string,
     create: (contentPane: Laya.GWidget) => TestWindow,
@@ -76,7 +94,6 @@ function route(
     return {
         id,
         url: `ui/${id}.lh`,
-        group: `ui:${id}`,
         multiplicity,
         retention,
         create,
@@ -87,32 +104,9 @@ function prefab(content: FakeGWidget = new FakeGWidget()): Laya.Prefab {
     return { create: () => content } as unknown as Laya.Prefab;
 }
 
-function resourceGroups() {
-    const leases = new Map<string, number>();
-    const controller: ResourceGroupController = {
-        assign: vi.fn(),
-        acquire(group) {
-            leases.set(group, (leases.get(group) ?? 0) + 1);
-            let released = false;
-            return {
-                group,
-                get released() { return released; },
-                release() {
-                    if (released) return;
-                    released = true;
-                    leases.set(group, (leases.get(group) ?? 1) - 1);
-                },
-            };
-        },
-        releaseGroupIfUnused: vi.fn((group) => (leases.get(group) ?? 0) === 0),
-    };
-    return { controller, leases };
-}
-
 describe("UIRouter", () => {
     it("rejects the unrecoverable multiple + hide policy", () => {
-        const router = new UIRouter(resourceGroups().controller);
-
+        const router = new UIRouter();
         expect(() => router.register(route(
             "invalid",
             (content) => new TestWindow(content),
@@ -124,10 +118,8 @@ describe("UIRouter", () => {
     it("destroys prefab content when the route factory throws", async () => {
         const content = new FakeGWidget();
         loaderLoad.mockResolvedValue(prefab(content));
-        const router = new UIRouter(resourceGroups().controller);
-        router.register(route("factory-error", () => {
-            throw new Error("factory failed");
-        }));
+        const router = new UIRouter();
+        router.register(route("factory-error", () => { throw new Error("factory failed"); }));
 
         await expect(router.show("factory-error", "args")).rejects.toThrow("factory failed");
         expect(content.destroyed).toBe(true);
@@ -137,12 +129,10 @@ describe("UIRouter", () => {
         loaderLoad.mockImplementation(() => Promise.resolve(prefab()));
         const windows: TestWindow[] = [];
         let fail = true;
-        const router = new UIRouter(resourceGroups().controller);
+        const router = new UIRouter();
         router.register(route("bind-error", (content) => {
             const window = new TestWindow(content, () => {
-                if (fail) {
-                    throw new Error("bind failed");
-                }
+                if (fail) throw new Error("bind failed");
             });
             windows.push(window);
             return window;
@@ -150,16 +140,13 @@ describe("UIRouter", () => {
 
         await expect(router.show("bind-error", "first")).rejects.toThrow("bind failed");
         expect(windows[0].destroyed).toBe(true);
-
         fail = false;
-        const second = await router.show("bind-error", "second");
-        expect(second).toBe(windows[1]);
-        expect(windows).toHaveLength(2);
+        expect(await router.show("bind-error", "second")).toBe(windows[1]);
     });
 
     it("rejects a close target owned by another route", async () => {
         loaderLoad.mockImplementation(() => Promise.resolve(prefab()));
-        const router = new UIRouter(resourceGroups().controller);
+        const router = new UIRouter();
         router.register(route("first", (content) => new TestWindow(content), "multiple"));
         router.register(route("second", (content) => new TestWindow(content), "multiple"));
         const first = await router.show("first", "first");
@@ -171,11 +158,11 @@ describe("UIRouter", () => {
         expect(second.destroyed).toBe(false);
     });
 
-    it("waits for an in-flight request to reject and destroy its late prefab", async () => {
+    it("waits for an in-flight request and destroys its superseded prefab", async () => {
         let finishLoad!: (value: Laya.Prefab) => void;
         loaderLoad.mockReturnValue(new Promise<Laya.Prefab>((resolve) => { finishLoad = resolve; }));
         const content = new FakeGWidget();
-        const router = new UIRouter(resourceGroups().controller);
+        const router = new UIRouter();
         router.register(route("late", (pane) => new TestWindow(pane)));
 
         const show = router.show("late", "args");
@@ -185,53 +172,59 @@ describe("UIRouter", () => {
         await expect(show).rejects.toThrow("superseded");
         await router.waitForPendingLoads();
         expect(content.destroyed).toBe(true);
-        expect(() => router.register(route("after-dispose", (pane) => new TestWindow(pane))))
-            .toThrow("disposed");
     });
 
-    it("keeps GRoot as the window stack source and tracks hidden retained windows", async () => {
+    it("uses GRoot ordering and tracks hidden retained windows", async () => {
         loaderLoad.mockResolvedValue(prefab());
-        const resources = resourceGroups();
-        const router = new UIRouter(resources.controller);
-        const reusable = route("reusable", (content) => new TestWindow(content), "singleton", "hide");
-        router.register({ ...reusable, layer: UILayer.Popup });
+        const router = new UIRouter();
+        router.register({
+            ...route("reusable", (content) => new TestWindow(content), "singleton", "hide"),
+            layer: UILayer.Popup,
+        });
 
         const window = await router.show("reusable", "first");
         expect(router.getTop()?.window).toBe(window);
-        expect(router.snapshot().managed[0]).toMatchObject({
-            routeId: "reusable",
-            layer: UILayer.Popup,
-            state: "visible",
-        });
-
         window.hide();
         expect(router.listVisible()).toEqual([]);
         expect(router.listManaged()[0].state).toBe("hidden-retained");
-        expect(resources.leases.get("ui:reusable")).toBe(1);
 
         expect(await router.show("reusable", "second")).toBe(window);
         expect(loaderLoad).toHaveBeenCalledOnce();
     });
 
-    it("turns a native hide into destruction for destroy-retained routes", async () => {
+    it("turns native hide into one non-reentrant destruction", async () => {
         loaderLoad.mockResolvedValue(prefab());
-        const resources = resourceGroups();
-        const router = new UIRouter(resources.controller);
+        const router = new UIRouter();
         router.register(route("transient", (content) => new TestWindow(content)));
         const window = await router.show("transient", "args");
+        const destroy = vi.spyOn(window, "destroy");
 
         window.hide();
 
         expect(window.destroyed).toBe(true);
+        expect(destroy).toHaveBeenCalledOnce();
         expect(router.listManaged()).toEqual([]);
-        expect(resources.leases.get("ui:transient")).toBe(0);
-        expect(resources.controller.releaseGroupIfUnused).toHaveBeenCalledWith("ui:transient");
+    });
+
+    it("keeps the ui2 modal layer aligned with the highest modal route", async () => {
+        loaderLoad.mockResolvedValue(prefab());
+        const router = new UIRouter();
+        router.register({
+            ...route("popup", (content) => new TestWindow(content)),
+            layer: UILayer.Popup,
+            modal: true,
+        });
+
+        const window = await router.show("popup", "args");
+        expect(root.modalLayer.zOrder).toBe(window.zOrder);
+        router.close("popup");
+        expect(root.modalLayer.zOrder).toBe(0);
     });
 
     it("reports in-flight route loads", async () => {
         let finishLoad!: (value: Laya.Prefab) => void;
         loaderLoad.mockReturnValue(new Promise<Laya.Prefab>((resolve) => { finishLoad = resolve; }));
-        const router = new UIRouter(resourceGroups().controller);
+        const router = new UIRouter();
         router.register(route("loading", (content) => new TestWindow(content)));
 
         const show = router.show("loading", "args");
@@ -239,5 +232,27 @@ describe("UIRouter", () => {
         finishLoad(prefab());
         await show;
         expect(router.snapshot().loading).toEqual({});
+    });
+
+    it("continues disposing other windows and can retry a failed destroy", async () => {
+        loaderLoad.mockImplementation(() => Promise.resolve(prefab()));
+        const router = new UIRouter();
+        let first = true;
+        router.register(route("cleanup", (content) => {
+            if (first) {
+                first = false;
+                return new RetryDestroyWindow(content);
+            }
+            return new TestWindow(content);
+        }, "multiple"));
+        const failed = await router.show("cleanup", "first") as RetryDestroyWindow;
+        const normal = await router.show("cleanup", "second");
+
+        expect(() => router.dispose()).toThrow("failed to clean up");
+        expect(normal.destroyed).toBe(true);
+        expect(failed.destroyed).toBe(false);
+        expect(() => router.dispose()).not.toThrow();
+        expect(failed.destroyed).toBe(true);
+        expect(failed.destroyAttempts).toBe(2);
     });
 });

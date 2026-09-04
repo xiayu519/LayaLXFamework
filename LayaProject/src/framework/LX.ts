@@ -6,16 +6,13 @@ class LXFacade {
         return getLXRuntime()?.bootstrap.state === "running";
     }
 
-    get App(): ApplicationRuntime {
-        return requireLXRuntime();
-    }
-
     get UI(): ApplicationRuntime["ui"] {
         return requireLXRuntime().ui;
     }
 
-    get Res(): ApplicationRuntime["resources"] {
-        return requireLXRuntime().resources;
+    get Res(): typeof Laya.loader {
+        requireLXRuntime();
+        return Laya.loader;
     }
 
     get Content(): ApplicationRuntime["content"] {
@@ -38,16 +35,13 @@ class LXFacade {
         return requireLXRuntime().pool;
     }
 
-    get Spine(): ApplicationRuntime["spine"] {
-        return requireLXRuntime().spine;
-    }
-
     get Performance(): ApplicationRuntime["performance"] {
         return requireLXRuntime().performance;
     }
 
-    get Scene(): ApplicationRuntime["scenes"] {
-        return requireLXRuntime().scenes;
+    get Scene(): typeof Laya.Scene {
+        requireLXRuntime();
+        return Laya.Scene;
     }
 
     get Net(): ApplicationRuntime["http"] {

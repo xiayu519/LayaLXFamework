@@ -1,10 +1,8 @@
 import type { AppService } from "../../../framework/application/lifecycle/AppService";
 import type { ConfigRegistry } from "../../../framework/application/config/ConfigRegistry";
-import type { ResourcePolicy } from "../../../framework/infrastructure/resource/ResourcePolicy";
 import ByteBuf from "../../generated/luban/ByteBuf";
 import { Tables } from "../../generated/config/schema";
 
-const CONFIG_GROUP = "config:game";
 const CONFIG_ROOT = "bootstrap/config/game";
 
 export class GameConfigService implements AppService {
@@ -12,10 +10,7 @@ export class GameConfigService implements AppService {
     private tables: Tables | undefined;
     private startTask: Promise<void> | undefined;
 
-    constructor(
-        private readonly registry: ConfigRegistry,
-        private readonly resources: ResourcePolicy,
-    ) {}
+    constructor(private readonly registry: ConfigRegistry) {}
 
     start(): Promise<void> {
         if (this.tables) {
@@ -34,12 +29,10 @@ export class GameConfigService implements AppService {
 
     private async load(): Promise<void> {
         const names = Tables.getTableNames();
-        const lease = this.resources.acquire(CONFIG_GROUP);
         const buffers = new Map<string, Uint8Array>();
         try {
             await Promise.all(names.map(async (name) => {
                 const url = `${CONFIG_ROOT}/${name}.bin`;
-                this.resources.assign(url, CONFIG_GROUP);
                 const loaded = await Laya.loader.load(url, Laya.Loader.BUFFER) as unknown;
                 buffers.set(name, toBytes(loaded, name));
             }));
@@ -52,8 +45,6 @@ export class GameConfigService implements AppService {
             });
             this.tables = this.registry.install(tables);
         } finally {
-            lease.release();
-            this.resources.releaseGroupIfUnused(CONFIG_GROUP);
             this.startTask = undefined;
         }
     }

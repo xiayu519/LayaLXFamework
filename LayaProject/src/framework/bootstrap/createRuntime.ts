@@ -1,13 +1,9 @@
 import { ConfigRegistry } from "../application/config/ConfigRegistry";
-import { SceneRouter, type SceneRoute } from "../application/scene/SceneRouter";
 import { AudioService, type AudioSettings } from "../infrastructure/audio/AudioService";
 import { ContentCatalog, type ContentEntry } from "../infrastructure/content/ContentCatalog";
 import { LayaHttpTransport, type HttpTransport } from "../infrastructure/network/HttpTransport";
 import { RenderPerformance } from "../infrastructure/performance/RenderPerformance";
 import { PrefabPoolService } from "../infrastructure/pool/PrefabPoolService";
-import { ResourcePolicy } from "../infrastructure/resource/ResourcePolicy";
-import { LayaSceneDriver } from "../infrastructure/scene/LayaSceneDriver";
-import { SpineService } from "../infrastructure/spine/SpineService";
 import {
     LayaLocalStorageDriver,
     SaveStore,
@@ -28,14 +24,11 @@ export interface ClientSettings extends AudioSettings {
 export interface RuntimeContext {
     readonly config: ConfigRegistry;
     readonly content: ContentCatalog;
-    readonly resources: ResourcePolicy;
     readonly settings: SaveStore<ClientSettings>;
     readonly audio: AudioService;
     readonly pool: PrefabPoolService;
-    readonly spine: SpineService;
     readonly performance: RenderPerformance;
     readonly ui: UIRouter;
-    readonly scenes: SceneRouter<Laya.Scene>;
     readonly platform: PlatformService;
     readonly purchase: PurchasePlatform;
     readonly http: HttpTransport;
@@ -55,7 +48,6 @@ export interface ApplicationAdapters {
 
 export interface ApplicationDefinition {
     readonly content?: readonly ContentEntry[];
-    readonly scenes?: readonly SceneRoute[];
     configureUI?(ui: UIRouter, content: ContentCatalog): void;
     createServices?(context: RuntimeContext): readonly AppService[];
 }
@@ -87,31 +79,25 @@ export function createRuntime(
 ): ApplicationRuntime {
     const config = new ConfigRegistry();
     const content = new ContentCatalog(definition.content ?? []);
-    const resources = new ResourcePolicy();
-    const audio = new AudioService(resources);
-    const pool = new PrefabPoolService(resources);
-    const spine = new SpineService(resources);
+    const audio = new AudioService();
+    const pool = new PrefabPoolService();
     const performance = new RenderPerformance();
     const settings = new SaveStore(new LayaLocalStorageDriver(), SETTINGS_SCHEMA);
     const platform = adapters.platform ?? new WebPlatformService();
     const purchase = adapters.purchase ?? new UnsupportedPurchasePlatform();
     const http = adapters.http ?? new LayaHttpTransport();
-    const scenes = new SceneRouter<Laya.Scene>(definition.scenes ?? [], new LayaSceneDriver());
-    const ui = new UIRouter(resources);
+    const ui = new UIRouter();
 
     definition.configureUI?.(ui, content);
 
     const context: RuntimeContext = {
         config,
         content,
-        resources,
         settings,
         audio,
         pool,
-        spine,
         performance,
         ui,
-        scenes,
         platform,
         purchase,
         http,
@@ -124,15 +110,21 @@ export function createRuntime(
         stop(): void {},
     };
     const cleanupService: AppService = {
-        name: "runtime-resources",
+        name: "runtime-cleanup",
         start(): void {},
         async stop(): Promise<void> {
-            ui.dispose();
-            await ui.waitForPendingLoads();
-            pool.dispose();
-            spine.dispose();
-            audio.dispose();
-            resources.releaseAll();
+            const errors: unknown[] = [];
+            await collectCleanup(errors, () => ui.dispose());
+            await collectCleanup(errors, () => ui.waitForPendingLoads());
+            await collectCleanup(errors, () => ui.dispose());
+            await collectCleanup(errors, () => pool.dispose());
+            await collectCleanup(errors, () => pool.waitForPendingLoads());
+            await collectCleanup(errors, () => pool.dispose());
+            await collectCleanup(errors, () => audio.dispose());
+            await collectCleanup(errors, () => Laya.Scene.gc());
+            if (errors.length > 0) {
+                throw new RuntimeCleanupError(errors);
+            }
         },
     };
     const gameServices = definition.createServices?.(context) ?? [];
@@ -164,4 +156,22 @@ export function createRuntime(
 
 function isVolume(value: unknown): value is number {
     return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1;
+}
+
+class RuntimeCleanupError extends Error {
+    constructor(readonly errors: readonly unknown[]) {
+        super(`${errors.length} runtime cleanup operation(s) failed.`);
+        this.name = "RuntimeCleanupError";
+    }
+}
+
+async function collectCleanup(
+    errors: unknown[],
+    action: () => unknown | Promise<unknown>,
+): Promise<void> {
+    try {
+        await action();
+    } catch (error) {
+        errors.push(error);
+    }
 }

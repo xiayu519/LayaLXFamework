@@ -2,7 +2,6 @@ export interface ContentEntry {
     readonly id: string;
     readonly url: string;
     readonly kind: "ui" | "scene" | "prefab" | "spine" | "audio" | "data" | "other";
-    readonly group?: string;
 }
 
 export class ContentCatalog {

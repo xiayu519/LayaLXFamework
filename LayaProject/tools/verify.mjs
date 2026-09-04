@@ -5,6 +5,7 @@ const staticChecks = [
     "typecheck",
     "test",
     "check:architecture",
+    "check:engine-source",
     "validate:assets",
     "validate:resource-layout",
     "check:skills",

@@ -1,11 +1,12 @@
 ---
 name: laya-spine
-description: 接入或诊断 LayaAir 3.4.1 Spine 动画、Spine2DRenderNode、播放句柄与资源释放时使用；普通 Sprite 动画和 UI 路由不触发。
+description: 接入或诊断 LayaAir 3.4.1 Spine2DRenderNode、.lh Spine Prefab、source、播放状态、池化与资源释放时使用；普通 Sprite 动画和 UI 路由不触发。
 ---
 
 # Laya Spine
 
-1. 以项目 `engine/types/LayaAir.d.ts` 和 `SpineService` 为准，确认发布设置启用 `laya.spine`。
-2. 使用 `Sprite + Spine2DRenderNode`，禁止旧 `SpineSkeleton`；由句柄同时拥有 Sprite、渲染节点和资源 lease。
-3. 明确动画名、循环、轨道、皮肤与快渲染/缓存策略；销毁顺序为停止播放、销毁显示对象、释放 lease、无引用后清 group。
-4. 补创建/销毁/加载失败测试；发布包必须含 `laya.spine.js`。真实骨骼效果或设备性能需要代表性 Spine 资产专项验证。
+1. 先确认 `laya.spine` 模块与 `laya.spine.js` 已启用；运行时类型使用 `Spine2DRenderNode`，禁止旧 `SpineSkeleton`。
+2. 在 `.lh` 的 Sprite 上挂 `Spine2DRenderNode` 并设置 `source`。引擎在 init/reset/disable/destroy 中维护 `SpineTemplet` 引用，业务不得手动改私有引用计数。
+3. 播放控制直接使用组件公开 API；高频实例复用整个 `.lh` Prefab，并交给 `PrefabPoolService` 的 acquire/release reset。
+4. 结束时先停止播放并销毁/归还 owner；全部相关节点和加载稳定后，由功能边界调用 `Laya.Scene.gc()`。
+5. 修改资产运行 `npm run validate:assets`。没有代表性 Spine 资产时只报告模块/发布链路验证，不宣称动画效果、内存或 DrawCall 已通过。

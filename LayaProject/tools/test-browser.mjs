@@ -21,6 +21,10 @@ if (!profileRoot.startsWith(`${temporaryRoot}${sep}`)) {
 const browserPath = findBrowser();
 let browser;
 let socket;
+const probePng = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+    "base64",
+);
 
 const server = createServer((request, response) => {
     let pathname;
@@ -32,6 +36,18 @@ const server = createServer((request, response) => {
     }
     if (pathname === "/favicon.ico") {
         response.writeHead(204).end();
+        return;
+    }
+    if (pathname === "/__lx_probe_slow.png") {
+        setTimeout(() => {
+            response.writeHead(200, { "Content-Type": "image/png", "Cache-Control": "no-store" });
+            response.end(probePng);
+        }, 200);
+        return;
+    }
+    if (pathname === "/__lx_probe_fast.png" || pathname === "/__lx_probe_shared.png") {
+        response.writeHead(200, { "Content-Type": "image/png", "Cache-Control": "no-store" });
+        response.end(probePng);
         return;
     }
     const relativePath = pathname === "/" ? "index.html" : pathname.slice(1);
@@ -145,21 +161,29 @@ try {
     if (consoleErrors.length > 0 || runtimeErrors.length > 0 || failedRequests.length > 0) {
         throw new Error(`browser errors: ${consoleErrors.concat(runtimeErrors, failedRequests).join(" | ")}`);
     }
+    await runEngineLifecycleProbes(cdp);
     const shutdown = await cdp.send("Runtime.evaluate", {
         expression: `(async () => {
-            const runtime = globalThis.LX.App;
-            await runtime.stop();
-            const resources = runtime.resources.snapshot();
-            const ui = runtime.ui.snapshot();
+            const services = {
+                config: globalThis.LX.Config,
+                ui: globalThis.LX.UI,
+                pool: globalThis.LX.Pool,
+                audio: globalThis.LX.Audio,
+            };
+            const startup = Array.from(globalThis.Laya.Scene.unDestroyedScenes)
+                .find((scene) => Boolean(scene.getComponent?.(globalThis.Laya.Script)));
+            if (!startup) throw new Error("Startup scene was not found.");
+            startup.destroy();
+            const deadline = performance.now() + 5000;
+            while (globalThis.LX.Ready && performance.now() < deadline) {
+                await new Promise((resolve) => setTimeout(resolve, 20));
+            }
             return {
                 ready: globalThis.LX.Ready,
-                configReady: runtime.config.ready,
-                managedUI: ui.managed.length,
-                activeLeases: Object.keys(resources.activeLeases).length,
-                trackedGroups: Object.keys(resources.trackedGroups).length,
-                pools: runtime.pool.snapshot().length,
-                spines: runtime.spine.snapshot().active,
-                sfx: runtime.audio.snapshot().activeSfx,
+                configReady: services.config.ready,
+                managedUI: services.ui.snapshot().managed.length,
+                pools: services.pool.snapshot().length,
+                sfx: services.audio.snapshot().activeSfx,
             };
         })()`,
         awaitPromise: true,
@@ -170,14 +194,18 @@ try {
         || shutdownState?.ready !== false
         || shutdownState?.configReady !== false
         || shutdownState?.managedUI !== 0
-        || shutdownState?.activeLeases !== 0
-        || shutdownState?.trackedGroups !== 0
         || shutdownState?.pools !== 0
-        || shutdownState?.spines !== 0
         || shutdownState?.sfx !== 0) {
         throw new Error(`runtime shutdown did not release every owner: ${JSON.stringify(shutdownState)}`);
     }
-    console.log(`Browser OK: ${runtimeState.title}, LayaAir ${runtimeState.engineVersion}, pure 2D, config=${runtimeState.configValue}, UI/Spine/performance ready, status=${runtimeState.statusText}, clean shutdown, no errors.`);
+    if (consoleErrors.length > 0 || runtimeErrors.length > 0 || failedRequests.length > 0) {
+        throw new Error(`browser errors: ${consoleErrors.concat(runtimeErrors, failedRequests).join(" | ")}`);
+    }
+    console.log(
+        `Browser OK: ${runtimeState.title}, LayaAir ${runtimeState.engineVersion}, pure 2D, `
+        + `config=${runtimeState.configValue}, UI/Spine module/performance ready, status=${runtimeState.statusText}, `
+        + `Timer/GLoader/shared-texture/PrefabPool/UI-modal probes passed, clean scene shutdown, no errors.`,
+    );
 } finally {
     socket?.close();
     if (browser && !browser.killed) {
@@ -185,6 +213,143 @@ try {
     }
     await close(server);
     await fs.rm(profileRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }).catch(() => {});
+}
+
+async function runEngineLifecycleProbes(cdp) {
+    const evaluation = await cdp.send("Runtime.evaluate", {
+        expression: `(async () => {
+            const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+            const timerOwner = {};
+            let timerCalls = 0;
+            globalThis.Laya.timer.once(20, timerOwner, () => { timerCalls += 1; });
+            globalThis.Laya.timer.clearAll(timerOwner);
+            await delay(60);
+            const timerCleared = timerCalls === 0;
+
+            const loader = new globalThis.Laya.GLoader();
+            loader.size(8, 8);
+            globalThis.Laya.GRoot.inst.addChild(loader);
+            loader.src = "__lx_probe_slow.png";
+            loader.src = "__lx_probe_fast.png";
+            await delay(350);
+            const fastTexture = globalThis.Laya.Loader.getRes(
+                "__lx_probe_fast.png",
+                globalThis.Laya.Loader.IMAGE,
+            );
+            const loaderLatest = loader.src === "__lx_probe_fast.png"
+                && loader.texture === fastTexture
+                && !loader.texture?.destroyed;
+            loader.src = "";
+            const loaderCleared = loader.texture == null;
+            loader.destroy();
+
+            const texture = await globalThis.Laya.loader.load(
+                "__lx_probe_shared.png",
+                globalThis.Laya.Loader.IMAGE,
+            );
+            const firstSprite = new globalThis.Laya.Sprite();
+            const secondSprite = new globalThis.Laya.Sprite();
+            firstSprite.graphics.drawTexture(texture, 0, 0, 1, 1);
+            secondSprite.graphics.drawTexture(texture, 0, 0, 1, 1);
+            globalThis.Laya.stage.addChild(firstSprite);
+            globalThis.Laya.stage.addChild(secondSprite);
+            const sharedReferenceCount = texture.referenceCount;
+            firstSprite.destroy();
+            globalThis.Laya.Scene.gc();
+            await delay(80);
+            const sharedSurvivedFirstOwner = !texture.destroyed && texture.referenceCount > 0;
+            secondSprite.destroy();
+            await delay(80);
+            globalThis.Laya.Scene.gc();
+            await delay(150);
+
+            const poolId = "__lx_headless_prefab";
+            globalThis.LX.Pool.register({
+                id: poolId,
+                url: "bootstrap/ui/FrameworkStatus.lh",
+                maxIdle: 1,
+                maxActive: 1,
+            });
+            const firstNode = await globalThis.LX.Pool.acquire(poolId);
+            globalThis.LX.Pool.release(poolId, firstNode);
+            const secondNode = await globalThis.LX.Pool.acquire(poolId);
+            const poolReused = firstNode === secondNode;
+            globalThis.LX.Pool.release(poolId, secondNode);
+            globalThis.LX.Pool.drain(poolId);
+            const poolDrained = globalThis.LX.Pool.snapshot()
+                .find((entry) => entry.id === poolId)?.idle === 0;
+
+            const statusInfo = globalThis.LX.UI.snapshot().managed
+                .find((entry) => entry.routeId === "lx.status");
+            if (!statusInfo) throw new Error("Status window was not available for the UI probe.");
+            const ProbeWindow = class extends statusInfo.window.constructor {};
+            const routeId = "__lx_headless_modal";
+            globalThis.LX.UI.register({
+                id: routeId,
+                url: "bootstrap/ui/FrameworkStatus.lh",
+                layer: 3,
+                modal: true,
+                multiplicity: "multiple",
+                retention: "destroy",
+                create: (pane) => new ProbeWindow(pane),
+            });
+            const popup = await globalThis.LX.UI.show(routeId, {
+                status: "PROBE",
+                detail: "Headless lifecycle probe",
+            });
+            await delay(40);
+            const root = globalThis.Laya.GRoot.inst;
+            const modalLayer = root.modalLayer;
+            const popupIndex = root.getChildIndex(popup);
+            const modalIndex = root.getChildIndex(modalLayer);
+            const statusIndex = root.getChildIndex(statusInfo.window);
+            const modalOrdered = popupIndex > modalIndex
+                && modalIndex > statusIndex
+                && modalLayer.zOrder === popup.zOrder
+                && globalThis.LX.UI.getTop()?.window === popup;
+            globalThis.LX.UI.close(routeId, popup);
+            await delay(40);
+            const uiDestroyed = popup.destroyed
+                && !globalThis.LX.UI.snapshot().managed.some((entry) => entry.routeId === routeId);
+
+            await delay(80);
+            globalThis.Laya.Scene.gc();
+            await delay(200);
+            const sharedReleasedAfterLastOwner = texture.referenceCount === 0
+                && texture.bitmap?.destroyed === true;
+
+            return {
+                timerCleared,
+                loaderLatest,
+                loaderCleared,
+                sharedReferenceCount,
+                sharedSurvivedFirstOwner,
+                sharedReleasedAfterLastOwner,
+                poolReused,
+                poolDrained,
+                modalOrdered,
+                uiDestroyed,
+            };
+        })()`,
+        awaitPromise: true,
+        returnByValue: true,
+    });
+    const result = evaluation.result?.value;
+    if (evaluation.exceptionDetails
+        || result?.timerCleared !== true
+        || result?.loaderLatest !== true
+        || result?.loaderCleared !== true
+        || result?.sharedReferenceCount < 2
+        || result?.sharedSurvivedFirstOwner !== true
+        || result?.sharedReleasedAfterLastOwner !== true
+        || result?.poolReused !== true
+        || result?.poolDrained !== true
+        || result?.modalOrdered !== true
+        || result?.uiDestroyed !== true) {
+        throw new Error(`engine lifecycle probes failed: ${JSON.stringify(result)}`);
+    }
+    return result;
 }
 
 function findBrowser() {
@@ -345,22 +510,20 @@ async function waitForRuntime(cdp, timeoutMs) {
                         triangles: 1000,
                     });
                     const ui = globalThis.LX.UI.snapshot();
-                    const resources = globalThis.LX.Res.snapshot();
                     ownershipReady = ui.loading["lx.status"] === undefined
                         && ui.managed.length === 1
                         && ui.visible.length === 1
                         && ui.top?.routeId === "lx.status"
                         && ui.bottom?.routeId === "lx.status"
-                        && resources.activeLeases["ui:bootstrap"] === 1
-                        && resources.activeLeases["config:game"] === undefined
-                        && resources.trackedGroups["config:game"] === undefined;
+                        && globalThis.LX.Res === globalThis.Laya.loader
+                        && globalThis.LX.Scene === globalThis.Laya.Scene;
                 }
                 return {
                     ready,
                     uiReady: ready && Boolean(globalThis.LX.UI),
                     configReady,
                     configValue,
-                    spineReady: ready && Boolean(globalThis.LX.Spine),
+                    spineReady: ready && typeof globalThis.Laya.Spine2DRenderNode === "function",
                     performanceReady: render !== null
                         && Number.isFinite(render.drawCalls2D)
                         && Number.isFinite(render.drawCalls)

@@ -1,7 +1,3 @@
-import type {
-    ResourceGroupController,
-    ResourceLease,
-} from "../../application/resource/ResourceGroup";
 import {
     BaseGameWindow,
     type WindowLifecycleObserver,
@@ -15,7 +11,6 @@ export type UIWindowState = "visible" | "hidden-retained";
 export interface UIRoute<TArgs> {
     readonly id: string;
     readonly url: string;
-    readonly group: string;
     readonly layer?: UILayer;
     readonly modal?: boolean;
     readonly multiplicity: UIWindowMultiplicity;
@@ -39,10 +34,16 @@ export interface UIRouterSnapshot {
     readonly bottom?: UIWindowInfo;
 }
 
+export class UIRouterCleanupError extends Error {
+    constructor(readonly errors: readonly unknown[]) {
+        super(`${errors.length} UI window(s) failed to clean up.`);
+        this.name = "UIRouterCleanupError";
+    }
+}
+
 interface WindowRecord {
     readonly route: UnknownRoute;
     readonly window: UnknownWindow;
-    readonly lease: ResourceLease;
 }
 
 type UnknownRoute = UIRoute<unknown>;
@@ -60,12 +61,10 @@ export class UIRouter implements WindowLifecycleObserver {
     private readonly loadingCounts = new Map<string, number>();
     private disposed = false;
 
-    constructor(private readonly resources: ResourceGroupController) {}
-
     register<TArgs>(route: UIRoute<TArgs>): void {
         this.requireActive();
-        if (!route.id || !route.url || !route.group) {
-            throw new Error("UI route id, url and group are required.");
+        if (!route.id || !route.url) {
+            throw new Error("UI route id and url are required.");
         }
         if (route.multiplicity === "multiple" && route.retention === "hide") {
             throw new Error(`UI route '${route.id}' cannot combine multiplicity 'multiple' with retention 'hide'.`);
@@ -75,7 +74,6 @@ export class UIRouter implements WindowLifecycleObserver {
         }
         this.routes.set(route.id, route as unknown as UnknownRoute);
         this.lifecycleVersions.set(route.id, 0);
-        this.resources.assign(route.url, route.group);
     }
 
     show<TArgs>(routeId: string, args: TArgs): Promise<BaseGameWindow<TArgs>> {
@@ -164,19 +162,27 @@ export class UIRouter implements WindowLifecycleObserver {
     }
 
     dispose(): void {
-        if (this.disposed) {
-            return;
+        if (!this.disposed) {
+            this.disposed = true;
+            for (const routeId of this.routes.keys()) {
+                this.invalidateRoute(routeId);
+            }
         }
-        this.disposed = true;
-        for (const routeId of this.routes.keys()) {
-            this.invalidateRoute(routeId);
-        }
+        const errors: unknown[] = [];
         for (const record of Array.from(this.records.values())) {
-            this.destroyWindow(record);
+            try {
+                this.destroyWindow(record);
+            } catch (error) {
+                errors.push(error);
+            }
         }
         this.routes.clear();
         this.lifecycleVersions.clear();
         this.singletonRequestVersions.clear();
+        if (errors.length > 0) {
+            throw new UIRouterCleanupError(errors);
+        }
+        this.syncModalLayer();
     }
 
     async waitForPendingLoads(): Promise<void> {
@@ -190,6 +196,7 @@ export class UIRouter implements WindowLifecycleObserver {
         if (record?.route.retention === "destroy") {
             this.destroyWindow(record);
         }
+        this.syncModalLayer();
     }
 
     onDestroyed(window: UnknownWindow): void {
@@ -218,7 +225,6 @@ export class UIRouter implements WindowLifecycleObserver {
             this.singletonRequestVersions.set(routeId, requestVersion);
         }
 
-        const lease = this.resources.acquire(route.group);
         this.changeLoading(routeId, 1);
         try {
             const prefab = await this.loadPrefab(route);
@@ -246,14 +252,8 @@ export class UIRouter implements WindowLifecycleObserver {
                 content.destroy();
                 throw new Error(`UI route '${routeId}' created a destroyed window.`);
             }
-            this.trackWindow(route, window, lease);
+            this.trackWindow(route, window);
             return await this.presentWindow(route, window, args);
-        } catch (error) {
-            if (!lease.released) {
-                lease.release();
-                this.resources.releaseGroupIfUnused(route.group);
-            }
-            throw error;
         } finally {
             this.changeLoading(routeId, -1);
         }
@@ -262,7 +262,6 @@ export class UIRouter implements WindowLifecycleObserver {
     private async loadPrefab(route: UnknownRoute): Promise<Laya.Prefab | null> {
         return Laya.loader.load(route.url, {
             type: Laya.Loader.HIERARCHY,
-            group: route.group,
         }) as Promise<Laya.Prefab | null>;
     }
 
@@ -282,6 +281,7 @@ export class UIRouter implements WindowLifecycleObserver {
                 || this.presentationVersions.get(unknownWindow) !== version) {
                 throw new Error(`UI request '${route.id}' was superseded.`);
             }
+            this.syncModalLayer();
             return window;
         } catch (error) {
             if (this.presentationVersions.get(unknownWindow) === version) {
@@ -297,14 +297,12 @@ export class UIRouter implements WindowLifecycleObserver {
     private trackWindow<TArgs>(
         route: UIRoute<TArgs>,
         window: BaseGameWindow<TArgs>,
-        lease: ResourceLease,
     ): void {
         const unknownWindow = window as unknown as UnknownWindow;
         unknownWindow.observeLifecycle(this);
         this.records.set(unknownWindow, {
             route: route as unknown as UnknownRoute,
             window: unknownWindow,
-            lease,
         });
         if (route.multiplicity === "singleton") {
             this.singletonWindows.set(route.id, unknownWindow);
@@ -351,8 +349,7 @@ export class UIRouter implements WindowLifecycleObserver {
                 this.multipleWindows.delete(record.route.id);
             }
         }
-        record.lease.release();
-        this.resources.releaseGroupIfUnused(record.route.group);
+        this.syncModalLayer();
     }
 
     private requestExpired(route: UnknownRoute, lifecycleVersion: number, requestVersion: number): boolean {
@@ -388,6 +385,16 @@ export class UIRouter implements WindowLifecycleObserver {
         if (this.disposed) {
             throw new Error("UIRouter has been disposed.");
         }
+    }
+
+    private syncModalLayer(): void {
+        const root = Laya.GRoot?.inst;
+        if (!root) {
+            return;
+        }
+        const modalWindows = this.listVisible().filter((info) => info.modal);
+        const topModal = modalWindows[modalWindows.length - 1];
+        root.modalLayer.zOrder = topModal?.window.zOrder ?? 0;
     }
 }
 

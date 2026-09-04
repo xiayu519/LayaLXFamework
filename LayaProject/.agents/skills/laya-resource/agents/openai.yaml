@@ -1,5 +1,5 @@
 interface:
   display_name: "LayaAir Resource Lifecycle"
-  short_description: "Control loader groups, release order, and memory"
+  short_description: "Validate native loader ownership and release order"
 policy:
   allow_implicit_invocation: true

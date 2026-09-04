@@ -23,7 +23,6 @@ export function createApplication(adapters: ApplicationAdapters = {}): Applicati
                 id: FRAMEWORK_STATUS_ROUTE,
                 url: "bootstrap/ui/FrameworkStatus.lh",
                 kind: "ui",
-                group: "ui:bootstrap",
             },
         ],
         configureUI(ui, content): void {
@@ -31,15 +30,14 @@ export function createApplication(adapters: ApplicationAdapters = {}): Applicati
             const statusRoute: UIRoute<FrameworkStatusArgs> = {
                 id: statusContent.id,
                 url: statusContent.url,
-                group: statusContent.group ?? "ui:default",
                 multiplicity: "singleton",
-                retention: "hide",
+                retention: "destroy",
                 create: (pane) => new FrameworkStatusWindow(pane),
             };
             ui.register(statusRoute);
         },
         createServices(context) {
-            return [new GameConfigService(context.config, context.resources)];
+            return [new GameConfigService(context.config)];
         },
     }, adapters);
 }

@@ -1,12 +1,12 @@
 ---
 name: laya-audio
-description: 实现或诊断 Laya SoundManager、AudioService、背景音乐、音效、静音、音量、焦点恢复和音频资源释放时使用；平台支付与普通资源加载不触发。
+description: 实现或诊断 Laya SoundManager、AudioService、BGM、SFX、静音、音量、owner 停止和前后台恢复时使用；普通 Loader 资源与 IAP 不触发。
 ---
 
 # Laya Audio
 
-1. 以 `engine/types/LayaAir.d.ts`、`AudioService` 和 Laya `SoundManager` 的真实行为为准。
-2. 业务从 `LX.Audio` 发出播放意图；服务保存业务需要的音量和静音状态，不复制 Laya 的声道系统。
-3. BGM 切换、重复播放、前后台恢复和用户静音必须幂等；Web 自动播放限制应保留为可观察失败或待用户手势状态。
-4. 每次播放返回可幂等停止的 handle；用 owner 批量停止功能音效。停止声道后释放对应 group lease，最后一个使用者退出后才清资源。
-5. 为状态转换补单元测试；需要证明真实播放初始化时运行 `npm run test:headless` 并检查 console/runtime 错误。
+1. 底层直接使用 `Laya.SoundManager`；`AudioService` 只提供 BGM/SFX、幂等 handle、owner 批量停止和用户设置。
+2. 明确 loops：BGM 默认持续循环，SFX 默认一次；完成回调、手动停止、替换 BGM 与 dispose 必须收敛到同一幂等状态。
+3. `SoundManager` 使用独立 `AudioDataCache`，不得用普通 Loader group lease 声称拥有或释放解码音频。
+4. 前后台恢复必须区分用户静音、平台失焦与待恢复 BGM；没有实际需求时不预建策略。
+5. 补状态单测；真实格式解码、焦点恢复与设备内存必须用代表性音频资产做专项 Headless/真机验证。

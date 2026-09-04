@@ -1,11 +1,12 @@
 ---
 name: laya-runtime-lifecycle
-description: 处理监听、Timer、Tween、异步回写、句柄和服务启停的统一清理所有权时使用；单纯资源分组与纯状态机不触发。
+description: 处理 Event、Laya.timer、Tween、异步回写、句柄和服务启停的 owner 清理时使用；单纯资源加载与纯状态机不触发。
 ---
 
 # Runtime Lifecycle
 
-1. 为持有副作用的对象确定 owner，并使用 `LifetimeScope`；每个注册动作紧邻登记反向清理。
-2. 窗口长期依赖归 lifetime，每次展示的监听、Timer、Tween、动态资源归 presentation；Hide 结束 presentation，Destroy 再结束 lifetime。
-3. 清理按登记反序执行且幂等；即使一项失败也继续清理，最终聚合报告。异步操作必须在回写前检查 token/owner 是否仍有效。
-4. 服务由 `AppBootstrap` 正序启动、逆序停止；业务服务停止后才统一清共享运行时资源。补重复停止、部分失败和晚到回调测试。
+1. Event、Timer、Tween 直接使用 Laya 原生对象；Timer 使用 engine-owned `Laya.timer`，不要 `new Laya.Timer()` 或创建同义管理器。
+2. 单类副作用优先用 `offAllCaller`、`clearAll`、`Tween.killAll` 等 owner API。只有同一 owner 需要聚合多种清理动作时才使用 `LifetimeScope`。
+3. 窗口长期副作用归 `lifetime`，每次展示归 `presentation`；Hide 清 presentation，Destroy 再清 lifetime。异步回写先检查 token。
+4. 清理逆序、幂等且聚合错误；服务交给 `AppBootstrap` 顺序启动、逆序停止。业务服务停止后才销毁共享 UI/池并执行资源 GC。
+5. 补重复停止、部分失败、Hide/Destroy 重入、Timer clearAll 和晚到回调测试。

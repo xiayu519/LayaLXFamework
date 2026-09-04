@@ -3,7 +3,7 @@ type: decision
 scope: framework-runtime
 description: UI、动态纹理、Prefab 池、音频和 Spine 用 owner scope 与资源 lease 明确生命周期，业务停机后才清共享资源。
 trigger: 新增持有监听、异步操作、显示对象、声道或 Loader 资源的运行时能力时
-status: active
+status: superseded
 last_verified: 2026-09-04
 source: user-confirmed
 ---

@@ -14,6 +14,7 @@ export abstract class BaseGameWindow<TArgs> extends Laya.GWindow {
     private readonly lifetimeScope = new LifetimeScope();
     private presentationScopeValue: LifetimeScope | undefined;
     private lifecycleObserver: WindowLifecycleObserver | undefined;
+    private destroying = false;
 
     protected constructor(contentPane: Laya.GWidget) {
         super();
@@ -54,7 +55,7 @@ export abstract class BaseGameWindow<TArgs> extends Laya.GWindow {
         this.hide();
     }
 
-    /** @internal UI 路由用于同步原生 GWindow hide/destroy 生命周期。 */
+    /** @internal Used by UIRouter to observe native GWindow hide/destroy lifecycle. */
     observeLifecycle(observer: WindowLifecycleObserver): void {
         if (this.lifecycleObserver && this.lifecycleObserver !== observer) {
             throw new Error("Window lifecycle observer is already assigned.");
@@ -63,18 +64,33 @@ export abstract class BaseGameWindow<TArgs> extends Laya.GWindow {
     }
 
     override destroy(): void {
-        if (this.destroyed) {
+        if (this.destroyed || this.destroying) {
             return;
         }
-        const errors: unknown[] = [];
-        this.bindingGuard.dispose();
-        collectCleanup(errors, () => this.disposePresentation());
-        collectCleanup(errors, () => this.lifetimeScope.dispose());
-        collectCleanup(errors, () => super.destroy());
-        this.lifecycleObserver?.onDestroyed(this as unknown as BaseGameWindow<unknown>);
+        this.destroying = true;
+        const observer = this.lifecycleObserver;
         this.lifecycleObserver = undefined;
-        if (errors.length > 0) {
-            throw new LifetimeCleanupError(errors);
+        const errors: unknown[] = [];
+        try {
+            this.bindingGuard.dispose();
+            collectCleanup(errors, () => this.disposePresentation());
+            collectCleanup(errors, () => this.lifetimeScope.dispose());
+            collectCleanup(errors, () => super.destroy());
+            if (!this.destroyed) {
+                collectCleanup(errors, () => super.destroy());
+            }
+            if (this.destroyed) {
+                collectCleanup(errors, () => observer?.onDestroyed(
+                    this as unknown as BaseGameWindow<unknown>,
+                ));
+            } else {
+                this.lifecycleObserver = observer;
+            }
+            if (errors.length > 0) {
+                throw new LifetimeCleanupError(errors);
+            }
+        } finally {
+            this.destroying = false;
         }
     }
 
@@ -83,7 +99,9 @@ export abstract class BaseGameWindow<TArgs> extends Laya.GWindow {
         this.bindingGuard.invalidate();
         collectCleanup(errors, () => this.disposePresentation());
         collectCleanup(errors, () => super.onHide());
-        this.lifecycleObserver?.onHidden(this as unknown as BaseGameWindow<unknown>);
+        collectCleanup(errors, () => this.lifecycleObserver?.onHidden(
+            this as unknown as BaseGameWindow<unknown>,
+        ));
         if (errors.length > 0) {
             throw new LifetimeCleanupError(errors);
         }

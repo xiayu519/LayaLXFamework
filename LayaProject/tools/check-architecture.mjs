@@ -87,6 +87,12 @@ for (const file of sourceFiles) {
     if (/\bSpineSkeleton\b/.test(source)) {
         failures.push(`${localPath(file)}: deprecated SpineSkeleton is forbidden; use Sprite with Spine2DRenderNode.`);
     }
+    if (/\._(?:addReference|removeReference|clearReference)\b/.test(source)) {
+        failures.push(`${localPath(file)}: private Laya resource reference APIs are forbidden.`);
+    }
+    if (/new\s+Laya\.Timer\b/.test(source)) {
+        failures.push(`${localPath(file)}: use the engine-owned Laya.timer instead of creating another Timer.`);
+    }
     const dependencies = [];
     if ((sourceLocation.layer === "domain" || sourceLocation.layer === "application")
         && /\b(Laya|window|document|navigator)\b/.test(source)) {

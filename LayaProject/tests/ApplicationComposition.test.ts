@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { HttpTransport } from "../src/framework/infrastructure/network/HttpTransport";
@@ -7,32 +7,27 @@ import type { PurchasePlatform } from "../src/framework/platform/purchase/Purcha
 
 class FakeGWidget {
     destroyed = false;
-
-    destroy(): void {
-        this.destroyed = true;
-    }
+    zOrder = 0;
+    destroy(): void { this.destroyed = true; }
 }
 
 class FakeGWindow extends FakeGWidget {
     contentPane!: FakeGWidget;
     modal = false;
-
-    show(): void {}
-    hide(): void {}
+    isShowing = false;
+    show(): void { this.isShowing = true; }
+    hide(): void { this.isShowing = false; }
+    protected onHide(): void {}
 }
 
 const storage = new Map<string, string>();
-const clearResByGroup = vi.fn();
+const sceneGc = vi.fn();
 const configBytes = readFileSync(resolve("assets/bootstrap/config/game/tbtableappconfig.bin"));
 vi.stubGlobal("Laya", {
     GWidget: FakeGWidget,
     GWindow: FakeGWindow,
-    Loader: {
-        HIERARCHY: "HIERARCHY",
-        BUFFER: "arraybuffer",
-        setGroup: vi.fn(),
-        clearResByGroup,
-    },
+    GRoot: { inst: { modalLayer: new FakeGWidget() } },
+    Loader: { HIERARCHY: "HIERARCHY", BUFFER: "arraybuffer" },
     loader: {
         load: vi.fn(async (url: string) => {
             if (url !== "bootstrap/config/game/tbtableappconfig.bin") {
@@ -43,11 +38,13 @@ vi.stubGlobal("Laya", {
             };
         }),
     },
-    Resource: {
-        cpuMemory: 0,
-        gpuMemory: 0,
-        destroyUnusedResources: vi.fn(),
+    Pool: {
+        getPoolBySign: vi.fn(() => []),
+        getItem: vi.fn(() => null),
+        recover: vi.fn(),
+        clearBySign: vi.fn(),
     },
+    Scene: { gc: sceneGc },
     LocalStorage: {
         getItem: (key: string) => storage.get(key) ?? null,
         setItem: (key: string, value: string) => storage.set(key, value),
@@ -64,14 +61,15 @@ const { LX } = await import("../src/framework/LX");
 const { createApplication } = await import("../src/game/bootstrap/createApplication");
 const { createRuntime } = await import("../src/framework/bootstrap/createRuntime");
 
-afterAll(() => {
-    vi.unstubAllGlobals();
+beforeEach(() => {
+    sceneGc.mockReset();
 });
 
+afterAll(() => vi.unstubAllGlobals());
+
 describe("createApplication", () => {
-    it("injects platform boundaries and does not overwrite settings during shutdown", async () => {
+    it("injects platform boundaries and leaves saved settings unchanged at shutdown", async () => {
         storage.clear();
-        clearResByGroup.mockClear();
         const platform: PlatformService = {
             name: "platform:test",
             kind: "native",
@@ -104,15 +102,13 @@ describe("createApplication", () => {
 
         await application.stop();
         expect(LX.Ready).toBe(false);
-
-        const stored = JSON.parse(storage.get("lx.client-settings") ?? "null");
-        expect(stored.data).toEqual({
+        expect(JSON.parse(storage.get("lx.client-settings") ?? "null").data).toEqual({
             language: "en-US",
             muted: true,
             musicVolume: 0.25,
             soundVolume: 0.5,
         });
-        expect(clearResByGroup).toHaveBeenCalledWith("ui:bootstrap");
+        expect(sceneGc).toHaveBeenCalledOnce();
         expect(platform.stop).toHaveBeenCalledOnce();
     });
 
@@ -128,32 +124,53 @@ describe("createApplication", () => {
         };
         const application = createApplication({ platform });
 
-        await expect(application.start()).rejects.toThrow("Service 'platform:broken' failed to start: platform unavailable");
-
+        await expect(application.start()).rejects.toThrow(
+            "Service 'platform:broken' failed to start: platform unavailable",
+        );
         expect(LX.Ready).toBe(false);
         expect(() => LX.UI).toThrow("runtime is not attached");
     });
 
-    it("stops game services before shared runtime resources", async () => {
+    it("stops game services before the shared Laya resource collection boundary", async () => {
         const events: string[] = [];
-        clearResByGroup.mockImplementationOnce(() => events.push("resources"));
+        sceneGc.mockImplementationOnce(() => { events.push("gc"); });
         const runtime = createRuntime({
-            createServices(context) {
+            createServices() {
                 return [{
                     name: "game-owner",
-                    start() {
-                        context.resources.assign("owned.bin", "owned");
-                    },
-                    stop() {
-                        events.push("game");
-                    },
+                    start(): void {},
+                    stop(): void { events.push("game"); },
                 }];
             },
         });
 
         await runtime.start();
         await runtime.stop();
+        expect(events).toEqual(["game", "gc"]);
+    });
 
-        expect(events).toEqual(["game", "resources"]);
+    it("continues every runtime cleanup step after an earlier failure", async () => {
+        const runtime = createRuntime({});
+        const events: string[] = [];
+        vi.spyOn(runtime.ui, "dispose")
+            .mockImplementationOnce(() => { events.push("ui"); throw new Error("ui cleanup failed"); })
+            .mockImplementation(() => { events.push("ui-retry"); });
+        vi.spyOn(runtime.ui, "waitForPendingLoads").mockImplementation(async () => { events.push("pending-ui"); });
+        vi.spyOn(runtime.pool, "dispose")
+            .mockImplementationOnce(() => { events.push("pool"); })
+            .mockImplementation(() => { events.push("pool-retry"); });
+        vi.spyOn(runtime.pool, "waitForPendingLoads").mockImplementation(async () => { events.push("pending-pool"); });
+        vi.spyOn(runtime.audio, "dispose").mockImplementation(() => { events.push("audio"); });
+        sceneGc.mockImplementationOnce(() => { events.push("gc"); });
+
+        await runtime.start();
+        await expect(runtime.stop()).rejects.toThrow("service(s) failed to stop");
+
+        expect(events).toEqual([
+            "ui", "pending-ui", "ui-retry",
+            "pool", "pending-pool", "pool-retry",
+            "audio", "gc",
+        ]);
+        expect(LX.Ready).toBe(false);
     });
 });
