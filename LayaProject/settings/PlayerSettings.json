@@ -1,0 +1,24 @@
+{
+  "resolution": {
+    "designWidth": 750,
+    "designHeight": 1334,
+    "scaleMode": "fixedauto",
+    "screenMode": "vertical",
+    "backgroundColor": "#0b1220"
+  },
+  "modules": {
+    "laya.ui": true,
+    "laya.spine": true,
+    "laya.d3": false
+  },
+  "addons": {
+    "laya.ui": "ui2"
+  },
+  "UI": {
+    "alwaysIncludeDefaultSkin": false,
+    "horizontalScrollBar": null,
+    "verticalScrollBar": null,
+    "popupMenu": null,
+    "tooltipsWidget": null
+  }
+}

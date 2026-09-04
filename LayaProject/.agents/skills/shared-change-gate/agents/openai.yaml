@@ -1,0 +1,5 @@
+interface:
+  display_name: "LXFamework Shared Change Gate"
+  short_description: "Decide whether business code belongs in shared framework"
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "module": "es6",
+    "target": "es6",
+    "lib": [
+      "ES2020",
+      "DOM"
+    ],
+    "strict": true,
+    "strictNullChecks": true,
+    "noEmit": true,
+    "noEmitHelpers": true,
+    "sourceMap": false,
+    "experimentalDecorators": true,
+    "skipLibCheck": true,
+    "moduleResolution": "node",
+    "useDefineForClassFields": false,
+    "allowSyntheticDefaultImports": true,
+    "paths": {
+      "~/packages/*": [
+        "./library/packages/*"
+      ]
+    }
+  },
+  "include": [
+    "./assets",
+    "./src",
+    "./engine"
+  ]
+}

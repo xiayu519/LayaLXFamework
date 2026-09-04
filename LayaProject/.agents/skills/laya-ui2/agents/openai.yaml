@@ -1,0 +1,5 @@
+interface:
+  display_name: "LayaAir ui2"
+  short_description: "Build ui2 assets, routing, and window lifecycles"
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,5 @@
+interface:
+  display_name: "LXFamework Architecture"
+  short_description: "Evolve layers, public contracts, and bootstrap safely"
+policy:
+  allow_implicit_invocation: true

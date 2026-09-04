@@ -1,0 +1,5 @@
+interface:
+  display_name: "LXFamework Bounded Task"
+  short_description: "Route clear low-risk edits to an efficient executor"
+policy:
+  allow_implicit_invocation: true

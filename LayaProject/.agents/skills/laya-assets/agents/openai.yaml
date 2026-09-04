@@ -1,0 +1,5 @@
+interface:
+  display_name: "LayaAir Source Assets"
+  short_description: "Maintain serialized scenes, prefabs, and UUID links"
+policy:
+  allow_implicit_invocation: true

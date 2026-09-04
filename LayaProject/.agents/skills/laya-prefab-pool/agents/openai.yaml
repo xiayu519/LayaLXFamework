@@ -1,0 +1,5 @@
+interface:
+  display_name: "LayaAir Prefab Pool"
+  short_description: "Manage bounded Prefab instance ownership"
+policy:
+  allow_implicit_invocation: true

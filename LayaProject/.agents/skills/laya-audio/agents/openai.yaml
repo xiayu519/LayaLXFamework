@@ -1,0 +1,5 @@
+interface:
+  display_name: "LayaAir Audio"
+  short_description: "Implement music, effects, mute, and focus recovery"
+policy:
+  allow_implicit_invocation: true

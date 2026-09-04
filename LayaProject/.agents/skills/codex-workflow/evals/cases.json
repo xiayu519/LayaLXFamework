@@ -1,0 +1,124 @@
+{
+  "cases": [
+    {
+      "id": "ui_async_close",
+      "request": "修复商城弹窗关闭后异步图标加载仍回写已销毁 GWindow 的问题，并验证 .lh 窗口生命周期。",
+      "expected": ["laya-ui2"]
+    },
+    {
+      "id": "asset_uuid",
+      "request": "Startup.ls 的脚本组件 UUID 无法解析，检查对应 .meta、_$ref 和 startupScene 并修好源资产。",
+      "expected": ["laya-assets"]
+    },
+    {
+      "id": "resource_release",
+      "request": "关卡退出后纹理 group 没有释放，检查 Laya.loader、ResourcePolicy 和显示对象销毁顺序。",
+      "expected": ["laya-resource"]
+    },
+    {
+      "id": "scene_race",
+      "request": "连续切换关卡时较早的 Scene.load 最后返回并覆盖当前场景，修复导航竞态。",
+      "expected": ["laya-scene"]
+    },
+    {
+      "id": "audio_focus",
+      "request": "实现背景音乐在切后台、恢复前台和用户静音后的幂等恢复逻辑。",
+      "expected": ["laya-audio"]
+    },
+    {
+      "id": "platform_safe_area",
+      "request": "为小游戏和 Web 接入安全区与前后台生命周期 capability，SDK 不支持时返回明确 unsupported。",
+      "expected": ["laya-platform"]
+    },
+    {
+      "id": "headless_release",
+      "request": "在当前项目执行交付前 LayaAir 3.4.1 原地构建和纯 Headless Chromium 验收，禁止复制项目。",
+      "expected": ["laya-headless"]
+    },
+    {
+      "id": "save_corruption",
+      "request": "SaveStore 读取损坏 JSON 时会覆盖原档，修复损坏恢复和未来版本拒绝覆盖，并补测试。",
+      "expected": ["client-storage"]
+    },
+    {
+      "id": "http_timeout",
+      "request": "给 HttpTransport 增加可取消超时和仅幂等请求可用的有上限重试，并区分错误类型。",
+      "expected": ["client-network"]
+    },
+    {
+      "id": "iap_duplicate_grant",
+      "request": "修复支付 SDK 重复回调导致重复发货，增加收据服务端校验、transaction id 幂等与重启恢复。",
+      "expected": ["iap-client"]
+    },
+    {
+      "id": "public_contract",
+      "request": "重新设计 LX 公共服务入口和 bootstrap 启停契约，这会影响所有业务模块；先对齐方案再改。",
+      "expected": ["lx-architecture", "sdd-explore"]
+    },
+    {
+      "id": "gameplay_clock",
+      "request": "实现不依赖 Laya 的战斗冷却状态机，使用固定步长推进并覆盖暂停和追帧边界。",
+      "expected": ["gameplay-domain"]
+    },
+    {
+      "id": "workflow_split",
+      "request": "重新拆分项目 Skill、修改 AGENTS.md 语义路由和 token 预算；这是工作流契约变更，先给 Change Contract。",
+      "expected": ["codex-workflow", "sdd-explore"]
+    },
+    {
+      "id": "memory_feedback",
+      "request": "查找以前关于 Headless 验收的开发者纠正，并把这次验证过的新踩坑沉淀到项目记忆。",
+      "expected": ["project-memory"]
+    },
+    {
+      "id": "shared_candidate",
+      "request": "正在做背包筛选，只有这一个页面需要 ItemFilterManager，但想放进 src/framework；先停止公共层改动并判断是否真正公用，未批准不要写。",
+      "expected": ["shared-change-gate"]
+    },
+    {
+      "id": "team_workflow_correction",
+      "request": "开发者纠正：项目是 2 到 3 人协作，不是单人项目。重新对齐并修改共享 Codex 工作流，验证后把这条长期纠正写入项目记忆。",
+      "expected": ["codex-workflow", "project-memory", "sdd-explore"]
+    },
+    {
+      "id": "bounded_small_change",
+      "request": "给 src/game/ScoreLabel.ts 中已存在的 formatScore 补上千位分隔符，接口不变，只改局部实现并运行现有单测。",
+      "expected": ["bounded-task"]
+    },
+    {
+      "id": "prefab_pool_ownership",
+      "request": "给战斗特效 Prefab 实例池补最大活跃数、重置、重复归还检测、排空和池资源租约测试。",
+      "expected": ["laya-prefab-pool"]
+    },
+    {
+      "id": "modern_spine",
+      "request": "用 LayaAir 3.4.1 的 Sprite 与 Spine2DRenderNode 加载骨骼动画，并保证播放句柄销毁时释放资源。",
+      "expected": ["laya-spine"]
+    },
+    {
+      "id": "render_budget",
+      "request": "分析战斗 UI 与 Spine 穿插导致的 DrawCall 上升，读取真实渲染统计并建立回归预算。",
+      "expected": ["laya-render-performance"]
+    },
+    {
+      "id": "runtime_cleanup",
+      "request": "窗口 Hide 后仍残留事件和 Timer，异步回调还会晚到；统一展示期生命周期并验证逆序幂等清理。",
+      "expected": ["laya-runtime-lifecycle"]
+    },
+    {
+      "id": "typescript_structure",
+      "request": "一个业务 TypeScript 已超过一千行并出现循环依赖和 ts-nocheck；按职责拆分且保持行为不变。",
+      "expected": ["ts-maintainability"]
+    },
+    {
+      "id": "luban_table",
+      "request": "在 Design 增加一张 Luban Excel 表，生成 TypeScript-bin，检查陈旧输出并让 LX.Config 在发布包加载。",
+      "expected": ["luban-config"]
+    },
+    {
+      "id": "minigame_resource_packages",
+      "request": "给新游戏规划 Laya 小游戏首包和功能资源分包，约束 battle 的 UI、Scene、Spine 共置，配置 loadPackage 并按目标平台限额检查包体。",
+      "expected": ["laya-minigame-packaging"]
+    }
+  ]
+}

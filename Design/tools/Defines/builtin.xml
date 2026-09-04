@@ -1,0 +1,32 @@
+<module name="">
+    <bean name="float2" sep=",">
+        <var name="x" type="float"/>
+        <var name="y" type="float"/>
+    </bean>
+    <bean name="int2" sep=",">
+        <var name="x" type="int"/>
+        <var name="y" type="int"/>
+    </bean>
+    <bean name="float3" sep=",">
+        <var name="x" type="float"/>
+        <var name="y" type="float"/>
+        <var name="z" type="float"/>
+    </bean>
+    <bean name="int3" sep=",">
+        <var name="x" type="int"/>
+        <var name="y" type="int"/>
+        <var name="z" type="int"/>
+    </bean>
+    <bean name="float4" sep=",">
+        <var name="x" type="float"/>
+        <var name="y" type="float"/>
+        <var name="z" type="float"/>
+        <var name="w" type="float"/>
+    </bean>
+    <bean name="int4" sep=",">
+        <var name="x" type="int"/>
+        <var name="y" type="int"/>
+        <var name="z" type="int"/>
+        <var name="w" type="int"/>
+    </bean>
+</module>

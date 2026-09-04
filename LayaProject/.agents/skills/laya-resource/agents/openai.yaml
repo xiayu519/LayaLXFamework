@@ -1,0 +1,5 @@
+interface:
+  display_name: "LayaAir Resource Lifecycle"
+  short_description: "Control loader groups, release order, and memory"
+policy:
+  allow_implicit_invocation: true

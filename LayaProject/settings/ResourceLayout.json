@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "roots": {
+    "bootstrap": "bootstrap",
+    "packages": "packages",
+    "shared": "shared",
+    "library": "library"
+  },
+  "assetTypes": [
+    "scenes",
+    "ui",
+    "prefabs",
+    "spine",
+    "animations",
+    "effects",
+    "images",
+    "atlas",
+    "fonts",
+    "audio",
+    "video",
+    "shaders",
+    "data",
+    "config"
+  ],
+  "startupScene": "bootstrap/scenes/Startup.ls",
+  "startupUI": "bootstrap/ui/FrameworkStatus.lh",
+  "generatedConfig": "bootstrap/config/game"
+}

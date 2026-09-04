@@ -1,0 +1,5 @@
+interface:
+  display_name: "LXFamework Client Storage"
+  short_description: "Evolve save schemas, validation, and migrations"
+policy:
+  allow_implicit_invocation: true

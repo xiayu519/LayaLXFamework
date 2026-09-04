@@ -1,0 +1,160 @@
+import type { AppService } from "../application/lifecycle/AppService";
+
+export type { AppService } from "../application/lifecycle/AppService";
+
+export type BootstrapState = "idle" | "starting" | "running" | "stopping" | "stopped";
+
+export class BootstrapStartError extends Error {
+    constructor(
+        readonly serviceName: string,
+        readonly cause: unknown,
+        readonly rollbackErrors: readonly unknown[],
+    ) {
+        super(`Service '${serviceName}' failed to start: ${describeCause(cause)}`);
+        this.name = "BootstrapStartError";
+    }
+}
+
+function describeCause(cause: unknown): string {
+    return cause instanceof Error ? cause.message : String(cause);
+}
+
+export class BootstrapStopError extends Error {
+    constructor(readonly errors: readonly unknown[]) {
+        super(`${errors.length} service(s) failed to stop.`);
+        this.name = "BootstrapStopError";
+    }
+}
+
+export class AppBootstrap {
+    private readonly activeServices: AppService[] = [];
+    private currentState: BootstrapState = "idle";
+    private startTask: Promise<void> | undefined;
+    private stopTask: Promise<void> | undefined;
+
+    constructor(private readonly services: readonly AppService[]) {
+        const names = new Set<string>();
+        for (const service of services) {
+            if (names.has(service.name)) {
+                throw new Error(`Duplicate service name '${service.name}'.`);
+            }
+            names.add(service.name);
+        }
+    }
+
+    get state(): BootstrapState {
+        return this.currentState;
+    }
+
+    start(): Promise<void> {
+        if (this.currentState === "running") {
+            return Promise.resolve();
+        }
+        if (this.currentState === "starting") {
+            return this.startTask ?? Promise.reject(new Error("Bootstrap start operation is missing."));
+        }
+        if (this.currentState === "stopping" || this.currentState === "stopped") {
+            return Promise.reject(new Error(`Cannot start while bootstrap state is '${this.currentState}'.`));
+        }
+
+        this.currentState = "starting";
+        const operation = this.startServices();
+        this.startTask = operation;
+        operation.then(
+            () => this.clearStartTask(operation),
+            () => this.clearStartTask(operation),
+        );
+        return operation;
+    }
+
+    stop(): Promise<void> {
+        if (this.stopTask) {
+            return this.stopTask;
+        }
+        if (this.currentState === "idle" || this.currentState === "stopped") {
+            this.currentState = "stopped";
+            return Promise.resolve();
+        }
+        if (this.currentState === "starting") {
+            const startTask = this.startTask;
+            if (!startTask) {
+                return Promise.reject(new Error("Bootstrap start operation is missing."));
+            }
+            return this.trackStop(this.stopAfterStart(startTask));
+        }
+
+        this.currentState = "stopping";
+        return this.trackStop(this.stopServices());
+    }
+
+    private async startServices(): Promise<void> {
+        for (const service of this.services) {
+            try {
+                await service.start();
+                this.activeServices.push(service);
+            } catch (cause) {
+                const rollbackErrors = await this.stopActiveServices();
+                this.currentState = "stopped";
+                throw new BootstrapStartError(service.name, cause, rollbackErrors);
+            }
+        }
+        this.currentState = "running";
+    }
+
+    private async stopAfterStart(startTask: Promise<void>): Promise<void> {
+        try {
+            await startTask;
+        } catch {
+            // startServices already rolled back every active service.
+            return;
+        }
+        if (this.currentState !== "running") {
+            return;
+        }
+
+        this.currentState = "stopping";
+        await this.stopServices();
+    }
+
+    private async stopServices(): Promise<void> {
+        const errors = await this.stopActiveServices();
+        this.currentState = "stopped";
+        if (errors.length > 0) {
+            throw new BootstrapStopError(errors);
+        }
+    }
+
+    private trackStop(operation: Promise<void>): Promise<void> {
+        this.stopTask = operation;
+        operation.then(
+            () => this.clearStopTask(operation),
+            () => this.clearStopTask(operation),
+        );
+        return operation;
+    }
+
+    private clearStartTask(operation: Promise<void>): void {
+        if (this.startTask === operation) {
+            this.startTask = undefined;
+        }
+    }
+
+    private clearStopTask(operation: Promise<void>): void {
+        if (this.stopTask === operation) {
+            this.stopTask = undefined;
+        }
+    }
+
+    private async stopActiveServices(): Promise<unknown[]> {
+        const errors: unknown[] = [];
+        for (let index = this.activeServices.length - 1; index >= 0; index -= 1) {
+            try {
+                await this.activeServices[index].stop();
+            } catch (error) {
+                errors.push(error);
+            }
+        }
+        this.activeServices.length = 0;
+        return errors;
+    }
+}

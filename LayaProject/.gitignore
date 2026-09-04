@@ -1,0 +1,13 @@
+.DS_Store
+/temp/
+/library/
+/local/
+/release/
+/node_modules/
+/bin/js/bundles/
+/coverage/
+/.vitest/
+/*.log
+/.env
+/.env.*
+!/.env.example

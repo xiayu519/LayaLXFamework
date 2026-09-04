@@ -1,0 +1,5 @@
+interface:
+  display_name: "LXFamework Client Network"
+  short_description: "Build HTTP timeout, retry, cancellation, and errors"
+policy:
+  allow_implicit_invocation: true

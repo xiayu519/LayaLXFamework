@@ -1,0 +1,5 @@
+interface:
+  display_name: "LayaAir Platform Adapters"
+  short_description: "Integrate web, mini-game, and native capabilities"
+policy:
+  allow_implicit_invocation: true

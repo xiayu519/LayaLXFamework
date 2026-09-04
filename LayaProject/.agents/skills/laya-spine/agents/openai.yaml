@@ -1,0 +1,5 @@
+interface:
+  display_name: "LayaAir Spine"
+  short_description: "Build modern Spine2D lifecycles"
+policy:
+  allow_implicit_invocation: true

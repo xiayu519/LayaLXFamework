@@ -1,0 +1,5 @@
+interface:
+  display_name: "Laya Runtime Lifecycle"
+  short_description: "Own and clean runtime side effects"
+policy:
+  allow_implicit_invocation: true

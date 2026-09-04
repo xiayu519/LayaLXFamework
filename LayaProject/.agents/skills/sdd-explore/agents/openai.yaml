@@ -1,0 +1,5 @@
+interface:
+  display_name: "LXFamework SDD Explore"
+  short_description: "Align uncertain or high-cost changes before implementation"
+policy:
+  allow_implicit_invocation: true

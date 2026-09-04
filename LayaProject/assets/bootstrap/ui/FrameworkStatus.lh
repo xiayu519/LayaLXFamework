@@ -1,0 +1,80 @@
+{
+  "_$ver": 1,
+  "_$id": "fwstatus",
+  "_$type": "GWidget",
+  "name": "FrameworkStatus",
+  "width": 750,
+  "height": 1334,
+  "background": {
+    "_$type": "DrawRectCmd",
+    "fillColor": "#0b1220"
+  },
+  "_$child": [
+    {
+      "_$id": "statuscard",
+      "_$type": "GWidget",
+      "name": "card",
+      "x": 64,
+      "y": 400,
+      "width": 622,
+      "height": 420,
+      "background": {
+        "_$type": "DrawRoundRectCmd",
+        "lineWidth": 2,
+        "lineColor": "#38bdf8",
+        "fillColor": "#111c2f",
+        "lt": 24,
+        "rt": 24,
+        "lb": 24,
+        "rb": 24
+      },
+      "_$child": [
+        {
+          "_$id": "statustitle",
+          "_$type": "GTextField",
+          "name": "titleText",
+          "x": 42,
+          "y": 42,
+          "width": 538,
+          "height": 62,
+          "text": "LXFamework",
+          "fontSize": 38,
+          "bold": true,
+          "color": "#f8fafc",
+          "align": "center",
+          "valign": "middle"
+        },
+        {
+          "_$id": "statusvalue",
+          "_$type": "GTextField",
+          "name": "statusText",
+          "x": 42,
+          "y": 132,
+          "width": 538,
+          "height": 58,
+          "text": "BOOTSTRAPPING",
+          "fontSize": 30,
+          "bold": true,
+          "color": "#4ade80",
+          "align": "center",
+          "valign": "middle"
+        },
+        {
+          "_$id": "statusdetail",
+          "_$type": "GTextField",
+          "name": "detailText",
+          "x": 52,
+          "y": 222,
+          "width": 518,
+          "height": 132,
+          "text": "LayaAir 3.4.1 / ui2\nNative-first services / headless verification",
+          "fontSize": 23,
+          "leading": 16,
+          "color": "#cbd5e1",
+          "align": "center",
+          "valign": "middle"
+        }
+      ]
+    }
+  ]
+}

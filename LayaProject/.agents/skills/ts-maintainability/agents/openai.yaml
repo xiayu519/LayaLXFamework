@@ -1,0 +1,5 @@
+interface:
+  display_name: "TypeScript Maintainability"
+  short_description: "Enforce focused TypeScript modules"
+policy:
+  allow_implicit_invocation: true

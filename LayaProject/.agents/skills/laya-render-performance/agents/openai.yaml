@@ -1,0 +1,5 @@
+interface:
+  display_name: "LayaAir Render Performance"
+  short_description: "Measure 2D rendering against budgets"
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,5 @@
+interface:
+  display_name: "LXFamework Codex Workflow"
+  short_description: "Design and verify lean semantic Codex routing"
+policy:
+  allow_implicit_invocation: true

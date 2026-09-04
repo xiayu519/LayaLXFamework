@@ -1,0 +1,5 @@
+interface:
+  display_name: "LayaAir Mini-game Packaging"
+  short_description: "Plan and validate bootstrap and resource subpackages"
+policy:
+  allow_implicit_invocation: true

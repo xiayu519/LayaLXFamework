@@ -1,0 +1,27 @@
+# LayaAir 3.4.1 generated and machine-local state
+/LayaProject/temp/
+/LayaProject/library/
+/LayaProject/local/
+/LayaProject/release/
+/LayaProject/node_modules/
+/LayaProject/bin/js/bundles/
+/Design/.luban-*/
+
+# Test output and logs
+/LayaProject/coverage/
+/LayaProject/.vitest/
+/LayaProject/*.log
+
+# Local secrets; commit only the example template
+/LayaProject/.env
+/LayaProject/.env.*
+!/LayaProject/.env.example
+*.pem
+*.p12
+*.pfx
+*.keystore
+*.jks
+
+# Operating-system metadata
+.DS_Store
+Thumbs.db

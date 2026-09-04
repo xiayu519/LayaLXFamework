@@ -1,0 +1,5 @@
+interface:
+  display_name: "LXFamework Gameplay Domain"
+  short_description: "Build deterministic engine-free gameplay rules"
+policy:
+  allow_implicit_invocation: true

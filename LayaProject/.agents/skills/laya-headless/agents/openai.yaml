@@ -1,0 +1,5 @@
+interface:
+  display_name: "LayaAir Headless Validation"
+  short_description: "Validate real 2D builds with CLI and headless CDP"
+policy:
+  allow_implicit_invocation: true

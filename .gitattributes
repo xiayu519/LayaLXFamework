@@ -1,0 +1,5 @@
+*.xlsx binary
+*.bin binary
+*.dll binary
+*.exe binary
+*.pdb binary

@@ -1,0 +1,5 @@
+interface:
+  display_name: "LayaAir Scene Flow"
+  short_description: "Handle scene navigation, races, and release boundaries"
+policy:
+  allow_implicit_invocation: true

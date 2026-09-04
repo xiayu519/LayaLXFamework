@@ -1,0 +1,5 @@
+interface:
+  display_name: "LXFamework Project Memory"
+  short_description: "Retrieve and record verified project knowledge"
+policy:
+  allow_implicit_invocation: true

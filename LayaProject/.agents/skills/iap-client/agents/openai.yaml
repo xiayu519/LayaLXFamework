@@ -1,0 +1,5 @@
+interface:
+  display_name: "LXFamework IAP Client"
+  short_description: "Implement recoverable and idempotent IAP flows"
+policy:
+  allow_implicit_invocation: true
