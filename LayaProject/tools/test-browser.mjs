@@ -11,6 +11,7 @@ import { createServer } from "node:http";
 import { homedir, tmpdir } from "node:os";
 import { dirname, extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { WebSocket } from "ws";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const releaseRoot = join(projectRoot, "release", "web");

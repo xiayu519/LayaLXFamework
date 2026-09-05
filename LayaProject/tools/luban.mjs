@@ -156,7 +156,7 @@ function compareGeneratedDirectory(source, destination) {
 }
 
 function generatedContentEquals(local, actual, expected) {
-    if (!local.endsWith(".meta")) {
+    if (!local.endsWith(".meta") && !local.endsWith(".ts")) {
         return actual.equals(expected);
     }
     return normalizeLineEndings(actual).equals(normalizeLineEndings(expected));
