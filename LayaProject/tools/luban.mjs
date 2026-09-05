@@ -21,8 +21,8 @@ const toolRoot = join(designRoot, "tools");
 const lubanDll = join(toolRoot, "Luban", "Luban.dll");
 const configuration = join(toolRoot, "luban.conf");
 const pinnedVersion = readFileSync(join(toolRoot, "LUBAN_VERSION"), "utf8").trim();
-const codeDestination = join(projectRoot, "src", "game", "generated", "config");
-const dataDestination = join(projectRoot, "assets", "bootstrap", "config", "game");
+const codeDestination = join(projectRoot, "src", "game", "generated", "tables");
+const dataDestination = join(projectRoot, "assets", "bootstrap", "tables", "game");
 const mode = process.argv[2] ?? "validate";
 
 if (!["generate", "check", "validate"].includes(mode)) {
@@ -48,7 +48,7 @@ try {
     if (mode === "generate") {
         replaceGeneratedDirectory(generatedCode, codeDestination);
         replaceGeneratedDirectory(generatedData, dataDestination);
-        console.log("Luban generate OK: TypeScript schema and binary data were updated.");
+        console.log("Luban generate OK: TypeScript tables and binary data were updated.");
     } else if (mode === "check") {
         compareGeneratedDirectory(generatedCode, codeDestination);
         compareGeneratedDirectory(generatedData, dataDestination);
@@ -151,7 +151,7 @@ function compareGeneratedDirectory(source, destination) {
         differences.push(`stale ${relative(projectRoot, join(destination, local))}`);
     }
     if (differences.length > 0) {
-        throw new Error(`Luban outputs are stale:\n- ${differences.join("\n- ")}\nRun 'npm run config:generate'.`);
+        throw new Error(`Luban outputs are stale:\n- ${differences.join("\n- ")}\nRun 'npm run tables:generate'.`);
     }
 }
 

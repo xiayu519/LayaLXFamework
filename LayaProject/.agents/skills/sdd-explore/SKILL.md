@@ -1,6 +1,6 @@
 ---
 name: sdd-explore
-description: 只读对齐会改变结果的需求或验收不确定性，以及已明确要修改的框架、公共契约、持久化 schema、生成规则、Codex 工作流和高回滚成本改动；写入前产出 Change Contract。尚未证明应公共化的业务候选不触发。
+description: 修改前只读对齐框架、公共契约、持久化 schema、生成规则或 Codex 工作流；开发者纠正改变共享语义及高回滚成本改动也触发，写入前产出 Change Contract。尚未证明应公共化的业务候选不触发。
 ---
 
 # SDD Explore

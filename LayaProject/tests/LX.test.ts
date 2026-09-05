@@ -14,6 +14,7 @@ function createRuntime(): ApplicationRuntime {
         ui: { id: "ui" },
         content: { id: "content" },
         config: { id: "config" },
+        tables: { id: "tables" },
         settings: { id: "settings" },
         audio: { id: "audio" },
         pool: { id: "pool" },
@@ -38,6 +39,8 @@ describe("LX", () => {
             expect(LX.Res).toBe(loader);
             expect(LX.Scene).toBe(FakeScene);
             expect(LX.Audio).toBe(runtime.audio);
+            expect(LX.Config).toBe(runtime.config);
+            expect(LX.Tables).toBe(runtime.tables);
             expect(LX.Net).toBe(runtime.http);
             expect("App" in LX).toBe(false);
             expect("Spine" in LX).toBe(false);

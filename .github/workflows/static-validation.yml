@@ -24,11 +24,14 @@ jobs:
         with:
           dotnet-version: "8.0.x"
       - run: npm ci
-      - run: npm run config:check
+      - run: npm run tables:check
       - run: npm run typecheck
       - run: npm test
       - run: npm run check:architecture
+      - run: npm run validate:assets
       - run: npm run validate:content-assets
       - run: npm run validate:resource-layout
+      - run: npm run validate:performance
+      - run: npm run validate:game-workflow
       - run: npm run check:skills
       - run: npm run check:memory

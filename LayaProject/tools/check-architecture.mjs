@@ -7,6 +7,7 @@ const sourceRoot = join(projectRoot, "src");
 const failures = [];
 const warnings = [];
 const dependencyGraph = new Map();
+const architecturalLayers = new Set(["application", "bootstrap", "domain", "generated", "infrastructure", "presentation", "platform"]);
 const layerDependencies = {
     domain: new Set(["domain"]),
     application: new Set(["application", "domain"]),
@@ -49,8 +50,16 @@ function walk(directory) {
 function locationOf(path) {
     const parts = relative(sourceRoot, path).split(sep);
     if (parts[0] === "framework" || parts[0] === "game") {
+        if (parts[0] === "game" && parts[1] && !architecturalLayers.has(parts[1])) {
+            return {
+                scope: "game",
+                gameId: parts[1],
+                layer: parts[2] === "generated" ? "infrastructure" : (parts[2] ?? "root"),
+            };
+        }
         return {
             scope: parts[0],
+            gameId: parts[0] === "game" ? "legacy" : undefined,
             layer: parts[0] === "game" && parts[1] === "generated"
                 ? "infrastructure"
                 : (parts.length > 2 ? parts[1] : "root"),
@@ -133,6 +142,12 @@ for (const file of sourceFiles) {
         }
 
         if (sourceLocation.scope === targetLocation.scope) {
+            if (sourceLocation.scope === "game" && sourceLocation.gameId !== targetLocation.gameId) {
+                failures.push(
+                    `${localPath(file)}: game '${sourceLocation.gameId}' cannot import game '${targetLocation.gameId}' (${specifier}).`,
+                );
+                continue;
+            }
             const allowed = layerDependencies[sourceLocation.layer];
             if (allowed && !allowed.has(targetLocation.layer)) {
                 failures.push(

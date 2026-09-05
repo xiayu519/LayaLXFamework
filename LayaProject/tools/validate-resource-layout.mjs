@@ -111,8 +111,9 @@ if (assetTypes.size === 0 || assetTypes.size !== assetTypeList.length || [...ass
 
 const startupScene = normalizedAssetPath(layout?.startupScene, "settings/ResourceLayout.json startupScene");
 const startupUI = normalizedAssetPath(layout?.startupUI, "settings/ResourceLayout.json startupUI");
-const generatedConfig = normalizedAssetPath(layout?.generatedConfig, "settings/ResourceLayout.json generatedConfig");
-for (const [label, path] of [["startupScene", startupScene], ["startupUI", startupUI], ["generatedConfig", generatedConfig]]) {
+const tipUI = normalizedAssetPath(layout?.tipUI, "settings/ResourceLayout.json tipUI");
+const generatedTables = normalizedAssetPath(layout?.generatedTables, "settings/ResourceLayout.json generatedTables");
+for (const [label, path] of [["startupScene", startupScene], ["startupUI", startupUI], ["tipUI", tipUI], ["generatedTables", generatedTables]]) {
     if (path && !existsSync(join(assetsRoot, path))) {
         failures.push(`settings/ResourceLayout.json ${label} is missing: assets/${path}.`);
     }
@@ -123,8 +124,11 @@ if (startupScene && !startupScene.startsWith(`${roots.bootstrap}/`)) {
 if (startupUI && !startupUI.startsWith(`${roots.bootstrap}/`)) {
     failures.push("settings/ResourceLayout.json: startupUI must be inside the bootstrap root.");
 }
-if (generatedConfig && !generatedConfig.startsWith(`${roots.bootstrap}/`)) {
-    failures.push("settings/ResourceLayout.json: generatedConfig must be inside the bootstrap root.");
+if (tipUI && !tipUI.startsWith(`${roots.bootstrap}/`)) {
+    failures.push("settings/ResourceLayout.json: tipUI must be inside the bootstrap root.");
+}
+if (generatedTables && !generatedTables.startsWith(`${roots.bootstrap}/`)) {
+    failures.push("settings/ResourceLayout.json: generatedTables must be inside the bootstrap root.");
 }
 
 const topLevelEntries = readdirSync(assetsRoot, { withFileTypes: true });

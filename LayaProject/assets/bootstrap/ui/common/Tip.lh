@@ -1,0 +1,32 @@
+{
+  "_$ver": 1,
+  "_$id": "lxtiproot",
+  "_$type": "GWidget",
+  "name": "LXTip",
+  "width": 620,
+  "height": 84,
+  "background": {
+    "_$type": "DrawRoundRectCmd",
+    "fillColor": "#111825",
+    "lt": 20,
+    "rt": 20,
+    "lb": 20,
+    "rb": 20
+  },
+  "_$child": [
+    {
+      "_$id": "lxtipmessage",
+      "_$type": "GTextField",
+      "name": "messageText",
+      "x": 24,
+      "y": 10,
+      "width": 572,
+      "height": 64,
+      "text": "Tip",
+      "fontSize": 28,
+      "color": "#ffffff",
+      "align": "center",
+      "valign": "middle"
+    }
+  ]
+}

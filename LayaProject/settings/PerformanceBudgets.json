@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "defaultProfile": "minigame-low-end",
+  "headless": {
+    "profile": "minigame-low-end",
+    "scene": "startup"
+  },
+  "profiles": {
+    "minigame-low-end": {
+      "platform": "minigame",
+      "scenes": {
+        "startup": {
+          "drawCalls2D": 20,
+          "drawCalls": 20,
+          "triangles": 1000
+        }
+      },
+      "requiredDeviceEvidence": [
+        "frame-time",
+        "cpu-memory",
+        "gpu-memory",
+        "package-size"
+      ]
+    },
+    "app-low-end": {
+      "platform": "app",
+      "inherits": "minigame-low-end",
+      "scenes": {},
+      "requiredDeviceEvidence": [
+        "frame-time",
+        "cpu-memory",
+        "gpu-memory",
+        "fill-rate",
+        "thermal-stability",
+        "foreground-resume"
+      ]
+    }
+  }
+}

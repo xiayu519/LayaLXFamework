@@ -7,7 +7,9 @@ assets/
   bootstrap/                     首次可交互前必需资源
     scenes/Startup.ls
     ui/FrameworkStatus.lh
-    config/game/*.bin
+    ui/common/Tip.lh
+    config/*.json
+    tables/game/*.bin
   packages/<feature>/            可延迟加载的完整业务功能
     scenes/  ui/  prefabs/
     spine/<name>/                .lh、.skel/.json、.atlas、纹理同目录
@@ -15,7 +17,7 @@ assets/
     images/  atlas/  fonts/
     audio/bgm/  audio/sfx/  audio/voice/
     video/  shaders/
-    data/  config/
+    data/  config/  maps/  levels/  tables/
   shared/<domain>/               已证明被多个延迟包复用的独立资源包
   library/                       Laya 模板与开发素材，不得被运行时资产引用
 ```
@@ -23,6 +25,7 @@ assets/
 ## 放置规则
 
 - 启动 Scene、Loading、启动错误兜底和首次交互前必需配置放入 `bootstrap`。
+- JSON 按用途放进 `config/data/maps/levels`；扩展名不决定目录。Luban 二进制只进入 `tables`，与 JSON 分开。
 - 新业务 UI 放入 `assets/packages/<feature>/ui/<Name>.lh`；业务 Scene 放入 `scenes/<Name>.ls`；普通 Prefab 放入 `prefabs/<Name>.lh`。
 - Spine Prefab 与骨骼、图集、纹理放入同一 `spine/<name>/`，不得拆到全局类型目录。
 - 图片、音频与 Spine 的源格式和 `.meta` 参数遵循 [asset-import.md](asset-import.md)，并由 `npm run validate:content-assets` 执行检查。

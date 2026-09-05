@@ -1,5 +1,5 @@
 interface:
-  display_name: "Luban Config"
+  display_name: "Luban Tables"
   short_description: "Generate and load typed game tables"
 policy:
   allow_implicit_invocation: true

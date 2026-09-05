@@ -49,13 +49,13 @@ for (const entry of buildSettings?.alwaysIncluded ?? []) {
     }
 }
 
-const generatedConfig = typeof resourceLayout?.generatedConfig === "string" ? resourceLayout.generatedConfig : "__invalid__";
-const configRoot = join(assetsRoot, generatedConfig);
-for (const sourcePath of binaryFiles(configRoot)) {
+const generatedTables = typeof resourceLayout?.generatedTables === "string" ? resourceLayout.generatedTables : "__invalid__";
+const tablesRoot = join(assetsRoot, generatedTables);
+for (const sourcePath of binaryFiles(tablesRoot)) {
     const assetRelativePath = relative(assetsRoot, sourcePath);
     const releasePath = join(releaseRoot, assetRelativePath);
     if (!existsSync(releasePath)) {
-        failures.push(`release/web/${assetRelativePath} is missing; generated config was not collected.`);
+        failures.push(`release/web/${assetRelativePath} is missing; generated table was not collected.`);
     } else if (!readFileSync(sourcePath).equals(readFileSync(releasePath))) {
         failures.push(`release/web/${assetRelativePath} differs from the generated source binary.`);
     }
@@ -70,6 +70,19 @@ if (!existsSync(statusPath)) {
     if (statusAsset?._$type !== "GWidget") {
         failures.push(`release/web/${startupUI} must export a GWidget root.`);
     }
+}
+const tipUI = typeof resourceLayout?.tipUI === "string" ? resourceLayout.tipUI : "__invalid__.lh";
+const tipPath = join(releaseRoot, tipUI);
+if (!existsSync(tipPath) || readJson(tipPath)?._$type !== "GWidget") {
+    failures.push(`release/web/${tipUI} must contain the pooled GWidget tip asset.`);
+}
+const runtimeConfig = "bootstrap/config/runtime.json";
+const runtimeConfigSource = join(assetsRoot, runtimeConfig);
+const runtimeConfigRelease = join(releaseRoot, runtimeConfig);
+if (!existsSync(runtimeConfigRelease)) {
+    failures.push(`release/web/${runtimeConfig} is missing; the bootstrap JSON config was not collected.`);
+} else if (JSON.stringify(readJson(runtimeConfigSource)) !== JSON.stringify(readJson(runtimeConfigRelease))) {
+    failures.push(`release/web/${runtimeConfig} differs from its source JSON.`);
 }
 
 const indexPath = join(releaseRoot, "js", "index.js");
@@ -126,7 +139,7 @@ if (failures.length > 0) {
     }
     process.exitCode = 1;
 } else {
-    console.log("Web build OK: bootstrap assets, 2D modules, startup UI and generated config binaries are present; library assets are excluded.");
+    console.log("Web build OK: bootstrap JSON, 2D modules, startup/tip UI and generated table binaries are present; library assets are excluded.");
 }
 
 function hierarchyFiles(path) {

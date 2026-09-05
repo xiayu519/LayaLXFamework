@@ -1,16 +1,17 @@
 import type { AppService } from "../../../framework/application/lifecycle/AppService";
-import type { ConfigRegistry } from "../../../framework/application/config/ConfigRegistry";
+import type { TablesRegistry } from "../../../framework/application/config/TablesRegistry";
 import ByteBuf from "../../generated/luban/ByteBuf";
-import { Tables } from "../../generated/config/schema";
+import { Tables } from "../../generated/tables/schema";
 
-const CONFIG_ROOT = "bootstrap/config/game";
+const TABLES_ROOT = "bootstrap/tables/game";
 
-export class GameConfigService implements AppService {
-    readonly name = "game-config";
+export class GameTablesService implements AppService {
+    readonly name = "game-tables";
+    private readonly loadedUrls = new Set<string>();
     private tables: Tables | undefined;
     private startTask: Promise<void> | undefined;
 
-    constructor(private readonly registry: ConfigRegistry) {}
+    constructor(private readonly registry: TablesRegistry) {}
 
     start(): Promise<void> {
         if (this.tables) {
@@ -24,6 +25,7 @@ export class GameConfigService implements AppService {
             this.registry.clear(this.tables);
             this.tables = undefined;
         }
+        this.clearResources();
         this.startTask = undefined;
     }
 
@@ -31,11 +33,16 @@ export class GameConfigService implements AppService {
         const names = Tables.getTableNames();
         const buffers = new Map<string, Uint8Array>();
         try {
-            await Promise.all(names.map(async (name) => {
-                const url = `${CONFIG_ROOT}/${name}.bin`;
+            const results = await Promise.allSettled(names.map(async (name) => {
+                const url = `${TABLES_ROOT}/${name}.bin`;
+                this.loadedUrls.add(url);
                 const loaded = await Laya.loader.load(url, Laya.Loader.BUFFER) as unknown;
                 buffers.set(name, toBytes(loaded, name));
             }));
+            const failure = results.find((result): result is PromiseRejectedResult => result.status === "rejected");
+            if (failure) {
+                throw failure.reason;
+            }
             const tables = new Tables((name) => {
                 const bytes = buffers.get(name);
                 if (!bytes) {
@@ -44,9 +51,19 @@ export class GameConfigService implements AppService {
                 return new ByteBuf(bytes);
             });
             this.tables = this.registry.install(tables);
+        } catch (error) {
+            this.clearResources();
+            throw error;
         } finally {
             this.startTask = undefined;
         }
+    }
+
+    private clearResources(): void {
+        for (const url of this.loadedUrls) {
+            Laya.loader.clearRes(url);
+        }
+        this.loadedUrls.clear();
     }
 }
 
@@ -60,5 +77,5 @@ function toBytes(loaded: unknown, name: string): Uint8Array {
     if (ArrayBuffer.isView(payload)) {
         return new Uint8Array(payload.buffer, payload.byteOffset, payload.byteLength);
     }
-    throw new Error(`Configuration '${name}' did not load as a binary TextResource.`);
+    throw new Error(`Table '${name}' did not load as a binary TextResource.`);
 }

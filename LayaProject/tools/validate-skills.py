@@ -8,6 +8,7 @@ import sys
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SKILLS_ROOT = PROJECT_ROOT / ".agents" / "skills"
+GAME_ROOT = PROJECT_ROOT / "src" / "game"
 VALIDATOR = Path.home() / ".codex" / "skills" / ".system" / "skill-creator" / "scripts" / "quick_validate.py"
 AGENTS = PROJECT_ROOT / "AGENTS.md"
 ROUTING_CASES = SKILLS_ROOT / "codex-workflow" / "evals" / "cases.json"
@@ -37,11 +38,14 @@ def main() -> int:
     errors = []
     uses_system_validator = VALIDATOR.is_file()
 
-    skills = sorted(path.parent for path in SKILLS_ROOT.glob("*/SKILL.md"))
-    if not skills:
+    public_skills = sorted(path.parent for path in SKILLS_ROOT.glob("*/SKILL.md"))
+    game_skill_files = sorted(GAME_ROOT.glob("*/.agents/skills/*/SKILL.md"))
+    game_skills = [path.parent for path in game_skill_files]
+    skills = public_skills + game_skills
+    if not public_skills:
         errors.append("No project skills discovered under .agents/skills.")
 
-    descriptions = []
+    descriptions = {}
     environment = os.environ.copy()
     environment["PYTHONUTF8"] = "1"
     for skill in skills:
@@ -78,7 +82,7 @@ def main() -> int:
             errors.append(f"{skill.name}: description exceeds 240 characters")
         if unknown_fields:
             errors.append(f"{skill.name}: unsupported frontmatter fields {unknown_fields}")
-        descriptions.append(description)
+        descriptions[skill] = description
 
         openai_yaml = skill / "agents" / "openai.yaml"
         if not openai_yaml.is_file():
@@ -94,9 +98,22 @@ def main() -> int:
             errors.extend(local_markdown_links_resolve(markdown))
 
     if len(set(skill.name for skill in skills)) != len(skills):
-        errors.append("Project skill names must be unique.")
-    if sum(len(description) for description in descriptions) > 2500:
-        errors.append("Combined project skill descriptions exceed the 2500-character budget.")
+        errors.append("Public and game skill names must be globally unique.")
+    public_budget = sum(len(descriptions.get(skill, "")) for skill in public_skills)
+    if public_budget > 2500:
+        errors.append("Combined public skill descriptions exceed the 2500-character budget.")
+
+    for game_agents in sorted(GAME_ROOT.glob("*/AGENTS.md")):
+        game_directory = game_agents.parent
+        active_game_skills = [skill for skill in game_skills if game_directory in skill.parents]
+        active_budget = public_budget + sum(len(descriptions.get(skill, "")) for skill in active_game_skills)
+        if active_budget > 2500:
+            errors.append(f"{game_directory.name}: active public + game skill descriptions exceed 2500 characters")
+        game_source = game_agents.read_text(encoding="utf-8")
+        if len(game_source.encode("utf-8")) > 2048:
+            errors.append(f"{game_agents.relative_to(PROJECT_ROOT)} exceeds the 2048-byte game budget.")
+        if EXPLICIT_SKILL.search(game_source):
+            errors.append(f"{game_agents.relative_to(PROJECT_ROOT)} must not hard-code explicit $skill routing.")
 
     agents_source = AGENTS.read_text(encoding="utf-8")
     if len(agents_source.encode("utf-8")) > 2048:
@@ -107,7 +124,7 @@ def main() -> int:
     try:
         cases = json.loads(ROUTING_CASES.read_text(encoding="utf-8"))["cases"]
         covered = {name for case in cases for name in case["expected"]}
-        discovered = {skill.name for skill in skills}
+        discovered = {skill.name for skill in public_skills}
         if covered != discovered:
             missing = sorted(discovered - covered)
             unknown = sorted(covered - discovered)
@@ -122,8 +139,8 @@ def main() -> int:
         return 1
 
     print(
-        f"Skills OK: {len(skills)} discovered dynamically; "
-        f"description budget {sum(len(item) for item in descriptions)}/2500 characters; "
+        f"Skills OK: {len(public_skills)} public + {len(game_skills)} game skill(s); "
+        f"public description budget {public_budget}/2500 characters; "
         f"validator={'system+project' if uses_system_validator else 'project-portable'}."
     )
     return 0

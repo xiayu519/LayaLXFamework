@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 
 const staticChecks = [
-    "config:check",
+    "tables:check",
     "typecheck",
     "test",
     "check:architecture",
@@ -9,6 +9,8 @@ const staticChecks = [
     "validate:assets",
     "validate:content-assets",
     "validate:resource-layout",
+    "validate:performance",
+    "validate:game-workflow",
     "check:skills",
     "check:memory",
 ];

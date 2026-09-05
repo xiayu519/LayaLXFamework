@@ -1,4 +1,4 @@
-export class ConfigRegistry {
+export class TablesRegistry {
     private current: object | undefined;
 
     get ready(): boolean {
@@ -7,7 +7,7 @@ export class ConfigRegistry {
 
     install<T extends object>(value: T): T {
         if (this.current && this.current !== value) {
-            throw new Error("A different configuration set is already installed.");
+            throw new Error("A different table set is already installed.");
         }
         this.current = value;
         return value;
@@ -15,7 +15,7 @@ export class ConfigRegistry {
 
     require<T extends object>(): T {
         if (!this.current) {
-            throw new Error("Configuration is not ready.");
+            throw new Error("Tables are not ready.");
         }
         return this.current as T;
     }

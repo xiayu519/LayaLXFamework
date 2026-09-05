@@ -3,6 +3,7 @@ import {
     createReadStream,
     existsSync,
     mkdtempSync,
+    readFileSync,
     promises as fs,
     statSync,
 } from "node:fs";
@@ -13,6 +14,9 @@ import { fileURLToPath } from "node:url";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const releaseRoot = join(projectRoot, "release", "web");
+const performanceSettings = JSON.parse(readFileSync(join(projectRoot, "settings", "PerformanceBudgets.json"), "utf8"));
+const headlessProfile = performanceSettings.profiles[performanceSettings.headless.profile];
+const startupRenderBudget = headlessProfile.scenes[performanceSettings.headless.scene];
 const temporaryRoot = resolve(tmpdir());
 const profileRoot = mkdtempSync(join(temporaryRoot, "lx-browser-"));
 if (!profileRoot.startsWith(`${temporaryRoot}${sep}`)) {
@@ -145,7 +149,9 @@ try {
         !runtimeState.ready
         || !runtimeState.uiReady
         || !runtimeState.configReady
+        || !runtimeState.tablesReady
         || runtimeState.configValue !== "LXFamework"
+        || runtimeState.tableValue !== "LXFamework"
         || !runtimeState.spineReady
         || runtimeState.spineVersion !== "4.2"
         || !runtimeState.performanceReady
@@ -167,6 +173,7 @@ try {
         expression: `(async () => {
             const services = {
                 config: globalThis.LX.Config,
+                tables: globalThis.LX.Tables,
                 ui: globalThis.LX.UI,
                 pool: globalThis.LX.Pool,
                 audio: globalThis.LX.Audio,
@@ -182,9 +189,12 @@ try {
             return {
                 ready: globalThis.LX.Ready,
                 configReady: services.config.ready,
+                tablesReady: services.tables.ready,
                 managedUI: services.ui.snapshot().managed.length,
                 pools: services.pool.snapshot().length,
                 sfx: services.audio.snapshot().activeSfx,
+                configCached: Boolean(globalThis.Laya.loader.getRes("bootstrap/config/runtime.json")),
+                tablesCached: Boolean(globalThis.Laya.loader.getRes("bootstrap/tables/game/tbtableappconfig.bin")),
             };
         })()`,
         awaitPromise: true,
@@ -194,9 +204,12 @@ try {
     if (shutdown.exceptionDetails
         || shutdownState?.ready !== false
         || shutdownState?.configReady !== false
+        || shutdownState?.tablesReady !== false
         || shutdownState?.managedUI !== 0
         || shutdownState?.pools !== 0
-        || shutdownState?.sfx !== 0) {
+        || shutdownState?.sfx !== 0
+        || shutdownState?.configCached !== false
+        || shutdownState?.tablesCached !== false) {
         throw new Error(`runtime shutdown did not release every owner: ${JSON.stringify(shutdownState)}`);
     }
     if (consoleErrors.length > 0 || runtimeErrors.length > 0 || failedRequests.length > 0) {
@@ -204,8 +217,8 @@ try {
     }
     console.log(
         `Browser OK: ${runtimeState.title}, LayaAir ${runtimeState.engineVersion}, pure 2D, `
-        + `config=${runtimeState.configValue}, UI/Spine ${runtimeState.spineVersion}/performance ready, status=${runtimeState.statusText}, `
-        + `Timer/GLoader/shared-texture/PrefabPool/UI-modal probes passed, clean scene shutdown, no errors.`,
+        + `config=${runtimeState.configValue}, tables=${runtimeState.tableValue}, UI/Spine ${runtimeState.spineVersion}/performance ready, `
+        + `status=${runtimeState.statusText}, Timer/GLoader/shared-texture/PrefabPool/Tip/UI-modal probes passed, clean scene shutdown, no errors.`,
     );
 } finally {
     socket?.close();
@@ -281,6 +294,29 @@ async function runEngineLifecycleProbes(cdp) {
             const poolDrained = globalThis.LX.Pool.snapshot()
                 .find((entry) => entry.id === poolId)?.idle === 0;
 
+            globalThis.LX.UI.tip("Headless tip one");
+            globalThis.LX.UI.tip("Headless tip two");
+            await delay(80);
+            const firstTip = globalThis.LX.UI.snapshot().tips;
+            const tipRoot = globalThis.Laya.GRoot.inst;
+            const firstTipView = Array.from({ length: tipRoot.numChildren }, (_, index) => tipRoot.getChildAt(index))
+                .find((node) => node.name === "LXTip");
+            const firstTipQueued = firstTip.active === 1
+                && firstTip.queued === 1
+                && firstTipView?.getChildByName?.("messageText")?.text === "Headless tip one";
+            await delay(520);
+            const secondTip = globalThis.LX.UI.snapshot().tips;
+            const tipCadence = secondTip.shown >= 2 && secondTip.active === 2 && secondTip.queued === 0;
+            await delay(1320);
+            const idleTips = globalThis.LX.Pool.snapshot().find((entry) => entry.id === "lx.ui.tip")?.idle ?? 0;
+            const tipsReleased = globalThis.LX.UI.snapshot().tips.active === 0 && idleTips >= 2;
+            globalThis.LX.UI.tip("Headless tip three");
+            await delay(80);
+            const reusedTipPool = globalThis.LX.Pool.snapshot()
+                .find((entry) => entry.id === "lx.ui.tip");
+            const tipReused = reusedTipPool?.active === 1 && reusedTipPool.idle >= 1;
+            await delay(1320);
+
             const statusInfo = globalThis.LX.UI.snapshot().managed
                 .find((entry) => entry.routeId === "lx.status");
             if (!statusInfo) throw new Error("Status window was not available for the UI probe.");
@@ -329,6 +365,10 @@ async function runEngineLifecycleProbes(cdp) {
                 sharedReleasedAfterLastOwner,
                 poolReused,
                 poolDrained,
+                firstTipQueued,
+                tipCadence,
+                tipsReleased,
+                tipReused,
                 modalOrdered,
                 uiDestroyed,
             };
@@ -346,6 +386,10 @@ async function runEngineLifecycleProbes(cdp) {
         || result?.sharedReleasedAfterLastOwner !== true
         || result?.poolReused !== true
         || result?.poolDrained !== true
+        || result?.firstTipQueued !== true
+        || result?.tipCadence !== true
+        || result?.tipsReleased !== true
+        || result?.tipReused !== true
         || result?.modalOrdered !== true
         || result?.uiDestroyed !== true) {
         throw new Error(`engine lifecycle probes failed: ${JSON.stringify(result)}`);
@@ -499,17 +543,17 @@ async function waitForRuntime(cdp, timeoutMs) {
                 const statusText = findStatusText(globalThis.Laya?.GRoot?.inst);
                 const ready = globalThis.LX?.Ready === true;
                 const configReady = ready && globalThis.LX.Config.ready === true;
+                const tablesReady = ready && globalThis.LX.Tables.ready === true;
                 const configValue = configReady
-                    ? globalThis.LX.Config.require().TbTableAppConfig.get(1)?.value ?? null
+                    ? globalThis.LX.Config.require("lx.runtime-config")?.framework ?? null
+                    : null;
+                const tableValue = tablesReady
+                    ? globalThis.LX.Tables.require().TbTableAppConfig.get(1)?.value ?? null
                     : null;
                 let render = null;
                 let ownershipReady = false;
                 if (ready) {
-                    render = globalThis.LX.Performance.assertBudget({
-                        drawCalls2D: 20,
-                        drawCalls: 20,
-                        triangles: 1000,
-                    });
+                    render = globalThis.LX.Performance.assertBudget(${JSON.stringify(startupRenderBudget)});
                     const ui = globalThis.LX.UI.snapshot();
                     ownershipReady = ui.loading["lx.status"] === undefined
                         && ui.managed.length === 1
@@ -524,6 +568,8 @@ async function waitForRuntime(cdp, timeoutMs) {
                     uiReady: ready && Boolean(globalThis.LX.UI),
                     configReady,
                     configValue,
+                    tablesReady,
+                    tableValue,
                     spineReady: ready && typeof globalThis.Laya.Spine2DRenderNode === "function",
                     spineVersion: globalThis.Laya?.PlayerConfig?.spineVersion ?? null,
                     performanceReady: render !== null
@@ -544,7 +590,7 @@ async function waitForRuntime(cdp, timeoutMs) {
         });
         const state = evaluation.result?.value;
         lastState = state;
-        if (state?.ready && state?.uiReady && state?.configReady && state?.statusText === "READY") {
+        if (state?.ready && state?.uiReady && state?.configReady && state?.tablesReady && state?.statusText === "READY") {
             return state;
         }
         await delay(100);

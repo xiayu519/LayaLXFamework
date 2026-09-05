@@ -112,8 +112,13 @@
     },
     {
       "id": "luban_table",
-      "request": "在 Design 增加 Luban Excel 表，生成 TypeScript-bin 并让 LX.Config 在发布包加载。",
-      "expected": ["luban-config"]
+      "request": "在 Design/Tables 增加 Luban Excel 表，生成 TypeScript-bin 并让 LX.Tables 在发布包加载。",
+      "expected": ["luban-tables"]
+    },
+    {
+      "id": "external_json_map",
+      "request": "接入另一个游戏的地图编辑器 JSON，使用 Laya Loader.JSON 加载、校验地图结构并在退出关卡时释放。",
+      "expected": ["laya-json-data"]
     },
     {
       "id": "minigame_resource_packages",

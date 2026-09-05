@@ -1,0 +1,5 @@
+interface:
+  display_name: "LayaAir JSON Data"
+  short_description: "Load and release typed JSON data"
+policy:
+  allow_implicit_invocation: true

@@ -1,6 +1,7 @@
-import { ConfigRegistry } from "../application/config/ConfigRegistry";
+import { TablesRegistry } from "../application/config/TablesRegistry";
 import { AudioService, type AudioSettings } from "../infrastructure/audio/AudioService";
 import { ContentCatalog, type ContentEntry } from "../infrastructure/content/ContentCatalog";
+import { JsonConfigService } from "../infrastructure/config/JsonConfigService";
 import { LayaHttpTransport, type HttpTransport } from "../infrastructure/network/HttpTransport";
 import { RenderPerformance } from "../infrastructure/performance/RenderPerformance";
 import { PrefabPoolService } from "../infrastructure/pool/PrefabPoolService";
@@ -14,6 +15,7 @@ import { WebPlatformService } from "../platform/WebPlatformService";
 import type { PurchasePlatform } from "../platform/purchase/PurchasePlatform";
 import { UnsupportedPurchasePlatform } from "../platform/purchase/UnsupportedPurchasePlatform";
 import { UIRouter } from "../presentation/ui/UIRouter";
+import { TipQueue } from "../presentation/ui/TipQueue";
 import { AppBootstrap, type AppService } from "./AppBootstrap";
 import { bindLXRuntime, unbindLXRuntime } from "./LXRuntimeHost";
 
@@ -22,7 +24,8 @@ export interface ClientSettings extends AudioSettings {
 }
 
 export interface RuntimeContext {
-    readonly config: ConfigRegistry;
+    readonly tables: TablesRegistry;
+    readonly config: JsonConfigService;
     readonly content: ContentCatalog;
     readonly settings: SaveStore<ClientSettings>;
     readonly audio: AudioService;
@@ -77,8 +80,9 @@ export function createRuntime(
     definition: ApplicationDefinition,
     adapters: ApplicationAdapters = {},
 ): ApplicationRuntime {
-    const config = new ConfigRegistry();
+    const tables = new TablesRegistry();
     const content = new ContentCatalog(definition.content ?? []);
+    const config = new JsonConfigService(content);
     const audio = new AudioService();
     const pool = new PrefabPoolService();
     const performance = new RenderPerformance();
@@ -86,11 +90,13 @@ export function createRuntime(
     const platform = adapters.platform ?? new WebPlatformService();
     const purchase = adapters.purchase ?? new UnsupportedPurchasePlatform();
     const http = adapters.http ?? new LayaHttpTransport();
-    const ui = new UIRouter();
+    const tips = new TipQueue(pool, "bootstrap/ui/common/Tip.lh");
+    const ui = new UIRouter(tips);
 
     definition.configureUI?.(ui, content);
 
     const context: RuntimeContext = {
+        tables,
         config,
         content,
         settings,
@@ -121,6 +127,8 @@ export function createRuntime(
             await collectCleanup(errors, () => pool.waitForPendingLoads());
             await collectCleanup(errors, () => pool.dispose());
             await collectCleanup(errors, () => audio.dispose());
+            await collectCleanup(errors, () => config.dispose());
+            await collectCleanup(errors, () => config.waitForPendingLoads());
             await collectCleanup(errors, () => Laya.Scene.gc());
             if (errors.length > 0) {
                 throw new RuntimeCleanupError(errors);

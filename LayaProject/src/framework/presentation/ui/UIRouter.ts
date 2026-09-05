@@ -3,6 +3,7 @@ import {
     type WindowLifecycleObserver,
 } from "./BaseGameWindow";
 import { UILayer } from "./UILayer";
+import { TipQueue, type TipQueueSnapshot } from "./TipQueue";
 
 export type UIWindowMultiplicity = "singleton" | "multiple";
 export type UIWindowRetention = "hide" | "destroy";
@@ -32,6 +33,7 @@ export interface UIRouterSnapshot {
     readonly visible: readonly UIWindowInfo[];
     readonly top?: UIWindowInfo;
     readonly bottom?: UIWindowInfo;
+    readonly tips: TipQueueSnapshot;
 }
 
 export class UIRouterCleanupError extends Error {
@@ -61,6 +63,8 @@ export class UIRouter implements WindowLifecycleObserver {
     private readonly loadingCounts = new Map<string, number>();
     private disposed = false;
 
+    constructor(private readonly tips?: TipQueue) {}
+
     register<TArgs>(route: UIRoute<TArgs>): void {
         this.requireActive();
         if (!route.id || !route.url) {
@@ -85,6 +89,14 @@ export class UIRouter implements WindowLifecycleObserver {
             () => this.pendingLoads.delete(operation),
         );
         return operation;
+    }
+
+    tip(message: string): void {
+        this.requireActive();
+        if (!this.tips) {
+            throw new Error("UI tip presentation is not configured.");
+        }
+        this.tips.show(message);
     }
 
     close(routeId: string, target?: UnknownWindow): void {
@@ -158,17 +170,23 @@ export class UIRouter implements WindowLifecycleObserver {
             visible,
             top: visible[visible.length - 1],
             bottom: visible[0],
+            tips: this.tips?.snapshot() ?? Object.freeze({ queued: 0, active: 0, shown: 0, dropped: 0 }),
         });
     }
 
     dispose(): void {
+        const errors: unknown[] = [];
         if (!this.disposed) {
             this.disposed = true;
+            try {
+                this.tips?.dispose();
+            } catch (error) {
+                errors.push(error);
+            }
             for (const routeId of this.routes.keys()) {
                 this.invalidateRoute(routeId);
             }
         }
-        const errors: unknown[] = [];
         for (const record of Array.from(this.records.values())) {
             try {
                 this.destroyWindow(record);
@@ -189,6 +207,7 @@ export class UIRouter implements WindowLifecycleObserver {
         while (this.pendingLoads.size > 0) {
             await Promise.allSettled(Array.from(this.pendingLoads));
         }
+        await this.tips?.waitForPending();
     }
 
     onHidden(window: UnknownWindow): void {

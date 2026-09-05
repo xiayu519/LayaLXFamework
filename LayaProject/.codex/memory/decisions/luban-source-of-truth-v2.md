@@ -3,14 +3,16 @@ type: decision
 scope: game-config
 description: 外层 Design 是 Luban 人工源，固定版本生成 TypeScript-bin；启动必需二进制进入 bootstrap，框架只公开泛型 LX.Config。
 trigger: 增删配置表、升级 Luban、修改生成路径或配置运行时入口时
-status: active
-last_verified: 2026-09-04
+status: superseded
+last_verified: 2026-09-05
 source: user-confirmed
 ---
 
 # Luban source of truth v2
 
 替代 [旧版决定](luban-source-of-truth.md)。
+
+已由 [Data pipelines v3](data-pipelines-v3.md) 替代；新版本明确拆分普通 JSON 与 Luban Tables，并更新公共入口和目录命名。
 
 ## Decision
 

@@ -20,9 +20,13 @@
     "video",
     "shaders",
     "data",
-    "config"
+    "config",
+    "maps",
+    "levels",
+    "tables"
   ],
   "startupScene": "bootstrap/scenes/Startup.ls",
   "startupUI": "bootstrap/ui/FrameworkStatus.lh",
-  "generatedConfig": "bootstrap/config/game"
+  "tipUI": "bootstrap/ui/common/Tip.lh",
+  "generatedTables": "bootstrap/tables/game"
 }

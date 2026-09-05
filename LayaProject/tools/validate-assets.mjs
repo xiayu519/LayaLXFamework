@@ -139,13 +139,13 @@ if (typeof bootstrapRoot !== "string" || !buildSettings?.alwaysIncluded?.include
     failures.push("settings/BuildSettings.json: the bootstrap resource root must be in alwaysIncluded.");
 }
 
-const generatedConfig = resourceLayout?.generatedConfig;
-const configRoot = typeof generatedConfig === "string" ? resolve(assetsRoot, generatedConfig) : resolve(assetsRoot, "__invalid__");
-const configBinaries = allFiles.filter((path) => path.endsWith(".bin") && path.startsWith(`${configRoot}${sep}`));
-if (configBinaries.length === 0) {
-    failures.push("settings/ResourceLayout.json: no generated Luban binary tables were found at generatedConfig.");
+const generatedTables = resourceLayout?.generatedTables;
+const tablesRoot = typeof generatedTables === "string" ? resolve(assetsRoot, generatedTables) : resolve(assetsRoot, "__invalid__");
+const tableBinaries = allFiles.filter((path) => path.endsWith(".bin") && path.startsWith(`${tablesRoot}${sep}`));
+if (tableBinaries.length === 0) {
+    failures.push("settings/ResourceLayout.json: no generated Luban binary tables were found at generatedTables.");
 }
-for (const path of configBinaries) {
+for (const path of tableBinaries) {
     if (!existsSync(`${path}.meta`)) {
         failures.push(`${relative(projectRoot, path)}: generated binary meta is missing.`);
     }
@@ -165,7 +165,9 @@ for (const setting of ["horizontalScrollBar", "verticalScrollBar", "popupMenu", 
 }
 
 const startupUI = typeof resourceLayout?.startupUI === "string" ? resourceLayout.startupUI : "__invalid__.lh";
+const tipUI = typeof resourceLayout?.tipUI === "string" ? resourceLayout.tipUI : "__invalid__.lh";
 const statusAsset = readJson(join(assetsRoot, startupUI));
+const tipAsset = readJson(join(assetsRoot, tipUI));
 const statusNames = new Set();
 visit(statusAsset, (node) => {
     if (typeof node.name === "string") {
@@ -179,6 +181,15 @@ for (const requiredName of ["statusText", "detailText"]) {
 }
 if (!statusNames.has("titleText")) {
     failures.push(`assets/${startupUI}: required child 'titleText' is missing.`);
+}
+const tipNames = new Set();
+visit(tipAsset, (node) => {
+    if (typeof node.name === "string") {
+        tipNames.add(node.name);
+    }
+});
+if (!tipNames.has("messageText")) {
+    failures.push(`assets/${tipUI}: required child 'messageText' is missing.`);
 }
 
 if (failures.length > 0) {

@@ -20,23 +20,34 @@ class FakeGWindow extends FakeGWidget {
     protected onHide(): void {}
 }
 
+class FakeTextResource {
+    constructor(readonly data: unknown) {}
+}
+
 const storage = new Map<string, string>();
 const sceneGc = vi.fn();
-const configBytes = readFileSync(resolve("assets/bootstrap/config/game/tbtableappconfig.bin"));
+const clearRes = vi.fn();
+const tableBytes = readFileSync(resolve("assets/bootstrap/tables/game/tbtableappconfig.bin"));
+const runtimeConfig = JSON.parse(readFileSync(resolve("assets/bootstrap/config/runtime.json"), "utf8"));
 vi.stubGlobal("Laya", {
     GWidget: FakeGWidget,
     GWindow: FakeGWindow,
     GRoot: { inst: { modalLayer: new FakeGWidget() } },
-    Loader: { HIERARCHY: "HIERARCHY", BUFFER: "arraybuffer" },
+    TextResource: FakeTextResource,
+    Loader: { HIERARCHY: "HIERARCHY", BUFFER: "arraybuffer", JSON: "json" },
     loader: {
         load: vi.fn(async (url: string) => {
-            if (url !== "bootstrap/config/game/tbtableappconfig.bin") {
-                throw new Error(`Unexpected test resource '${url}'.`);
+            if (url === "bootstrap/tables/game/tbtableappconfig.bin") {
+                return {
+                    data: tableBytes.buffer.slice(tableBytes.byteOffset, tableBytes.byteOffset + tableBytes.byteLength),
+                };
             }
-            return {
-                data: configBytes.buffer.slice(configBytes.byteOffset, configBytes.byteOffset + configBytes.byteLength),
-            };
+            if (url === "bootstrap/config/runtime.json") {
+                return new FakeTextResource(runtimeConfig);
+            }
+            throw new Error(`Unexpected test resource '${url}'.`);
         }),
+        clearRes,
     },
     Pool: {
         getPoolBySign: vi.fn(() => []),
@@ -45,6 +56,7 @@ vi.stubGlobal("Laya", {
         clearBySign: vi.fn(),
     },
     Scene: { gc: sceneGc },
+    timer: { clearAll: vi.fn() },
     LocalStorage: {
         getItem: (key: string) => storage.get(key) ?? null,
         setItem: (key: string, value: string) => storage.set(key, value),
@@ -63,6 +75,7 @@ const { createRuntime } = await import("../src/framework/bootstrap/createRuntime
 
 beforeEach(() => {
     sceneGc.mockReset();
+    clearRes.mockReset();
 });
 
 afterAll(() => vi.unstubAllGlobals());
@@ -92,6 +105,9 @@ describe("createApplication", () => {
         expect(application.http).toBe(http);
         await application.start();
         expect(LX.Ready).toBe(true);
+        expect(LX.Tables.ready).toBe(true);
+        expect(LX.Config.ready).toBe(false);
+        expect(await LX.Config.load<{ framework: string }>("lx.runtime-config")).toEqual(runtimeConfig);
         expect(LX.Config.ready).toBe(true);
         application.settings.save({
             language: "en-US",
@@ -102,6 +118,8 @@ describe("createApplication", () => {
 
         await application.stop();
         expect(LX.Ready).toBe(false);
+        expect(application.tables.ready).toBe(false);
+        expect(application.config.ready).toBe(false);
         expect(JSON.parse(storage.get("lx.client-settings") ?? "null").data).toEqual({
             language: "en-US",
             muted: true,
@@ -109,6 +127,8 @@ describe("createApplication", () => {
             soundVolume: 0.5,
         });
         expect(sceneGc).toHaveBeenCalledOnce();
+        expect(clearRes).toHaveBeenCalledWith("bootstrap/tables/game/tbtableappconfig.bin");
+        expect(clearRes).toHaveBeenCalledWith("bootstrap/config/runtime.json");
         expect(platform.stop).toHaveBeenCalledOnce();
     });
 
@@ -161,6 +181,8 @@ describe("createApplication", () => {
             .mockImplementation(() => { events.push("pool-retry"); });
         vi.spyOn(runtime.pool, "waitForPendingLoads").mockImplementation(async () => { events.push("pending-pool"); });
         vi.spyOn(runtime.audio, "dispose").mockImplementation(() => { events.push("audio"); });
+        vi.spyOn(runtime.config, "dispose").mockImplementation(() => { events.push("config"); });
+        vi.spyOn(runtime.config, "waitForPendingLoads").mockImplementation(async () => { events.push("pending-config"); });
         sceneGc.mockImplementationOnce(() => { events.push("gc"); });
 
         await runtime.start();
@@ -169,7 +191,7 @@ describe("createApplication", () => {
         expect(events).toEqual([
             "ui", "pending-ui", "ui-retry",
             "pool", "pending-pool", "pool-retry",
-            "audio", "gc",
+            "audio", "config", "pending-config", "gc",
         ]);
         expect(LX.Ready).toBe(false);
     });

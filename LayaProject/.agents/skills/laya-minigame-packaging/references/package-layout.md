@@ -7,6 +7,8 @@
 - `assets/shared/<domain>/<type>/`：被多个延迟功能稳定复用、值得承担额外包请求的资源。
 - `assets/library/`：开发模板，不参与运行时依赖。
 
+普通 JSON 按语义进入 `config/data/maps/levels`；Luban 二进制进入 `tables`。格式相同或扩展名相同不能跨功能拆包。
+
 允许的 `<type>` 以 `settings/ResourceLayout.json` 为准。UI、Scene、Prefab 与 Spine 的固定落点见 `docs/resource-layout.md`。
 
 ## Build and load

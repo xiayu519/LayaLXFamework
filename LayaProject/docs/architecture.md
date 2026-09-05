@@ -11,13 +11,14 @@
 | 领域 | 直接使用 | 项目扩展 |
 | --- | --- | --- |
 | 事件/时间/动画 | Event、`Laya.timer`、Tween | `LifetimeScope` 仅聚合异构清理；不建立新 Timer |
-| 资源 | `Laya.loader`、Resource 引用计数、`Scene.gc()` | `ContentCatalog` 只映射 ID/URL |
+| 资源 | `Laya.loader`、Resource 引用计数、`Scene.gc()` | `ContentCatalog` 映射 ID/URL；`LX.Config` 增加 JSON 校验和显式释放 |
 | 场景 | `Laya.Scene.open/close/destroy/gc` | 真实业务有竞态时在 game 层增加请求版本，不设公共 SceneRouter |
 | UI | ui2 `GRoot/GWindow/GWidget/GLoader` | 路由、分层查询、窗口参数与生命周期约束 |
 | 对象池 | `Laya.Pool` | Prefab 异步创建、容量、所有权和 reset 钩子 |
 | 音频 | `SoundManager` / `AudioDataCache` | BGM/SFX、handle、owner 与用户设置 |
 | Spine | `.lh` + `Spine2DRenderNode.source` | 复用时走通用 Prefab 池，不设 SpineService |
 | 存储/网络 | LocalStorage、HttpRequest | schema 迁移与稳定错误契约 |
+| 配表 | `Loader.BUFFER` | Luban 生成的业务 Tables 安装到 `LX.Tables` |
 
 `LX.Res` 返回准确的 `Laya.loader`，`LX.Scene` 返回准确的 `Laya.Scene`。`LX` 不暴露整个 runtime，也不提供 `LX.Spine` 之类的平行入口。
 
@@ -37,6 +38,14 @@ Laya.loader.load(.lh, HIERARCHY)
 固定节点、布局和交互组件必须来自 `.ls/.lh`。动态图片直接设置 `GLoader.src`；源码中的 `_loadId` 会拒绝过期结果，清空 `src` 或销毁节点会移除绘制命令的纹理引用。框架不再重复实现动态图片加载器。
 
 `BaseGameWindow.destroy()` 在进入原生 `GWindow.destroy()` 前暂时解除路由 observer，避免 `hideImmediately()` 触发 Hide 后再次进入 Destroy；清理失败会聚合报告，路由可重试仍未销毁的窗口。
+
+公共提示通过 `LX.UI.tip(message)` 进入 `UILayer.Toast`。第一条立即显示，后续按 FIFO 每 500ms 出队；固定 `Tip.lh` 实例由 `PrefabPoolService` 复用，动画直接使用 `Laya.Tween`。回池会停止 Tween、移除父节点并复位文字、透明度、缩放和可见性；UI 停机清队列、Timer、活动实例与晚到 acquire。
+
+## JSON 与 Tables
+
+`LX.Config` 只处理通用 JSON 文档，适用于外部游戏数据、地图/关卡编辑器输出和业务配置。它通过 `ContentCatalog` 的 `data` ID 调用原生 `Loader.JSON`，可在消费边界提供校验器，并支持并发合并、查询、显式释放和晚到结果失效。
+
+`LX.Tables` 只保存 Luban TypeScript-bin 生成的 `Tables`。人工源、生成代码和二进制分别位于 `Design/Tables`、`src/game/generated/tables` 与 `assets/bootstrap/tables/game`。两条数据链没有依赖关系。
 
 ## 资源与释放
 
@@ -60,10 +69,10 @@ Laya.loader.load(.lh, HIERARCHY)
 
 ## 启动与停止
 
-`AppBootstrap` 顺序启动并逆序停止。业务服务先停；共享清理依次处理 UI（含晚到加载重试）、Prefab pool（含晚到加载重试）、Audio，最后执行 `Laya.Scene.gc()`。每一步独立执行并汇总错误。
+`AppBootstrap` 顺序启动并逆序停止。业务服务先停；共享清理依次处理 UI（含晚到加载重试）、Prefab pool（含晚到加载重试）、Audio、JSON Config，最后执行 `Laya.Scene.gc()`。每一步独立执行并汇总错误。
 
 ## 验证证据
 
 `settings/LayaSourceBaseline.json` 固定官方 `v3.4.1` commit 和 22 个关键 TypeScript 文件的哈希。`npm run check:engine-source` 从本机 CLI 的 `.js.map` 提取完整源码离线比对。
 
-Headless Chromium 真实探针覆盖：`Laya.timer.clearAll`、`GLoader` 晚到请求、共享纹理双持有者引用、Prefab 池复用/排空、UI modal 层与 Destroy 重入、Startup Scene 销毁触发 runtime 停机。图片/音频/Spine 静态策略另由 `validate:content-assets` 覆盖；代表性 Spine 动画、真实音频解码、纹理压缩与目标机性能必须在业务提供对应资产后另做专项验收。
+Headless Chromium 真实探针覆盖：JSON 与 Tables、`Laya.timer.clearAll`、GLoader 晚到请求、共享纹理引用、Prefab 池、Tip 队列/动画/复用、UI modal/Destroy 和 runtime 停机。图片/音频/Spine 静态策略另由 `validate:content-assets` 覆盖；代表性 Spine 动画、真实音频解码、纹理压缩与目标机性能必须在业务提供对应资产后另做专项验收。

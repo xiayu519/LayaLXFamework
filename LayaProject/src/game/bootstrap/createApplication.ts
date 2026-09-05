@@ -8,10 +8,11 @@ import {
     FrameworkStatusWindow,
     type FrameworkStatusArgs,
 } from "../presentation/ui/FrameworkStatusWindow";
-import { GameConfigService } from "../infrastructure/config/GameConfigService";
-import type { Tables } from "../generated/config/schema";
+import { GameTablesService } from "../infrastructure/tables/GameTablesService";
+import type { Tables } from "../generated/tables/schema";
 
 export const FRAMEWORK_STATUS_ROUTE = "lx.status";
+export const RUNTIME_CONFIG_ID = "lx.runtime-config";
 
 export type { ApplicationAdapters, ApplicationRuntime };
 export type GameTables = Tables;
@@ -23,6 +24,11 @@ export function createApplication(adapters: ApplicationAdapters = {}): Applicati
                 id: FRAMEWORK_STATUS_ROUTE,
                 url: "bootstrap/ui/FrameworkStatus.lh",
                 kind: "ui",
+            },
+            {
+                id: RUNTIME_CONFIG_ID,
+                url: "bootstrap/config/runtime.json",
+                kind: "data",
             },
         ],
         configureUI(ui, content): void {
@@ -37,7 +43,7 @@ export function createApplication(adapters: ApplicationAdapters = {}): Applicati
             ui.register(statusRoute);
         },
         createServices(context) {
-            return [new GameConfigService(context.config)];
+            return [new GameTablesService(context.tables)];
         },
     }, adapters);
 }

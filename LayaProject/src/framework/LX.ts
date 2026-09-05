@@ -23,6 +23,10 @@ class LXFacade {
         return requireLXRuntime().config;
     }
 
+    get Tables(): ApplicationRuntime["tables"] {
+        return requireLXRuntime().tables;
+    }
+
     get Storage(): ApplicationRuntime["settings"] {
         return requireLXRuntime().settings;
     }
