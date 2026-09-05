@@ -25,6 +25,7 @@ npm run doctor
 ```text
 LayaLXFamework/
 ├─ Books/                         开发与运行时手册
+├─ Design/genBin.*                Windows/macOS Luban 快捷入口
 ├─ Design/Tables/                 Luban Excel 人工源
 ├─ Design/tools/                  固定 Luban 工具
 └─ LayaProject/
@@ -173,7 +174,7 @@ LX.Config.release("map.level-001");
 
 ### Luban Tables
 
-修改 `Design/Tables/*.xlsx` 后执行：
+修改 `Design/Tables/*.xlsx` 后，Windows 双击 `Design/genBin.bat`，macOS 双击 `Design/genBin.command`。原命令继续保留：
 
 ```shell
 cd LayaProject

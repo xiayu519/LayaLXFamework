@@ -173,6 +173,8 @@ const requiredPaths = [
 for (const path of [
     "Design/Tables/__tables__.xlsx",
     "Design/Tables/#TableAppConfig.xlsx",
+    "Design/genBin.bat",
+    "Design/genBin.command",
     "Design/tools/luban.conf",
     "Design/tools/LUBAN_VERSION",
     "Design/tools/Luban/Luban.dll",

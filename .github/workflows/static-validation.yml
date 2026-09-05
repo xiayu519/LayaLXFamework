@@ -50,4 +50,12 @@ jobs:
             "$HOME/.layaair/layaair" install 3.4.1
           fi
       - run: npm ci
+      - name: Verify Design table command on Windows
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: ..\Design\genBin.bat --no-pause
+      - name: Verify Design table command on macOS
+        if: runner.os == 'macOS'
+        shell: bash
+        run: ../Design/genBin.command --no-pause
       - run: npm run verify
