@@ -6,7 +6,7 @@
 
 共享框架在 `src/framework/`，业务在 `src/game/`；framework 不依赖 game，业务只经 `LX`。新游戏放在 `src/game/<game-id>/`，从该目录启动以叠加公共/游戏规则与 Skills。写前保留他人改动；同一区域并行冲突时停止。
 
-根目录存在 `.framework-lock.json` 即为下游消费模式：禁止手改 manifest 管理文件和 lock；缺口反馈上游，只同步已确认版本。
+根目录存在 `.framework-lock.json` 即为下游消费模式：禁止手改 manifest 管理文件和 lock；缺口反馈上游，只同步已确认 Tag 或已提交的 channel snapshot。
 
 Windows/macOS 共用框架与工作流；环境自备，仓库只检测。工具优先跨平台 Node API，差异由双平台 CI 验证。
 

@@ -44,7 +44,7 @@ Codex 对两类文件采用不同的官方发现顺序：`AGENTS.md` 从 Git 根
 
 框架由一人维护；投入使用后约 2–3 人可能协作，这不表示每个 Codex 任务需要多个代理。多人并行写入时先重新读取目标文件；同一语义区域已被他人修改时停止并报告，不猜测覆盖。`git init`、commit 与 push 只在开发者明确要求时执行。
 
-下游仓库存在 `.framework-lock.json` 时，manifest 管理内容为只读；框架缺口反馈上游，待上游验证并发布 Tag 后再同步。目录所有权、启动扩展点和同步命令只在 [框架发行与下游同步](../LayaProject/docs/framework-distribution.md) 维护。
+下游仓库存在 `.framework-lock.json` 时，manifest 管理内容为只读；框架缺口反馈上游，稳定消费等待验证后的 Tag，开发联调可按需同步已提交的 channel snapshot。目录所有权、启动扩展点和同步命令只在 [框架发行与下游同步](../LayaProject/docs/framework-distribution.md) 维护。
 
 ## 验证
 

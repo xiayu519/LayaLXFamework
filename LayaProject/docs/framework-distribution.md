@@ -27,7 +27,7 @@ src/Main.ts
 
 ## 发布与同步
 
-上游完成 `npm run verify`、提交并创建不可变 SemVer Tag。下游只在独立同步分支执行：
+正式发布时，上游完成 `npm run verify`、提交并创建不可变 SemVer Tag。下游只在独立同步分支执行：
 
 ```shell
 git switch -c sync/framework-0.2.0
@@ -37,8 +37,18 @@ npm run check:framework-integrity
 npm run verify
 ```
 
-同步工具从 manifest 复制发行文件，更新 `.framework-lock.json` 中的 repository、Tag、commit、manifest 哈希及逐文件 SHA-256，并合并最小 JSON 契约。若 npm 契约变化，下游在同步分支更新 `package-lock.json`。游戏回归通过后才合并主分支。
+开发期不需要为每批提交创建 Tag。需要联调最新 `main` 时，下游执行：
 
-第一次建立下游仓库时先从一个已发布 Tag 创建完整项目并设置自己的 `origin`，再对同一 Tag 执行一次 `framework:sync` 生成初始 lock。以后只同步更高的已发布版本，不追踪 `main`。
+```shell
+git switch -c sync/framework-main-20260905
+cd LayaProject
+npm run framework:sync -- --channel main
+npm run check:framework-integrity
+npm run verify
+```
 
-本地文件仍可被编辑，但受管文件与 lock 不一致会被离线完整性检查拒绝；CI 还通过 `npm run check:framework-upstream` 对照 lock 指向的真实上游 Tag，因此同时伪造文件与 lock 也会失败。仓库必须启用分支保护并要求 `CODEOWNERS` 审查；框架缺口回到上游修复，不能修改哈希绕过。
+同步工具从 manifest 复制发行文件，更新 `.framework-lock.json` 中的 repository、来源模式与 ref、commit、manifest 哈希及逐文件 SHA-256，并合并最小 JSON 契约。release 模式锁定 Tag；snapshot 模式在同步时解析 channel 最新提交并固定该 commit，channel 后续推进不会改变已有下游。若 npm 契约变化，下游在同步分支更新 `package-lock.json`。游戏回归通过后才合并主分支。
+
+第一次建立下游仓库时仍建议从一个已发布 Tag 创建完整项目并设置自己的 `origin`，再对同一 Tag 执行一次 `framework:sync` 生成初始 lock。之后可以同步更高的已发布版本，也可以按需显式更新 `main` snapshot；下游不会在上游 push 时自动漂移。
+
+本地文件仍可被编辑，但受管文件与 lock 不一致会被离线完整性检查拒绝；CI 还通过 `npm run check:framework-upstream` 对照 lock 指向的真实 Tag 或 channel 历史中的固定 commit，因此同时伪造文件与 lock 也会失败。用于 snapshot 的 channel 必须禁止 force-push，仓库必须启用分支保护并要求 `CODEOWNERS` 审查；框架缺口回到上游修复，不能修改哈希绕过。

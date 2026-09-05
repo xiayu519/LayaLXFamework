@@ -3,12 +3,14 @@ type: decision
 scope: framework-distribution
 description: 上游用 manifest 发布公共框架，下游用版本 lock 和完整性 CI 只读消费，所有公共修改回流上游。
 trigger: 创建下游游戏仓库、同步框架版本、修改发行边界，或发现下游 framework 差异时。
-status: active
+status: superseded
 last_verified: 2026-09-05
 source: code-verified
 ---
 
 # Framework distribution ownership
+
+Superseded by [Framework distribution channels](framework-distribution-channels.md).
 
 ## Decision
 

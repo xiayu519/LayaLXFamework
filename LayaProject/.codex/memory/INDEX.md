@@ -35,7 +35,8 @@
 - [Cross-platform development workflow](decisions/cross-platform-development-workflow.md)：Windows/macOS 共用框架和工作流，系统差异只由工具内部适配。
 - [Laya resource package layout](decisions/resource-package-layout.md)：已被 framework/game 启动作用域的新版本替代。
 - [Laya resource package layout v2](decisions/resource-package-layout-v2.md)：bootstrap 拆分框架与游戏所有权，功能包仍按依赖边界组织。
-- [Framework distribution ownership](decisions/framework-distribution-ownership.md)：上游 manifest 发布、下游版本 lock 只读消费并由完整性 CI 执行。
+- [Framework distribution ownership](decisions/framework-distribution-ownership.md)：旧 Tag-only 同步决定，已由双轨发行模式替代。
+- [Framework distribution channels](decisions/framework-distribution-channels.md)：release 使用 Tag，开发 snapshot 显式跟随 channel，并统一锁定不可变 commit。
 - [Content asset import policy](decisions/content-asset-import-policy.md)：图片、音频和 Spine 使用固定可执行导入规格与精确例外。
 - [HTTP retry idempotency](decisions/http-retry-idempotency.md)：默认不重试；只有幂等请求可进行有限瞬时失败重试。
 

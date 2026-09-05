@@ -50,11 +50,23 @@ describe("framework distribution", () => {
         expect(run("check", "--destination", destination)).toContain("Framework integrity OK");
         expect(run("upstream", "--source", source, "--destination", destination)).toContain("Framework upstream OK");
 
+        const lockPath = join(destination, ".framework-lock.json");
+        const currentLock = JSON.parse(readFileSync(lockPath, "utf8"));
+        expect(currentLock).toMatchObject({
+            schemaVersion: 2,
+            source: { mode: "release", ref: "v1.0.0" },
+            manifestVersion: "1.0.0",
+        });
+        const { source: _source, manifestVersion: _manifestVersion, ...legacyLock } = currentLock;
+        writeJson(lockPath, { ...legacyLock, schemaVersion: 1, version: "v1.0.0" });
+        expect(run("check", "--destination", destination)).toContain("Framework integrity OK");
+        expect(run("upstream", "--source", source, "--destination", destination)).toContain("Framework upstream OK");
+        run("sync", "--source", source, "--destination", destination, "--ref", "v1.0.0");
+
         const managedFile = join(destination, "LayaProject", "src", "framework", "Example.ts");
         write(managedFile, "export const value = 2;\n");
         expect(() => run("check", "--destination", destination)).toThrow(/Framework integrity check failed/);
 
-        const lockPath = join(destination, ".framework-lock.json");
         const lock = JSON.parse(readFileSync(lockPath, "utf8"));
         const entry = lock.files.find((item: { path: string }) => item.path.endsWith("Example.ts"));
         if (!entry) {
@@ -73,6 +85,54 @@ describe("framework distribution", () => {
         run("sync", "--source", source, "--destination", destination, "--ref", "v1.0.0");
         expect(run("check", "--destination", destination)).toContain("Framework integrity OK");
     });
+
+    it("updates a channel snapshot explicitly while keeping the previous commit reproducible", () => {
+        const source = fixture("lx-framework-channel-source-");
+        const destination = fixture("lx-framework-channel-consumer-");
+        writeJson(join(source, "framework.manifest.json"), {
+            schemaVersion: 1,
+            name: "LayaLXFamework",
+            version: "1.0.0",
+            repository: "https://example.invalid/LayaLXFamework.git",
+            managedPaths: [
+                "framework.manifest.json",
+                "LayaProject/src/framework/**",
+            ],
+        });
+        const managedFile = join(source, "LayaProject", "src", "framework", "Example.ts");
+        write(managedFile, "export const value = 1;\n");
+        git(source, "init");
+        git(source, "config", "user.name", "Framework Test");
+        git(source, "config", "user.email", "framework-test@example.invalid");
+        git(source, "add", ".");
+        git(source, "commit", "-m", "test: initial channel snapshot");
+        git(source, "branch", "-M", "main");
+
+        run("sync", "--repository", source, "--destination", destination, "--channel", "main");
+        const firstLock = JSON.parse(readFileSync(join(destination, ".framework-lock.json"), "utf8"));
+        expect(firstLock).toMatchObject({
+            schemaVersion: 2,
+            source: { mode: "snapshot", ref: "main" },
+            manifestVersion: "1.0.0",
+        });
+        expect(readFileSync(join(destination, "LayaProject", "src", "framework", "Example.ts"), "utf8"))
+            .toBe("export const value = 1;\n");
+
+        write(managedFile, "export const value = 2;\n");
+        git(source, "add", ".");
+        git(source, "commit", "-m", "test: advance channel");
+        expect(run("upstream", "--repository", source, "--destination", destination))
+            .toContain(firstLock.commit);
+
+        run("sync", "--repository", source, "--destination", destination, "--channel", "main");
+        const secondLock = JSON.parse(readFileSync(join(destination, ".framework-lock.json"), "utf8"));
+        expect(secondLock.commit).not.toBe(firstLock.commit);
+        expect(secondLock.source).toEqual({ mode: "snapshot", ref: "main" });
+        expect(readFileSync(join(destination, "LayaProject", "src", "framework", "Example.ts"), "utf8"))
+            .toBe("export const value = 2;\n");
+        expect(run("check", "--destination", destination)).toContain("main snapshot");
+        expect(gitOutput(source, "tag")).toBe("");
+    });
 });
 
 function fixture(prefix: string): string {
@@ -83,6 +143,10 @@ function fixture(prefix: string): string {
 
 function git(cwd: string, ...args: string[]): void {
     execFileSync("git", args, { cwd, stdio: "ignore" });
+}
+
+function gitOutput(cwd: string, ...args: string[]): string {
+    return execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 }
 
 function run(...args: string[]): string {

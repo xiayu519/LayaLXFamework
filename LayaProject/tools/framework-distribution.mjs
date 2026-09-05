@@ -18,6 +18,7 @@ import { fileURLToPath } from "node:url";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const defaultRepositoryRoot = resolve(projectRoot, "..");
+const semverTagPattern = /^v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
 const command = process.argv[2] ?? "check";
 const options = parseOptions(process.argv.slice(3));
 const destinationRoot = resolve(options.get("destination") ?? defaultRepositoryRoot);
@@ -34,7 +35,7 @@ if (command === "manifest") {
 } else if (command === "sync") {
     await syncFramework(destinationRoot, options);
 } else {
-    throw new Error("Usage: framework-distribution.mjs <manifest|check|upstream|sync> [--source <path> | --repository <url>] [--ref <tag>] [--destination <path>]");
+    throw new Error("Usage: framework-distribution.mjs <manifest|check|upstream|sync> [--source <path> | --repository <url>] (--ref <tag> | --channel <branch>) [--destination <path>]");
 }
 
 async function verifyUpstream(root, parsed) {
@@ -43,35 +44,48 @@ async function verifyUpstream(root, parsed) {
         console.log("Framework upstream verification skipped: this is the unlocked source repository.");
         return;
     }
-    const lock = readJson(lockPath);
-    if (!/^v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(lock.version ?? "")) {
-        throw new Error("Consumer lock version must be an immutable SemVer Tag.");
-    }
+    const lock = readConsumerLock(lockPath);
     let sourceRoot;
     let temporaryClone;
     try {
         if (parsed.has("source")) {
-            sourceRoot = resolve(parsed.get("source"));
-            verifyLocalReference(sourceRoot, lock.version);
+            const localSource = resolve(parsed.get("source"));
+            verifyLockedReference(localSource, lock.source, lock.commit);
+            temporaryClone = mkdtempSync(join(resolve(tmpdir()), "lx-framework-upstream-"));
+            sourceRoot = join(temporaryClone, "source");
+            runGit(["-c", "core.autocrlf=false", "clone", "--no-checkout", "--local", "--", localSource, sourceRoot]);
+            runGit(["-c", "core.autocrlf=false", "-C", sourceRoot, "checkout", "--detach", lock.commit]);
         } else {
             const repository = parsed.get("repository") ?? lock.repository;
             temporaryClone = mkdtempSync(join(resolve(tmpdir()), "lx-framework-upstream-"));
             sourceRoot = join(temporaryClone, "source");
-            runGit(["clone", "--depth", "1", "--branch", lock.version, "--", repository, sourceRoot]);
+            if (lock.source.mode === "release") {
+                runGit(["-c", "core.autocrlf=false", "clone", "--depth", "1", "--branch", lock.source.ref, "--", repository, sourceRoot]);
+                verifyClonedReference(sourceRoot, lock.source, lock.commit);
+            } else {
+                runGit(["-c", "core.autocrlf=false", "clone", "--filter=blob:none", "--single-branch", "--branch", lock.source.ref, "--", repository, sourceRoot]);
+                if (!gitSucceeds(sourceRoot, ["merge-base", "--is-ancestor", lock.commit, `origin/${lock.source.ref}`])) {
+                    throw new Error(`Locked commit '${lock.commit}' is no longer reachable from channel '${lock.source.ref}'.`);
+                }
+                runGit(["-c", "core.autocrlf=false", "-C", sourceRoot, "checkout", "--detach", lock.commit]);
+            }
         }
         const sourceCommit = gitValue(sourceRoot, ["rev-parse", "HEAD"]);
         const manifest = readManifest(sourceRoot);
         const sourceFiles = expandManagedFiles(sourceRoot, manifest);
         const locked = new Map((lock.files ?? []).map((entry) => [entry.path, entry]));
         const failures = [];
-        if (`v${manifest.version}` !== lock.version) {
-            failures.push(`version ${lock.version} does not match upstream manifest v${manifest.version}`);
+        if (manifest.version !== lock.manifestVersion) {
+            failures.push(`manifest version ${lock.manifestVersion} does not match upstream ${manifest.version}`);
+        }
+        if (lock.source.mode === "release" && `v${manifest.version}` !== lock.source.ref) {
+            failures.push(`release ${lock.source.ref} does not match upstream manifest v${manifest.version}`);
         }
         if (sourceCommit !== lock.commit) {
             failures.push(`commit ${lock.commit} does not match upstream ${sourceCommit ?? "unknown"}`);
         }
         if (hashFile(join(sourceRoot, "framework.manifest.json")) !== lock.manifestHash) {
-            failures.push("manifest hash does not match the upstream Tag");
+            failures.push("manifest hash does not match the locked upstream commit");
         }
         for (const path of sourceFiles) {
             const expected = locked.get(path);
@@ -89,7 +103,7 @@ async function verifyUpstream(root, parsed) {
         if (failures.length > 0) {
             throw new Error(`Framework upstream verification failed:\n- ${failures.join("\n- ")}`);
         }
-        console.log(`Framework upstream OK: ${lock.version} (${lock.commit}), ${sourceFiles.length} managed file(s).`);
+        console.log(`Framework upstream OK: ${formatLockSource(lock)} (${lock.commit}), ${sourceFiles.length} managed file(s).`);
     } finally {
         if (temporaryClone && dirname(temporaryClone) === resolve(tmpdir())) {
             rmSync(temporaryClone, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
@@ -102,7 +116,7 @@ function parseOptions(args) {
     for (let index = 0; index < args.length; index += 2) {
         const key = args[index];
         const value = args[index + 1];
-        if (!["--source", "--repository", "--ref", "--destination"].includes(key) || !value) {
+        if (!["--source", "--repository", "--ref", "--channel", "--destination"].includes(key) || !value) {
             throw new Error(`Invalid framework distribution option '${key ?? ""}'.`);
         }
         if (parsed.has(key.slice(2))) {
@@ -181,20 +195,7 @@ function checkIntegrity(root) {
         return;
     }
 
-    const lock = readJson(lockPath);
-    if (lock?.schemaVersion !== 1
-        || typeof lock?.repository !== "string"
-        || typeof lock?.version !== "string"
-        || typeof lock?.commit !== "string"
-        || typeof lock?.manifestHash !== "string"
-        || !Array.isArray(lock?.files)
-        || lock.files.some((entry) => !entry
-            || typeof entry.path !== "string"
-            || typeof entry.sha256 !== "string"
-            || typeof entry.size !== "number")
-        || new Set(lock.files.map((entry) => entry.path)).size !== lock.files.length) {
-        throw new Error(".framework-lock.json has an invalid lock contract.");
-    }
+    const lock = readConsumerLock(lockPath);
     const failures = [];
     const manifestHash = hashFile(join(root, "framework.manifest.json"));
     if (manifestHash !== lock.manifestHash) {
@@ -217,7 +218,7 @@ function checkIntegrity(root) {
     if (failures.length > 0) {
         throw new Error(`Framework integrity check failed:\n- ${failures.join("\n- ")}\nRun the approved framework sync command; do not patch managed files downstream.`);
     }
-    console.log(`Framework integrity OK: ${lock.version} (${lock.commit}), ${lock.files.length} managed file(s).`);
+    console.log(`Framework integrity OK: ${formatLockSource(lock)} (${lock.commit}), ${lock.files.length} managed file(s).`);
 }
 
 async function syncFramework(root, parsed) {
@@ -225,22 +226,38 @@ async function syncFramework(root, parsed) {
         throw new Error("Use either --source or --repository, not both.");
     }
     const reference = parsed.get("ref");
+    const channel = parsed.get("channel");
+    if ((reference ? 1 : 0) + (channel ? 1 : 0) !== 1) {
+        throw new Error("Framework sync requires exactly one of --ref <tag> or --channel <branch>.");
+    }
+    if (reference && !semverTagPattern.test(reference)) {
+        throw new Error("Framework --ref must be an immutable SemVer Tag such as v0.2.0.");
+    }
+    if (channel) {
+        validateChannel(channel);
+    }
+    const lockSource = reference
+        ? { mode: "release", ref: reference }
+        : { mode: "snapshot", ref: channel };
     let sourceRoot;
     let temporaryClone;
     try {
         if (parsed.has("source")) {
-            sourceRoot = resolve(parsed.get("source"));
-            if (reference) {
-                verifyLocalReference(sourceRoot, reference);
+            const localSource = resolve(parsed.get("source"));
+            if (localSource === resolve(root)) {
+                throw new Error("Framework sync source and destination must be different repositories.");
             }
+            verifyLocalReference(localSource, lockSource);
+            temporaryClone = mkdtempSync(join(resolve(tmpdir()), "lx-framework-sync-"));
+            sourceRoot = join(temporaryClone, "source");
+            runGit(["-c", "core.autocrlf=false", "clone", "--no-checkout", "--local", "--", localSource, sourceRoot]);
+            runGit(["-c", "core.autocrlf=false", "-C", sourceRoot, "checkout", "--detach", localReference(lockSource)]);
         } else {
-            if (!reference || !/^v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(reference)) {
-                throw new Error("Remote framework sync requires an immutable SemVer --ref such as v0.2.0.");
-            }
             const repository = parsed.get("repository") ?? readExistingRepository(root);
             temporaryClone = mkdtempSync(join(resolve(tmpdir()), "lx-framework-sync-"));
             sourceRoot = join(temporaryClone, "source");
-            runGit(["clone", "--depth", "1", "--branch", reference, "--", repository, sourceRoot]);
+            runGit(["-c", "core.autocrlf=false", "clone", "--depth", "1", "--branch", lockSource.ref, "--", repository, sourceRoot]);
+            verifyClonedReference(sourceRoot, lockSource);
         }
 
         if (resolve(sourceRoot) === resolve(root)) {
@@ -273,22 +290,22 @@ async function syncFramework(root, parsed) {
         applyJsonContracts(root, manifest);
 
         const sourceCommit = gitValue(sourceRoot, ["rev-parse", "HEAD"]) ?? "working-tree";
-        const version = reference ?? `v${manifest.version}`;
         const files = sourceFiles.map((path) => {
             const target = safeResolve(root, path);
             return { path, sha256: hashFile(target), size: statSync(target).size };
         });
         const lock = {
-            schemaVersion: 1,
+            schemaVersion: 2,
             repository: manifest.repository,
-            version,
+            source: lockSource,
             commit: sourceCommit,
+            manifestVersion: manifest.version,
             manifestHash: hashFile(join(root, "framework.manifest.json")),
             files,
         };
         writeJson(join(root, ".framework-lock.json"), lock);
         checkIntegrity(root);
-        console.log(`Framework sync OK: ${version} (${sourceCommit}).`);
+        console.log(`Framework sync OK: ${formatLockSource(lock)} (${sourceCommit}).`);
     } finally {
         if (temporaryClone && dirname(temporaryClone) === resolve(tmpdir())) {
             rmSync(temporaryClone, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
@@ -384,23 +401,110 @@ function readExistingRepository(root) {
     throw new Error("No framework repository is configured; pass --repository <url>.");
 }
 
-function verifyLocalReference(root, reference) {
-    if (!existsSync(join(root, ".git"))) {
-        return;
-    }
+function verifyLocalReference(root, source) {
     const head = gitValue(root, ["rev-parse", "HEAD"]);
-    const expected = gitValue(root, ["rev-parse", `${reference}^{commit}`]);
+    const expected = gitValue(root, ["rev-parse", `${localReference(source)}^{commit}`]);
     if (!head || !expected || head !== expected) {
-        throw new Error(`Local framework source HEAD does not match '${reference}'.`);
+        throw new Error(`Local framework source HEAD does not match ${source.mode} '${source.ref}'.`);
     }
     if (gitValue(root, ["status", "--porcelain"])) {
-        throw new Error("Local framework source has uncommitted changes; sync only a clean released Tag.");
+        throw new Error("Local framework source has uncommitted changes; sync only a clean selected reference.");
     }
 }
 
+function verifyLockedReference(root, source, commit) {
+    const expected = gitValue(root, ["rev-parse", `${localReference(source)}^{commit}`]);
+    if (!expected) {
+        throw new Error(`Local framework source does not contain '${source.ref}'.`);
+    }
+    if (source.mode === "release" && expected !== commit) {
+        throw new Error(`Release '${source.ref}' does not point to locked commit '${commit}'.`);
+    }
+    if (source.mode === "snapshot" && !gitSucceeds(root, ["merge-base", "--is-ancestor", commit, localReference(source)])) {
+        throw new Error(`Locked commit '${commit}' is no longer reachable from channel '${source.ref}'.`);
+    }
+}
+
+function verifyClonedReference(root, source, expectedCommit) {
+    const reference = source.mode === "release"
+        ? `refs/tags/${source.ref}`
+        : `refs/remotes/origin/${source.ref}`;
+    const resolved = gitValue(root, ["rev-parse", `${reference}^{commit}`]);
+    const head = gitValue(root, ["rev-parse", "HEAD"]);
+    if (!resolved || resolved !== head || (expectedCommit && resolved !== expectedCommit)) {
+        throw new Error(`Cloned framework source does not match ${source.mode} '${source.ref}'.`);
+    }
+}
+
+function localReference(source) {
+    return source.mode === "release"
+        ? `refs/tags/${source.ref}`
+        : `refs/heads/${source.ref}`;
+}
+
+function validateChannel(channel) {
+    if (channel.startsWith("-") || !gitSucceeds(undefined, ["check-ref-format", "--branch", channel])) {
+        throw new Error(`Invalid framework channel '${channel}'.`);
+    }
+}
+
+function readConsumerLock(path) {
+    const lock = readJson(path);
+    if (!hasValidLockFiles(lock)
+        || typeof lock.repository !== "string"
+        || typeof lock.commit !== "string"
+        || typeof lock.manifestHash !== "string") {
+        throw new Error(".framework-lock.json has an invalid lock contract.");
+    }
+    if (lock.schemaVersion === 1 && semverTagPattern.test(lock.version ?? "")) {
+        return {
+            ...lock,
+            source: { mode: "release", ref: lock.version },
+            manifestVersion: lock.version.slice(1),
+        };
+    }
+    if (lock.schemaVersion === 2
+        && (lock.source?.mode === "release" || lock.source?.mode === "snapshot")
+        && typeof lock.source.ref === "string"
+        && typeof lock.manifestVersion === "string"
+        && /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(lock.manifestVersion)
+        && ((lock.source.mode === "release" && semverTagPattern.test(lock.source.ref))
+            || (lock.source.mode === "snapshot" && isValidChannel(lock.source.ref)))) {
+        return lock;
+    }
+    throw new Error(".framework-lock.json has an invalid lock contract.");
+}
+
+function hasValidLockFiles(lock) {
+    return Array.isArray(lock?.files)
+        && lock.files.every((entry) => entry
+            && typeof entry.path === "string"
+            && typeof entry.sha256 === "string"
+            && typeof entry.size === "number")
+        && new Set(lock.files.map((entry) => entry.path)).size === lock.files.length;
+}
+
+function isValidChannel(channel) {
+    return typeof channel === "string"
+        && !channel.startsWith("-")
+        && gitSucceeds(undefined, ["check-ref-format", "--branch", channel]);
+}
+
+function formatLockSource(lock) {
+    return lock.source.mode === "release"
+        ? lock.source.ref
+        : `${lock.source.ref} snapshot`;
+}
+
 function gitValue(root, args) {
-    const result = spawnSync("git", ["-C", root, ...args], { encoding: "utf8", windowsHide: true });
+    const gitArgs = root ? ["-C", root, ...args] : args;
+    const result = spawnSync("git", gitArgs, { encoding: "utf8", windowsHide: true });
     return result.status === 0 ? result.stdout.trim() : undefined;
+}
+
+function gitSucceeds(root, args) {
+    const gitArgs = root ? ["-C", root, ...args] : args;
+    return spawnSync("git", gitArgs, { encoding: "utf8", windowsHide: true }).status === 0;
 }
 
 function runGit(args) {
