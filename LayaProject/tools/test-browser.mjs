@@ -234,6 +234,15 @@ async function runEngineLifecycleProbes(cdp) {
     const evaluation = await cdp.send("Runtime.evaluate", {
         expression: `(async () => {
             const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+            const waitUntil = async (predicate, timeoutMs, label) => {
+                const deadline = performance.now() + timeoutMs;
+                while (!predicate()) {
+                    if (performance.now() >= deadline) {
+                        throw new Error(\`Timed out waiting for \${label}.\`);
+                    }
+                    await delay(20);
+                }
+            };
 
             const timerOwner = {};
             let timerCalls = 0;
@@ -297,7 +306,15 @@ async function runEngineLifecycleProbes(cdp) {
 
             globalThis.LX.UI.tip("Headless tip one");
             globalThis.LX.UI.tip("Headless tip two");
-            await delay(80);
+            await waitUntil(() => {
+                const snapshot = globalThis.LX.UI.snapshot().tips;
+                const root = globalThis.Laya.GRoot.inst;
+                const view = Array.from({ length: root.numChildren }, (_, index) => root.getChildAt(index))
+                    .find((node) => node.name === "LXTip");
+                return snapshot.active === 1
+                    && snapshot.queued === 1
+                    && view?.getChildByName?.("messageText")?.text === "Headless tip one";
+            }, 3000, "the first queued tip");
             const firstTip = globalThis.LX.UI.snapshot().tips;
             const tipRoot = globalThis.Laya.GRoot.inst;
             const firstTipView = Array.from({ length: tipRoot.numChildren }, (_, index) => tipRoot.getChildAt(index))
@@ -305,18 +322,36 @@ async function runEngineLifecycleProbes(cdp) {
             const firstTipQueued = firstTip.active === 1
                 && firstTip.queued === 1
                 && firstTipView?.getChildByName?.("messageText")?.text === "Headless tip one";
-            await delay(520);
+            const firstTipAt = performance.now();
+            await waitUntil(() => {
+                const snapshot = globalThis.LX.UI.snapshot().tips;
+                return snapshot.shown >= 2 && snapshot.active === 2 && snapshot.queued === 0;
+            }, 3000, "the second queued tip");
             const secondTip = globalThis.LX.UI.snapshot().tips;
-            const tipCadence = secondTip.shown >= 2 && secondTip.active === 2 && secondTip.queued === 0;
-            await delay(1320);
+            const tipCadence = performance.now() - firstTipAt >= 450
+                && secondTip.shown >= 2
+                && secondTip.active === 2
+                && secondTip.queued === 0;
+            await waitUntil(() => {
+                const idle = globalThis.LX.Pool.snapshot()
+                    .find((entry) => entry.id === "lx.ui.tip")?.idle ?? 0;
+                return globalThis.LX.UI.snapshot().tips.active === 0 && idle >= 2;
+            }, 3000, "queued tips to return to the pool");
             const idleTips = globalThis.LX.Pool.snapshot().find((entry) => entry.id === "lx.ui.tip")?.idle ?? 0;
             const tipsReleased = globalThis.LX.UI.snapshot().tips.active === 0 && idleTips >= 2;
             globalThis.LX.UI.tip("Headless tip three");
-            await delay(80);
+            await waitUntil(() => {
+                const pool = globalThis.LX.Pool.snapshot().find((entry) => entry.id === "lx.ui.tip");
+                return pool?.active === 1 && pool.idle >= 1;
+            }, 3000, "a pooled tip to be reused");
             const reusedTipPool = globalThis.LX.Pool.snapshot()
                 .find((entry) => entry.id === "lx.ui.tip");
             const tipReused = reusedTipPool?.active === 1 && reusedTipPool.idle >= 1;
-            await delay(1320);
+            await waitUntil(
+                () => globalThis.LX.UI.snapshot().tips.active === 0,
+                3000,
+                "the reused tip to finish",
+            );
 
             const statusInfo = globalThis.LX.UI.snapshot().managed
                 .find((entry) => entry.routeId === "lx.status");

@@ -167,15 +167,33 @@ describe("TipQueue", () => {
         expect(root.views).toHaveLength(0);
         expect(() => tips.show("late")).toThrow("disposed");
     });
+
+    it("starts the cadence after an asynchronous first presentation is visible", async () => {
+        const pool = createPool(600);
+        const tips = new TipQueue(pool as never, "bootstrap/ui/common/Tip.lh");
+
+        tips.show("first");
+        tips.show("second");
+        await vi.advanceTimersByTimeAsync(500);
+        expect(tips.snapshot()).toMatchObject({ queued: 1, active: 0, shown: 0 });
+
+        await vi.advanceTimersByTimeAsync(100);
+        expect(tips.snapshot()).toMatchObject({ queued: 1, active: 1, shown: 1 });
+        await vi.advanceTimersByTimeAsync(499);
+        expect(tips.snapshot()).toMatchObject({ queued: 1, active: 1, shown: 1 });
+        await vi.advanceTimersByTimeAsync(1);
+        expect(tips.snapshot()).toMatchObject({ queued: 0, active: 2, shown: 2 });
+    });
 });
 
-function createPool() {
+function createPool(firstAcquireDelayMs = 0) {
     let definition: {
         onAcquire?(view: FakeGWidget): void;
         onRelease?(view: FakeGWidget): void;
     } | undefined;
     const active = new Set<FakeGWidget>();
     const idle: FakeGWidget[] = [];
+    let acquireCount = 0;
     return {
         idle,
         created: 0,
@@ -183,6 +201,10 @@ function createPool() {
             definition = value;
         },
         async acquire(): Promise<FakeGWidget> {
+            acquireCount += 1;
+            if (acquireCount === 1 && firstAcquireDelayMs > 0) {
+                await new Promise<void>((resolve) => setTimeout(resolve, firstAcquireDelayMs));
+            }
             let view = idle.pop();
             if (!view) {
                 view = new FakeGWidget();

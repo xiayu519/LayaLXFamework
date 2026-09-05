@@ -122,8 +122,12 @@ export class TipQueue {
         this.pending.add(operation);
         operation.catch((error: unknown) => {
             console.error("[LX] tip presentation failed", error);
-        }).finally(() => this.pending.delete(operation));
-        Laya.timer.once(this.options.intervalMs, this, this.pump);
+        }).finally(() => {
+            this.pending.delete(operation);
+            if (!this.disposed) {
+                Laya.timer.once(this.options.intervalMs, this, this.pump);
+            }
+        });
     }
 
     private async present(message: string): Promise<void> {

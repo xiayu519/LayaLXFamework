@@ -116,7 +116,8 @@ function replaceGeneratedDirectory(source, destination) {
         const local = relative(source, file);
         const target = join(destinationRoot, local);
         mkdirSync(dirname(target), { recursive: true });
-        writeFileSync(target, readFileSync(file));
+        const content = readFileSync(file);
+        writeFileSync(target, local.endsWith(".ts") ? normalizeLineEndings(content) : content);
         writeFileSync(`${target}.meta`, metadataFor(target));
     }
 }
