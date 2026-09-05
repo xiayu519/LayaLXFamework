@@ -4,6 +4,10 @@
 
 ## Problems
 
+- [Laya statistics readiness](problems/laya-statistics-readiness.md)：未发布的统计窗口不能用零值通过预算，GPU 取 driver 计量。
+- [Runtime quarantine reference release](problems/runtime-quarantine-reference-release.md)：clean unbind 立即释放；settling 隔离在清理完成后主动解除强引用。
+- [HTTP timer overflow](problems/http-timer-overflow.md)：timer 参数限制为 32-bit 上限，retry jitter 最终 cap 到 `maxDelayMs`。
+
 - [Codex CLI routing eval isolation](problems/codex-cli-routing-eval-isolation.md)：旧 PowerShell 评测入口，已由跨平台版本替代。
 - [Codex routing eval isolation v2](problems/codex-routing-eval-isolation-v2.md)：固定 Codex CLI 由 Node 跨平台隔离执行并检查 token 预算。
 - [Laya Loader.BUFFER TextResource](problems/laya-buffer-text-resource.md)：LayaAir 3.4 二进制加载结果需从 `TextResource.data` 取出。
@@ -18,7 +22,8 @@
 ## Decisions
 
 - [Laya native runtime boundary](decisions/laya-native-runtime-boundary.md)：先采用已审计的 Laya 原生生命周期，只保留薄业务扩展。
-- [Codex model floor](decisions/codex-model-floor.md)：主线程与门禁固定 `gpt-5.6-sol/high`，低风险小任务可使用 medium 执行模型。
+- [Codex model floor](decisions/codex-model-floor.md)：旧固定模型策略，已由单点配置与用户选择优先替代。
+- [Codex model policy](decisions/codex-model-policy.md)：默认值单点维护，用户显式选择优先，已批准方案不重复审批。
 - [Framework/game ownership](decisions/framework-game-ownership.md)：共享 framework 与具体 game 物理分离，业务只经 `LX`。
 - [Repository boundary](decisions/repository-boundary.md)：Git 根目录在外层，完整 Codex 工作流保留在 `LayaProject`。
 - [Runtime resource ownership](decisions/runtime-resource-ownership.md)：旧 scope/lease 方案，已由 Laya native runtime boundary 替代。
@@ -39,5 +44,6 @@
 - [Source-first Laya design](feedback/source-first-laya-design.md)：公共模块必须先审查固定版本源码，禁止重复造引擎轮子。
 - [In-place Headless validation](feedback/in-place-headless-validation.md)：验证必须在当前项目原地纯 Headless 执行。
 - [Semantic Skill routing](feedback/semantic-skill-routing.md)：业务请求按语义触发窄 Skill，不在 `AGENTS.md` 写死路由。
-- [Small-team collaboration](feedback/small-team-collaboration.md)：项目按 2–3 人协作处理，公共候选和冲突先停下判断。
+- [Small-team collaboration](feedback/small-team-collaboration.md)：旧多人维护解释，已由单维护者协作策略替代。
+- [Single-maintainer collaboration](feedback/single-maintainer-collaboration.md)：框架单人维护；Codex 默认单代理，团队规模不决定委派数量。
 - [Laya-focused documentation](feedback/laya-focused-documentation.md)：只记录已验证的 LayaAir 规则。

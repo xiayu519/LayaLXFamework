@@ -2,11 +2,12 @@ import {
     LifetimeCleanupError,
     LifetimeScope,
 } from "../../application/lifecycle/LifetimeScope";
-import { AsyncBindingGuard, type BindingToken } from "../../application/ui/AsyncBindingGuard";
+import { AsyncBindingGuard, awaitBinding, type BindingToken } from "../../application/ui/AsyncBindingGuard";
 
 export interface WindowLifecycleObserver {
     onHidden(window: BaseGameWindow<unknown>): void;
     onDestroyed(window: BaseGameWindow<unknown>): void;
+    onOrderChanged?(window: BaseGameWindow<unknown>): void;
 }
 
 export abstract class BaseGameWindow<TArgs> extends Laya.GWindow {
@@ -15,6 +16,8 @@ export abstract class BaseGameWindow<TArgs> extends Laya.GWindow {
     private presentationScopeValue: LifetimeScope | undefined;
     private lifecycleObserver: WindowLifecycleObserver | undefined;
     private destroying = false;
+    private destructionCompleteValue = false;
+    private destructionFailureValue: LifetimeCleanupError | undefined;
 
     protected constructor(contentPane: Laya.GWidget) {
         super();
@@ -32,18 +35,26 @@ export abstract class BaseGameWindow<TArgs> extends Laya.GWindow {
         return this.presentationScopeValue;
     }
 
-    async present(args: TArgs): Promise<boolean> {
+    get destructionComplete(): boolean { return this.destructionCompleteValue; }
+
+    /** Native destroyed may become true before cleanup throws; it does not prove completion. */
+    get destructionFailure(): LifetimeCleanupError | undefined { return this.destructionFailureValue; }
+
+    async present(args: TArgs, signal?: AbortSignal): Promise<boolean> {
         this.endPresentation();
-        this.presentationScopeValue = new LifetimeScope();
-        const token = this.bindingGuard.next();
+        const scope = new LifetimeScope();
+        this.presentationScopeValue = scope;
+        const token = this.bindingGuard.next(signal);
         try {
-            await this.onBind(args, token);
+            if (token.isCurrent()) await awaitBinding(this.onBind(args, token), token.signal);
         } catch (error) {
-            this.endPresentation();
+            const cancelled = token.signal.aborted;
+            this.endPresentation(scope);
+            if (cancelled) return false;
             throw error;
         }
         if (!token.isCurrent()) {
-            this.endPresentation();
+            this.endPresentation(scope);
             return false;
         }
         this.show();
@@ -51,8 +62,19 @@ export abstract class BaseGameWindow<TArgs> extends Laya.GWindow {
     }
 
     hideForReuse(): void {
-        this.endPresentation();
         this.hide();
+    }
+
+    override hide(): void {
+        const errors: unknown[] = [];
+        collectCleanup(errors, () => this.endPresentation());
+        collectCleanup(errors, () => super.hide());
+        if (errors.length > 0) throw new LifetimeCleanupError(errors);
+    }
+
+    override bringToFront(): void {
+        super.bringToFront();
+        this.lifecycleObserver?.onOrderChanged?.(this as unknown as BaseGameWindow<unknown>);
     }
 
     /** @internal Used by UIRouter to observe native GWindow hide/destroy lifecycle. */
@@ -64,9 +86,9 @@ export abstract class BaseGameWindow<TArgs> extends Laya.GWindow {
     }
 
     override destroy(): void {
-        if (this.destroyed || this.destroying) {
-            return;
-        }
+        if (this.destroying) return;
+        if (this.destructionFailureValue) throw this.destructionFailureValue;
+        if (this.destroyed) return;
         this.destroying = true;
         const observer = this.lifecycleObserver;
         this.lifecycleObserver = undefined;
@@ -75,11 +97,21 @@ export abstract class BaseGameWindow<TArgs> extends Laya.GWindow {
             this.bindingGuard.dispose();
             collectCleanup(errors, () => this.disposePresentation());
             collectCleanup(errors, () => this.lifetimeScope.dispose());
-            collectCleanup(errors, () => super.destroy());
-            if (!this.destroyed) {
-                collectCleanup(errors, () => super.destroy());
+            const permanentErrors = [...errors];
+            let nativeCompleted = false;
+            try {
+                super.destroy();
+                if (!this.destroyed) throw new Error("GWindow.destroy() returned without destroying the window.");
+                nativeCompleted = true;
+            } catch (error) {
+                errors.push(error);
+                if (this.destroyed) permanentErrors.push(error);
             }
-            if (this.destroyed) {
+            if (permanentErrors.length > 0) {
+                this.destructionFailureValue = new LifetimeCleanupError(permanentErrors);
+            }
+            if (nativeCompleted && !this.destructionFailureValue) {
+                this.destructionCompleteValue = true;
                 collectCleanup(errors, () => observer?.onDestroyed(
                     this as unknown as BaseGameWindow<unknown>,
                 ));
@@ -113,9 +145,12 @@ export abstract class BaseGameWindow<TArgs> extends Laya.GWindow {
 
     protected abstract onBind(args: TArgs, token: BindingToken): void | Promise<void>;
 
-    private endPresentation(): void {
-        this.bindingGuard.invalidate();
-        this.disposePresentation();
+    private endPresentation(scope = this.presentationScopeValue): void {
+        if (scope === this.presentationScopeValue) {
+            this.presentationScopeValue = undefined;
+            this.bindingGuard.invalidate();
+        }
+        scope?.dispose();
     }
 
     private disposePresentation(): void {

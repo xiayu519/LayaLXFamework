@@ -16,7 +16,7 @@ import type { PurchasePlatform } from "../platform/purchase/PurchasePlatform";
 import { UnsupportedPurchasePlatform } from "../platform/purchase/UnsupportedPurchasePlatform";
 import { UIRouter } from "../presentation/ui/UIRouter";
 import { TipQueue } from "../presentation/ui/TipQueue";
-import { AppBootstrap, type AppService } from "./AppBootstrap";
+import { AppBootstrap, type AppService, type BootstrapOptions } from "./AppBootstrap";
 import { bindLXRuntime, unbindLXRuntime } from "./LXRuntimeHost";
 
 export interface ClientSettings extends AudioSettings {
@@ -41,6 +41,16 @@ export interface ApplicationRuntime extends RuntimeContext {
     readonly bootstrap: AppBootstrap;
     start(): Promise<void>;
     stop(): Promise<void>;
+    snapshot(): RuntimeSnapshot;
+}
+
+export interface RuntimeSnapshot {
+    readonly bootstrap: ReturnType<AppBootstrap["snapshot"]>;
+    readonly ui: ReturnType<UIRouter["snapshot"]>;
+    readonly pools: ReturnType<PrefabPoolService["snapshot"]>;
+    readonly config: ReturnType<JsonConfigService["snapshot"]>;
+    readonly pendingCleanup: readonly string[];
+    readonly gc: "not-requested" | "requested" | "skipped";
 }
 
 export interface ApplicationAdapters {
@@ -50,6 +60,7 @@ export interface ApplicationAdapters {
 }
 
 export interface ApplicationDefinition {
+    readonly lifecycle?: BootstrapOptions & { readonly pendingLoadTimeoutMs?: number };
     readonly content?: readonly ContentEntry[];
     configureUI?(ui: UIRouter, content: ContentCatalog): void;
     createServices?(context: RuntimeContext): readonly AppService[];
@@ -80,6 +91,11 @@ export function createRuntime(
     definition: ApplicationDefinition,
     adapters: ApplicationAdapters = {},
 ): ApplicationRuntime {
+    const pendingLoadTimeoutMs = definition.lifecycle?.pendingLoadTimeoutMs ?? 5_000;
+    if (!Number.isFinite(pendingLoadTimeoutMs) || pendingLoadTimeoutMs <= 0
+        || pendingLoadTimeoutMs >= (definition.lifecycle?.stopTimeoutMs ?? 10_000)) {
+        throw new Error("pendingLoadTimeoutMs must be positive and less than stopTimeoutMs.");
+    }
     const tables = new TablesRegistry();
     const content = new ContentCatalog(definition.content ?? []);
     const config = new JsonConfigService(content);
@@ -115,33 +131,56 @@ export function createRuntime(
         },
         stop(): void {},
     };
+    const pendingCleanup = new Set<string>();
+    let gc: RuntimeSnapshot["gc"] = "not-requested";
     const cleanupService: AppService = {
         name: "runtime-cleanup",
         start(): void {},
         async stop(): Promise<void> {
             const errors: unknown[] = [];
-            await collectCleanup(errors, () => ui.dispose());
-            await collectCleanup(errors, () => ui.waitForPendingLoads());
+            let safeToCollect = true;
             await collectCleanup(errors, () => ui.dispose());
             await collectCleanup(errors, () => pool.dispose());
-            await collectCleanup(errors, () => pool.waitForPendingLoads());
-            await collectCleanup(errors, () => pool.dispose());
-            await collectCleanup(errors, () => audio.dispose());
-            await collectCleanup(errors, () => config.dispose());
-            await collectCleanup(errors, () => config.waitForPendingLoads());
-            await collectCleanup(errors, () => Laya.Scene.gc());
+            if (!await collectCleanup(errors, () => audio.dispose())) safeToCollect = false;
+            if (!await collectCleanup(errors, () => config.dispose())) safeToCollect = false;
+            const waits = [
+                ["ui", () => ui.waitForPendingLoads()],
+                ["pool", () => pool.waitForPendingLoads()],
+                ["config", () => config.waitForPendingLoads()],
+            ] as const;
+            const settling = Promise.all(waits.map(async ([name, wait]) => {
+                pendingCleanup.add(name);
+                try { await wait(); } finally { pendingCleanup.delete(name); }
+            }));
+            if (!await collectCleanup(errors, () => waitWithDeadline(settling, pendingLoadTimeoutMs))) {
+                safeToCollect = false;
+            }
+            if (!await collectCleanup(errors, () => ui.dispose())) safeToCollect = false;
+            if (!await collectCleanup(errors, () => pool.dispose())) safeToCollect = false;
+            const state = bootstrap.snapshot();
+            if (state.pending.some((operation) => operation.serviceName !== "runtime-cleanup")
+                || state.failedStops.length > 0 || state.lateCleanupErrors > 0) {
+                safeToCollect = false;
+                errors.push(new Error("Service operations remain incomplete; resource GC was skipped."));
+            }
+            gc = safeToCollect ? "requested" : "skipped";
+            if (safeToCollect) await collectCleanup(errors, () => Laya.Scene.gc());
             if (errors.length > 0) {
-                throw new RuntimeCleanupError(errors);
+                throw new RuntimeCleanupError([...errors], [...pendingCleanup]);
             }
         },
     };
     const gameServices = definition.createServices?.(context) ?? [];
-    const bootstrap = new AppBootstrap([platform, cleanupService, preferencesService, ...gameServices]);
+    const bootstrap = new AppBootstrap([platform, cleanupService, preferencesService, ...gameServices], definition.lifecycle);
 
     let runtime: ApplicationRuntime;
     runtime = {
         ...context,
         bootstrap,
+        snapshot(): RuntimeSnapshot {
+            return Object.freeze({ bootstrap: bootstrap.snapshot(), ui: ui.snapshot(),
+                pools: pool.snapshot(), config: config.snapshot(), pendingCleanup: [...pendingCleanup], gc });
+        },
         async start(): Promise<void> {
             bindLXRuntime(runtime);
             try {
@@ -167,7 +206,7 @@ function isVolume(value: unknown): value is number {
 }
 
 class RuntimeCleanupError extends Error {
-    constructor(readonly errors: readonly unknown[]) {
+    constructor(readonly errors: readonly unknown[], readonly pending: readonly string[]) {
         super(`${errors.length} runtime cleanup operation(s) failed.`);
         this.name = "RuntimeCleanupError";
     }
@@ -176,10 +215,23 @@ class RuntimeCleanupError extends Error {
 async function collectCleanup(
     errors: unknown[],
     action: () => unknown | Promise<unknown>,
-): Promise<void> {
+): Promise<boolean> {
     try {
         await action();
+        return true;
     } catch (error) {
         errors.push(error);
+        return false;
+    }
+}
+
+async function waitWithDeadline(operation: Promise<unknown>, timeoutMs: number): Promise<void> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+        await Promise.race([operation, new Promise<never>((_, reject) => {
+            timer = setTimeout(() => reject(new Error(`Runtime pending loads exceeded ${timeoutMs}ms; GC skipped.`)), timeoutMs);
+        })]);
+    } finally {
+        clearTimeout(timer);
     }
 }

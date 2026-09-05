@@ -2,6 +2,10 @@ import { getLXRuntime, requireLXRuntime } from "./bootstrap/LXRuntimeHost";
 import type { ApplicationRuntime } from "./bootstrap/createRuntime";
 
 class LXFacade {
+    snapshot(): ReturnType<ApplicationRuntime["snapshot"]> {
+        return requireLXRuntime().snapshot();
+    }
+
     get Ready(): boolean {
         return getLXRuntime()?.bootstrap.state === "running";
     }

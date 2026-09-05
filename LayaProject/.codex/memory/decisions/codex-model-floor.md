@@ -3,12 +3,14 @@ type: decision
 scope: codex-workflow
 description: 主线程和任务门禁固定使用 gpt-5.6-sol/high，已确认的低风险小任务可由 gpt-5.6-terra/medium 执行。
 trigger: 修改 .codex 配置、执行模型分层、评估 token 与质量取舍或运行工作流评测时。
-status: active
+status: superseded
 last_verified: 2026-09-04
 source: user-confirmed
 ---
 
 # Codex model floor
+
+已由 [Codex model policy](codex-model-policy.md) 替代；下文保留原决定，不再作为当前模型选择规则。
 
 ## Decision
 

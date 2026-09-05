@@ -1,6 +1,6 @@
 ---
 name: lx-architecture
-description: 设计或修改 src/framework 共享层、LX 公共入口、服务契约、模块边界、启动顺序与失败回滚时使用；尚未证明应公共化的业务候选与单一功能内部实现不触发。
+description: 设计共享架构、LX 公共入口、服务契约、模块边界、启动顺序与失败回滚时使用；仅位于 src/framework 的单一功能内部修复及未证明应公共化的业务候选不触发。
 ---
 
 # LX Architecture

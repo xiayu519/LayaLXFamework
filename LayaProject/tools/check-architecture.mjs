@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, extname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { analyzeModuleDependencies, findDependencyCycles, readArchitectureCompilerOptions } from "./architecture-analysis.mjs";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const sourceRoot = join(projectRoot, "src");
@@ -81,6 +82,8 @@ for (const required of [join(sourceRoot, "framework"), join(sourceRoot, "game"),
 
 const sourceFiles = walk(sourceRoot);
 const sourceFileSet = new Set(sourceFiles.map((file) => resolve(file)));
+const config = readArchitectureCompilerOptions(projectRoot);
+failures.push(...config.diagnostics);
 for (const file of sourceFiles) {
     const source = readFileSync(file, "utf8");
     const sourceLocation = locationOf(file);
@@ -109,19 +112,17 @@ for (const file of sourceFiles) {
         failures.push(`${localPath(file)}: pure layers cannot reference engine or browser globals.`);
     }
 
-    const importPattern = /\bfrom\s+["']([^"']+)["']/g;
-    for (const match of source.matchAll(importPattern)) {
-        const specifier = match[1];
-        if (!specifier.startsWith(".")) {
-            continue;
+    const analysis = analyzeModuleDependencies(file, source, config.options);
+    failures.push(...analysis.diagnostics);
+    for (const edge of analysis.dependencies) {
+        if (edge.external || !edge.target) continue;
+        const specifier = edge.specifier;
+        const sourceTarget = edge.target;
+        if (edge.runtime && sourceFileSet.has(sourceTarget)) dependencies.push(sourceTarget);
+        if (!sourceFileSet.has(sourceTarget) && !/\.d\.[cm]?ts$/.test(sourceTarget)) {
+            failures.push(`${localPath(file)}:${edge.line}: local dependency '${specifier}' is outside the checked source tree.`);
         }
-        const target = resolve(dirname(file), specifier);
-        const sourceTarget = resolveSourceTarget(target);
-        const statementStart = source.lastIndexOf("import", match.index);
-        const importPrefix = statementStart >= 0 ? source.slice(statementStart, match.index).trim() : "";
-        if (sourceTarget && !/^import\s+type\b/.test(importPrefix)) {
-            dependencies.push(sourceTarget);
-        }
+        const target = sourceTarget.replace(/\.[cm]?[jt]sx?$/, "");
         const targetLocation = locationOf(target);
 
         if (target === runtimeHostPath && !runtimeHostCallers.has(file)) {
@@ -187,7 +188,7 @@ for (const file of sourceFiles) {
     }
 }
 
-for (const cycle of findCycles(dependencyGraph)) {
+for (const cycle of findDependencyCycles(dependencyGraph)) {
     failures.push(`TypeScript dependency cycle: ${cycle.map(localPath).join(" -> ")}.`);
 }
 
@@ -213,46 +214,4 @@ if (failures.length > 0) {
         console.warn(`Architecture review: ${warning}`);
     }
     console.log("Architecture OK: ownership, dependency direction, cycles, file size, type-safety and Laya 2D rules passed.");
-}
-
-function resolveSourceTarget(target) {
-    for (const candidate of [target, `${target}.ts`, join(target, "index.ts")]) {
-        const resolved = resolve(candidate);
-        if (sourceFileSet.has(resolved)) {
-            return resolved;
-        }
-    }
-    return undefined;
-}
-
-function findCycles(graph) {
-    const cycles = [];
-    const state = new Map();
-    const stack = [];
-    const reported = new Set();
-    const visitNode = (node) => {
-        state.set(node, 1);
-        stack.push(node);
-        for (const target of graph.get(node) ?? []) {
-            if (state.get(target) === 1) {
-                const start = stack.indexOf(target);
-                const cycle = [...stack.slice(start), target];
-                const key = cycle.slice(0, -1).sort().join("|");
-                if (!reported.has(key)) {
-                    reported.add(key);
-                    cycles.push(cycle);
-                }
-            } else if (!state.has(target)) {
-                visitNode(target);
-            }
-        }
-        stack.pop();
-        state.set(node, 2);
-    };
-    for (const node of graph.keys()) {
-        if (!state.has(node)) {
-            visitNode(node);
-        }
-    }
-    return cycles;
 }

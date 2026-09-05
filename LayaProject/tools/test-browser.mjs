@@ -12,6 +12,8 @@ import { homedir, tmpdir } from "node:os";
 import { dirname, extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocket } from "ws";
+import { runFrameworkProbes } from "./browser-framework-probes.mjs";
+import { handleNetworkProbe, runNetworkProbes } from "./browser-network-probes.mjs";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const releaseRoot = join(projectRoot, "release", "web");
@@ -44,6 +46,7 @@ const server = createServer((request, response) => {
         response.writeHead(204).end();
         return;
     }
+    if (handleNetworkProbe(request, response, pathname)) return;
     if (pathname === "/__lx_probe_slow.png") {
         setTimeout(() => {
             response.writeHead(200, { "Content-Type": "image/png", "Cache-Control": "no-store" });
@@ -174,6 +177,16 @@ try {
         throw new Error(`browser errors: ${consoleErrors.concat(runtimeErrors, failedRequests).join(" | ")}`);
     }
     await runEngineLifecycleProbes(cdp);
+    for (const probe of [runNetworkProbes, runFrameworkProbes]) {
+        const result = await cdp.send("Runtime.evaluate", {
+            expression: `(${probe.toString()})(${JSON.stringify(headlessValidation)})`,
+            awaitPromise: true, returnByValue: true,
+        });
+        if (result.exceptionDetails) {
+            throw new Error(`${probe.name}: ${JSON.stringify(result.exceptionDetails)}`);
+        }
+        console.log(`${probe.name}: ${JSON.stringify(result.result?.value)}`);
+    }
     const shutdown = await cdp.send("Runtime.evaluate", {
         expression: `(async () => {
             const validation = ${JSON.stringify(headlessValidation)};
@@ -189,11 +202,13 @@ try {
             if (!startup) throw new Error("Startup scene was not found.");
             startup.destroy();
             const deadline = performance.now() + 5000;
-            while (globalThis.LX.Ready && performance.now() < deadline) {
+            const isAttached = () => { try { globalThis.LX.snapshot(); return true; } catch { return false; } };
+            while (isAttached() && performance.now() < deadline) {
                 await new Promise((resolve) => setTimeout(resolve, 20));
             }
             return {
                 ready: globalThis.LX.Ready,
+                attached: isAttached(),
                 configReady: services.config.ready,
                 tablesReady: services.tables.ready,
                 managedUI: services.ui.snapshot().managed.length,
@@ -213,6 +228,7 @@ try {
     const shutdownState = shutdown.result?.value;
     if (shutdown.exceptionDetails
         || shutdownState?.ready !== false
+        || shutdownState?.attached !== false
         || shutdownState?.configReady !== false
         || shutdownState?.tablesReady !== false
         || shutdownState?.managedUI !== 0
@@ -612,7 +628,10 @@ async function waitForRuntime(cdp, timeoutMs) {
                 let render = null;
                 let ownershipReady = false;
                 if (ready) {
-                    render = globalThis.LX.Performance.assertBudget(${JSON.stringify(startupRenderBudget)});
+                    const sample = globalThis.LX.Performance.capture();
+                    if (sample.statisticsReady) {
+                        render = globalThis.LX.Performance.assertBudget(${JSON.stringify(startupRenderBudget)}, sample);
+                    }
                     const ui = globalThis.LX.UI.snapshot();
                     const expectedRoute = validation.uiProbe?.baseRouteId;
                     ownershipReady = (!expectedRoute
@@ -655,6 +674,7 @@ async function waitForRuntime(cdp, timeoutMs) {
             && state?.uiReady
             && state?.configReady
             && state?.tablesReady
+            && state?.performanceReady
             && (!headlessValidation.status || state?.statusText === headlessValidation.status.expected)) {
             return state;
         }

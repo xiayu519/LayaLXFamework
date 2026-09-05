@@ -3,6 +3,8 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { assertUsage, assertToolFreeTranscript } from "./evaluation-policy.mjs";
+import { assertRoutingResult, loadRoutingEvaluation } from "./routing-evaluation.mjs";
 
 const CODEX_CLI_VERSION = "0.153.2";
 const INPUT_TOKEN_LIMIT = 25_000;
@@ -10,13 +12,8 @@ const OUTPUT_TOKEN_LIMIT = 2_500;
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const skillRoot = resolve(scriptDirectory, "..");
 const projectRoot = resolve(skillRoot, "..", "..", "..");
-const casesPath = join(skillRoot, "evals", "cases.json");
 const schemaPath = join(skillRoot, "evals", "routing-output.schema.json");
-const cases = JSON.parse(readFileSync(casesPath, "utf8")).cases;
-const requests = cases.map(({ id, request }) => ({ id, request }));
-const prompt = `这是 LXFamework 项目 Skill 的语义路由评测。不要调用工具、打开文件、执行或分析任务本身；只根据本次启动时提供的项目 Skill 名称和 description 分类。
-为每个 case 返回完成请求所需的最小项目 Skill 集合。仅在语义确实跨独立边界时返回多个；不要返回系统 Skill、相邻但不需要的 Skill 或解释。保留 case id。
-cases: ${JSON.stringify(requests)}`;
+const { definition, policy, prompt } = loadRoutingEvaluation(projectRoot, process.env);
 const temporaryRoot = resolve(tmpdir());
 const evaluationRoot = mkdtempSync(join(temporaryRoot, "lx-skill-routing-"));
 const resultPath = join(evaluationRoot, "last-message.json");
@@ -34,8 +31,8 @@ try {
         "--sandbox", "read-only",
         "--disable", "plugins",
         "--disable", "apps",
-        "--model", "gpt-5.6-sol",
-        "-c", 'model_reasoning_effort="high"',
+        "--model", policy.model,
+        "-c", `model_reasoning_effort="${policy.effort}"`,
         "--json",
         "--output-schema", schemaPath,
         "--output-last-message", resultPath,
@@ -56,6 +53,7 @@ try {
         encoding: "utf8",
         windowsHide: true,
         maxBuffer: 20 * 1024 * 1024,
+        timeout: 240_000,
     });
     if (execution.error) {
         throw execution.error;
@@ -65,58 +63,17 @@ try {
         throw new Error(`Codex routing evaluation exited with code ${execution.status ?? 1}.\n${evidence}`);
     }
 
+    const events = execution.stdout.split(/\r?\n/).filter(Boolean).flatMap((line) => {
+        try { return [JSON.parse(line)]; } catch { return []; }
+    });
+    const usage = assertToolFreeTranscript(events);
+    assertUsage(usage, INPUT_TOKEN_LIMIT, OUTPUT_TOKEN_LIMIT);
+    console.log(`Evaluation usage (post-run threshold): ${JSON.stringify(usage)}; ${policy.model}/${policy.effort}.`);
     const actual = JSON.parse(readFileSync(resultPath, "utf8"));
-    const actualById = new Map();
-    for (const result of actual.results) {
-        if (actualById.has(result.id)) {
-            throw new Error(`Duplicate routing result id: ${result.id}`);
-        }
-        actualById.set(result.id, [...result.skills].sort());
-    }
+    const counts = assertRoutingResult(actual, definition);
 
-    const failures = [];
-    for (const testCase of cases) {
-        const observed = actualById.get(testCase.id);
-        const expected = [...testCase.expected].sort();
-        if (!observed) {
-            failures.push(`${testCase.id}: missing result`);
-        } else if (JSON.stringify(observed) !== JSON.stringify(expected)) {
-            failures.push(`${testCase.id}: expected [${expected.join(", ")}], got [${observed.join(", ")}]`);
-        }
-        actualById.delete(testCase.id);
-    }
-    for (const id of actualById.keys()) {
-        failures.push(`${id}: unexpected result`);
-    }
-    if (failures.length > 0) {
-        throw new Error(`Skill routing eval failed:\n- ${failures.join("\n- ")}`);
-    }
-
-    const events = execution.stdout.split(/\r?\n/).filter(Boolean);
-    let usage;
-    for (const line of events) {
-        try {
-            const event = JSON.parse(line);
-            if (event.type === "turn.completed") {
-                usage = event.usage;
-            }
-        } catch {
-            // Non-JSON progress lines do not affect the schema-validated result.
-        }
-    }
-    if (!usage) {
-        throw new Error("Skill routing eval did not report token usage.");
-    }
-    const inputTokens = Number(usage.input_tokens ?? 0);
-    const outputTokens = Number(usage.output_tokens ?? 0);
-    if (inputTokens > INPUT_TOKEN_LIMIT) {
-        throw new Error(`Skill routing input token budget exceeded: ${inputTokens} > ${INPUT_TOKEN_LIMIT}.`);
-    }
-    if (outputTokens > OUTPUT_TOKEN_LIMIT) {
-        throw new Error(`Skill routing output token budget exceeded: ${outputTokens} > ${OUTPUT_TOKEN_LIMIT}.`);
-    }
     console.log(
-        `Skill routing OK: ${cases.length} semantic cases, one ephemeral read-only Codex run. `
+        `Skill routing OK: ${counts.routing} routing + ${counts.decisions} decision cases, ${policy.model}/${policy.effort}, one ephemeral read-only Codex run. `
         + `Usage: ${JSON.stringify(usage)}.`,
     );
 } finally {

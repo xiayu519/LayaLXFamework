@@ -1,14 +1,16 @@
 ---
 type: feedback
 scope: collaboration
-description: 项目按 2–3 人协作处理；业务中途出现公共化候选或同一区域并行修改时必须停止相应边界并判断。
+description: 旧条目误把约 2–3 人使用理解为框架维护与 Codex 任务均需多人协作，已由单维护者协作策略替代。
 trigger: 业务实现中拟修改 framework、公共契约、Codex 工作流，或检测到其他成员同时修改目标文件时。
-status: active
-last_verified: 2026-09-04
+status: superseded
+last_verified: 2026-09-05
 source: user-confirmed
 ---
 
 # Small-team collaboration
+
+> 已由 [Single-maintainer collaboration](single-maintainer-collaboration.md) 替代。本条保留用于追溯旧解释，不再指导任务委派。
 
 ## Required behavior
 
@@ -19,4 +21,4 @@ source: user-confirmed
 
 ## Evidence
 
-开发者明确纠正项目不是单人框架，而是可能由 2–3 人同时协作。
+当时把“使用时约 2–3 人协作”误解为框架由多人维护，并进一步影响了 Codex 委派策略。开发者已明确纠正：框架由一人维护，使用团队规模不等于每个任务的代理数量。

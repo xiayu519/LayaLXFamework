@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | LayaAirIDE | 3.4.1 | [LayaAir 下载与安装](https://layaair.com/3.x/doc/basics/developmentEnvironment/download/) |
 | LayaAir CLI | 3.4.1 | [LayaAir CLI](https://github.com/layabox/layaair-cli) |
-| Node.js | 20+ | [Node.js 下载](https://nodejs.org/en/download) |
+| Node.js | 24.x（团队/CI 统一基线；Vitest 5 不支持 Node 20） | [Node.js 下载](https://nodejs.org/en/download) |
 | .NET Runtime | 8 | [.NET 8 下载](https://dotnet.microsoft.com/en-us/download/dotnet/8.0) |
 | Python | 3.9+ | [Python 下载](https://www.python.org/downloads/) |
 | Headless 浏览器 | Edge、Chrome 或 Chromium | [Chrome 下载](https://www.google.com/chrome/) |

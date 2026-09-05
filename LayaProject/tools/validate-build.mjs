@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, extname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { assertBuildTitle } from "./build-title.mjs";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const assetsRoot = join(projectRoot, "assets");
@@ -112,9 +113,8 @@ if (existsSync(join(releaseRoot, "internal", "UI"))) {
 
 const htmlPath = join(releaseRoot, "index.html");
 const htmlSource = existsSync(htmlPath) ? readFileSync(htmlPath, "utf8") : "";
-if (!htmlSource.includes("<title>LXFamework</title>")) {
-    failures.push("release/web/index.html does not use the LXFamework title.");
-}
+try { assertBuildTitle(htmlSource, buildSettings?.name); }
+catch (error) { failures.push(`release/web/index.html: ${error.message}`); }
 
 const scriptSources = Array.from(htmlSource.matchAll(/<script[^>]+src=["']([^"']+)["']/gi), (match) => match[1]);
 for (const requiredScript of ["libs/laya.core.js", "libs/laya.webgl_2D.js", "libs/laya.ui2.js", "libs/laya.spine.js"]) {

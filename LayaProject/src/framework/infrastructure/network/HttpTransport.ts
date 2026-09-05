@@ -1,3 +1,6 @@
+import { createEngineHttpRequest } from "./EngineHttpRequest";
+import { prepareHttpPayload, type PreparedHttpPayload } from "./HttpPayload";
+
 export type HttpMethod = "GET" | "POST" | "HEAD";
 export type HttpResponseType = "text" | "json" | "arraybuffer";
 export type HttpErrorKind =
@@ -7,12 +10,16 @@ export type HttpErrorKind =
     | "timeout"
     | "network"
     | "http"
+    | "parse"
+    | "schema"
     | "dispatch";
 
 export interface HttpRetryPolicy {
     /** Total attempts, including the initial request. Range: 1..5. */
     readonly maxAttempts: number;
+    /** Range: 0..2_147_483_647. */
     readonly baseDelayMs?: number;
+    /** Range: baseDelayMs..2_147_483_647. */
     readonly maxDelayMs?: number;
     readonly jitterRatio?: number;
     readonly statusCodes?: readonly number[];
@@ -21,8 +28,12 @@ export interface HttpRetryPolicy {
 export interface HttpRequestOptions {
     readonly method?: HttpMethod;
     readonly headers?: Readonly<Record<string, string>>;
+    /** String, plain JSON object/array, ArrayBuffer, or ArrayBufferView. */
     readonly body?: unknown;
     readonly responseType?: HttpResponseType;
+    /** Runs after decoding, including null for JSON HEAD/204/205 responses. */
+    readonly validate?: (value: unknown) => boolean;
+    /** Range: 0..2_147_483_647. Zero disables the request timeout. */
     readonly timeoutMs?: number;
     readonly signal?: AbortSignal;
     /** Required before POST retries are allowed. Also sent as Idempotency-Key. */
@@ -35,6 +46,8 @@ export interface HttpResponse<T> {
     readonly url: string;
     readonly status: number;
     readonly data: T;
+    /** Lowercase names; only headers exposed by the platform/CORS are available. */
+    readonly headers: Readonly<Record<string, string>>;
 }
 
 export interface HttpTransport {
@@ -66,6 +79,7 @@ interface ResolvedRetryPolicy {
 }
 
 const DEFAULT_RETRY_STATUSES = [408, 425, 429, 500, 502, 503, 504] as const;
+const MAX_TIMER_DELAY_MS = 2_147_483_647;
 
 export class LayaHttpTransport implements HttpTransport {
     async request<T>(url: string, options: HttpRequestOptions = {}): Promise<HttpResponse<T>> {
@@ -84,11 +98,20 @@ export class LayaHttpTransport implements HttpTransport {
                 retry.maxAttempts,
             );
         }
+        let payload: PreparedHttpPayload;
+        try {
+            payload = prepareHttpPayload(options.body, options.headers, options.idempotencyKey);
+        } catch (cause) {
+            throw new HttpTransportError(
+                cause instanceof Error ? cause.message : "HTTP payload validation failed.",
+                url, 0, "validation", false, 0, retry.maxAttempts,
+            );
+        }
 
         let attempt = 1;
         while (true) {
             try {
-                return await this.executeAttempt<T>(url, method, timeoutMs, options, retry, attempt);
+                return await this.executeAttempt<T>(url, method, timeoutMs, options, payload, retry, attempt);
             } catch (cause) {
                 if (!(cause instanceof HttpTransportError)
                     || !cause.retryable
@@ -106,13 +129,14 @@ export class LayaHttpTransport implements HttpTransport {
         method: HttpMethod,
         timeoutMs: number,
         options: HttpRequestOptions,
+        payload: PreparedHttpPayload,
         retry: ResolvedRetryPolicy,
         attempt: number,
     ): Promise<HttpResponse<T>> {
         return new Promise<HttpResponse<T>>((resolve, reject) => {
             let request: Laya.HttpRequest;
             try {
-                request = new Laya.HttpRequest();
+                request = createEngineHttpRequest();
             } catch (cause) {
                 reject(new HttpTransportError(
                     "HTTP request initialization failed.",
@@ -175,14 +199,39 @@ export class LayaHttpTransport implements HttpTransport {
                     return;
                 }
                 const status = Number(request.http?.status ?? 200);
-                if (status >= 400) {
+                if (status !== 0 && (status < 200 || status >= 300)) {
                     fail(`HTTP request failed with status ${status}.`, "http", status);
                     return;
                 }
+                let data: unknown = request.data;
+                if ((options.responseType ?? "json") === "json") {
+                    try {
+                        data = method === "HEAD" || status === 204 || status === 205
+                            ? null
+                            : JSON.parse(data as string);
+                    } catch {
+                        // Native SyntaxError messages can contain response content.
+                        fail("HTTP response is not valid JSON.", "parse", status);
+                        return;
+                    }
+                }
+                if (options.validate) {
+                    let valid = false;
+                    try {
+                        valid = options.validate(data) === true;
+                    } catch {
+                        // Validator errors must not leak the response into diagnostics.
+                    }
+                    if (!valid) {
+                        fail("HTTP response failed schema validation.", "schema", status);
+                        return;
+                    }
+                }
+                if (settled) return;
                 settled = true;
-                const data = request.data as T;
+                const headers = readResponseHeaders(request);
                 cleanup();
-                resolve({ url, status, data });
+                resolve({ url, status, data: data as T, headers });
             };
 
             if (options.signal?.aborted) {
@@ -208,23 +257,12 @@ export class LayaHttpTransport implements HttpTransport {
                     }, timeoutMs);
                 }
 
-                const headers = flattenHeaders(options.headers);
-                if (options.idempotencyKey && !hasHeader(options.headers, "idempotency-key")) {
-                    headers.push("Idempotency-Key", options.idempotencyKey);
-                }
-                let body = options.body;
-                if (isJsonBody(body)) {
-                    body = JSON.stringify(body);
-                    if (!hasHeader(options.headers, "content-type")) {
-                        headers.push("Content-Type", "application/json");
-                    }
-                }
                 request.send(
                     url,
-                    body ?? null,
+                    payload.body,
                     method.toLowerCase() as "get" | "post" | "head",
-                    options.responseType ?? "json",
-                    headers,
+                    options.responseType === "arraybuffer" ? "arraybuffer" : "text",
+                    payload.headers,
                 );
             } catch (cause) {
                 fail("HTTP request dispatch failed.", "dispatch", 0, cause);
@@ -254,15 +292,19 @@ function validateRequest(
     if (!url) {
         return "HTTP request url is required.";
     }
-    if (!Number.isFinite(timeoutMs) || timeoutMs < 0) {
-        return "HTTP timeout must be a finite non-negative number.";
+    if (method !== "GET" && method !== "POST" && method !== "HEAD") {
+        return "HTTP method must be GET, POST, or HEAD.";
+    }
+    if (!Number.isFinite(timeoutMs) || timeoutMs < 0 || timeoutMs > MAX_TIMER_DELAY_MS) {
+        return `HTTP timeout must be a finite number from 0 to ${MAX_TIMER_DELAY_MS}ms.`;
     }
     if (!Number.isInteger(retry.maxAttempts) || retry.maxAttempts < 1 || retry.maxAttempts > 5) {
         return "HTTP retry maxAttempts must be an integer from 1 to 5.";
     }
     if (!Number.isFinite(retry.baseDelayMs) || retry.baseDelayMs < 0
-        || !Number.isFinite(retry.maxDelayMs) || retry.maxDelayMs < retry.baseDelayMs) {
-        return "HTTP retry delays must be finite, non-negative, and maxDelayMs must cover baseDelayMs.";
+        || !Number.isFinite(retry.maxDelayMs) || retry.maxDelayMs < retry.baseDelayMs
+        || retry.maxDelayMs > MAX_TIMER_DELAY_MS) {
+        return `HTTP retry delays must be finite, within 0..${MAX_TIMER_DELAY_MS}ms, and maxDelayMs must cover baseDelayMs.`;
     }
     if (!Number.isFinite(retry.jitterRatio) || retry.jitterRatio < 0 || retry.jitterRatio > 1) {
         return "HTTP retry jitterRatio must be between 0 and 1.";
@@ -299,7 +341,10 @@ function retryDelay(policy: ResolvedRetryPolicy, failedAttempt: number): number 
         return exponential;
     }
     const spread = exponential * policy.jitterRatio;
-    return Math.max(0, Math.round(exponential - spread + Math.random() * spread * 2));
+    return Math.min(
+        policy.maxDelayMs,
+        Math.max(0, Math.round(exponential - spread + Math.random() * spread * 2)),
+    );
 }
 
 function waitForRetry(
@@ -331,31 +376,20 @@ function waitForRetry(
     });
 }
 
-function isJsonBody(body: unknown): body is readonly unknown[] | Readonly<Record<string, unknown>> {
-    if (Array.isArray(body)) {
-        return true;
+function readResponseHeaders(request: Laya.HttpRequest): Readonly<Record<string, string>> {
+    const headers: Record<string, string> = Object.create(null);
+    let raw: string;
+    try {
+        raw = request.http?.getAllResponseHeaders?.() ?? "";
+    } catch {
+        return Object.freeze(headers);
     }
-    if (!body || typeof body !== "object") {
-        return false;
+    for (const line of raw.split(/\r?\n/)) {
+        const separator = line.indexOf(":");
+        if (separator < 1) continue;
+        const name = line.slice(0, separator).trim().toLowerCase();
+        const value = line.slice(separator + 1).trim();
+        headers[name] = headers[name] ? `${headers[name]}, ${value}` : value;
     }
-    const prototype = Object.getPrototypeOf(body);
-    return prototype === Object.prototype || prototype === null;
-}
-
-function flattenHeaders(headers?: Readonly<Record<string, string>>): string[] {
-    const flattened: string[] = [];
-    if (!headers) {
-        return flattened;
-    }
-    for (const key of Object.keys(headers)) {
-        flattened.push(key, headers[key]);
-    }
-    return flattened;
-}
-
-function hasHeader(headers: Readonly<Record<string, string>> | undefined, expected: string): boolean {
-    if (!headers) {
-        return false;
-    }
-    return Object.keys(headers).some((key) => key.toLowerCase() === expected);
+    return Object.freeze(headers);
 }

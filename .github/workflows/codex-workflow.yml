@@ -1,0 +1,124 @@
+name: Codex workflow regression
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'Books/LXFamework-Codex-Workflow.md'
+      - 'LayaProject/AGENTS.md'
+      - 'LayaProject/.agents/**'
+      - 'LayaProject/.codex/**'
+      - 'LayaProject/src/game/**/AGENTS.md'
+      - 'LayaProject/src/game/**/.agents/**'
+      - 'LayaProject/src/game/**/.codex/**'
+      - 'LayaProject/package.json'
+      - 'LayaProject/package-lock.json'
+      - 'LayaProject/tools/create-game.mjs'
+      - 'LayaProject/tools/python-runtime.mjs'
+      - 'LayaProject/tools/run-python.mjs'
+      - 'LayaProject/tools/validate-skills.py'
+      - 'LayaProject/tests/workflow/**'
+      - '.github/workflows/codex-workflow.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'Books/LXFamework-Codex-Workflow.md'
+      - 'LayaProject/AGENTS.md'
+      - 'LayaProject/.agents/**'
+      - 'LayaProject/.codex/**'
+      - 'LayaProject/src/game/**/AGENTS.md'
+      - 'LayaProject/src/game/**/.agents/**'
+      - 'LayaProject/src/game/**/.codex/**'
+      - 'LayaProject/package.json'
+      - 'LayaProject/package-lock.json'
+      - 'LayaProject/tools/create-game.mjs'
+      - 'LayaProject/tools/python-runtime.mjs'
+      - 'LayaProject/tools/run-python.mjs'
+      - 'LayaProject/tools/validate-skills.py'
+      - 'LayaProject/tests/workflow/**'
+      - '.github/workflows/codex-workflow.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  static-policy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      model: ${{ steps.evaluation.outputs.model }}
+      effort: ${{ steps.evaluation.outputs.effort }}
+    defaults:
+      run:
+        working-directory: LayaProject
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: LayaProject/package-lock.json
+      - run: npm ci
+      - run: npm run check:skills
+      - run: npm run check:memory
+      - run: npm run validate:game-workflow
+      - run: npm test -- tests/workflow
+      - name: Prepare sanitized evaluation artifact
+        id: evaluation
+        run: npm run prepare:skill-routing -- --github-output "$GITHUB_OUTPUT"
+      - name: Upload sanitized evaluation artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: codex-routing-input
+          path: |
+            LayaProject/codex-eval/routing-prompt.md
+            LayaProject/codex-eval/routing-output.schema.json
+          if-no-files-found: error
+          retention-days: 1
+
+  semantic-evaluation:
+    needs: static-policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      final_message: ${{ steps.run_codex.outputs.final-message }}
+    steps:
+      - name: Download sanitized evaluation artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: codex-routing-input
+          path: codex-eval
+      - name: Run isolated Codex evaluation
+        id: run_codex
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.CODEX_API_KEY }}
+          prompt-file: codex-eval/routing-prompt.md
+          model: ${{ needs.static-policy.outputs.model }}
+          effort: ${{ needs.static-policy.outputs.effort }}
+          sandbox: read-only
+          safety-strategy: drop-sudo
+          codex-version: 0.153.2
+          codex-args: '["--ephemeral","--ignore-user-config","--skip-git-repo-check","--disable","plugins","--disable","apps","--output-schema","codex-eval/routing-output.schema.json"]'
+
+  validate-semantic-result:
+    needs: semantic-evaluation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: LayaProject
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Validate structured result
+        env:
+          LX_CODEX_EVAL_RESULT: ${{ needs.semantic-evaluation.outputs.final_message }}
+        run: npm run validate:skill-routing

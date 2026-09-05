@@ -30,8 +30,16 @@ describe("LayaHttpTransport", () => {
         const constructor = vi.fn();
         vi.stubGlobal("Laya", { Event: { COMPLETE: "complete", ERROR: "error" }, HttpRequest: constructor });
 
-        const invalidTimeout = new LayaHttpTransport().request("/api", { timeoutMs: Number.NaN });
-        await expect(invalidTimeout).rejects.toMatchObject({ kind: "validation", attempt: 0 });
+        const invalidOptions = [
+            { timeoutMs: Number.NaN },
+            { timeoutMs: 2_147_483_648 },
+            { retry: { maxAttempts: 2, baseDelayMs: 2_147_483_648, maxDelayMs: 2_147_483_648 } },
+            { retry: { maxAttempts: 2, baseDelayMs: 1, maxDelayMs: 2_147_483_648 } },
+        ] as const;
+        for (const options of invalidOptions) {
+            await expect(new LayaHttpTransport().request("/api", options))
+                .rejects.toMatchObject({ kind: "validation", attempt: 0 });
+        }
         const unsafePost = new LayaHttpTransport().request("/api", {
             method: "POST",
             retry: { maxAttempts: 2 },
@@ -40,19 +48,46 @@ describe("LayaHttpTransport", () => {
         expect(constructor).not.toHaveBeenCalled();
     });
 
-    it("serializes only JSON-shaped bodies", async () => {
+    it("accepts the host timer ceiling", async () => {
+        const timer = vi.spyOn(globalThis, "setTimeout");
+        installHttpRequests([{ event: "complete" }]);
+        await new LayaHttpTransport().request("/api", { timeoutMs: 2_147_483_647 });
+        expect(timer).toHaveBeenCalledWith(expect.any(Function), 2_147_483_647);
+        timer.mockRestore();
+    });
+
+    it("keeps retry jitter within maxDelayMs", async () => {
+        vi.useFakeTimers();
+        const fixture = installHttpRequests([
+            { event: "error", status: 0 },
+            { event: "complete", status: 200, data: { ok: true } },
+        ]);
+        const random = vi.spyOn(Math, "random").mockReturnValue(1);
+        const response = new LayaHttpTransport().request("/retry", {
+            timeoutMs: 0,
+            retry: { maxAttempts: 2, baseDelayMs: 10, maxDelayMs: 10, jitterRatio: 1 },
+        });
+        await vi.advanceTimersByTimeAsync(9);
+        expect(fixture.requests).toHaveLength(1);
+        await vi.advanceTimersByTimeAsync(1);
+        await expect(response).resolves.toMatchObject({ data: { ok: true } });
+        expect(fixture.requests).toHaveLength(2);
+        random.mockRestore();
+    });
+
+    it("serializes JSON and snapshots binary bodies before passing them to Laya", async () => {
         const fixture = installHttpRequests([{ event: "complete" }, { event: "complete" }]);
         const transport = new LayaHttpTransport();
 
         await transport.request("/json", { method: "POST", body: { value: 1 }, timeoutMs: 0 });
-        class NativePayload { readonly value = 2; }
-        const nativePayload = new NativePayload();
-        await transport.request("/native", { method: "POST", body: nativePayload, timeoutMs: 0 });
+        const binary = new Uint8Array([1, 2]);
+        await transport.request("/binary", { method: "POST", body: binary, timeoutMs: 0 });
 
         expect(fixture.sent[0][1]).toBe('{"value":1}');
         expect(fixture.sent[0][4]).toEqual(["Content-Type", "application/json"]);
-        expect(fixture.sent[1][1]).toBe(nativePayload);
-        expect(fixture.sent[1][4]).toEqual([]);
+        expect(fixture.sent[1][1]).toBeInstanceOf(ArrayBuffer);
+        expect(Array.from(new Uint8Array(fixture.sent[1][1] as ArrayBuffer))).toEqual([1, 2]);
+        expect(fixture.sent[1][4]).toEqual(["Content-Type", "application/octet-stream"]);
     });
 
     it("retries retryable GET failures up to the configured ceiling", async () => {
@@ -168,7 +203,7 @@ function installHttpRequests(plans: readonly RequestPlan[]): {
             const plan = plans[nextPlan++] ?? { event: "none" };
             const listeners = new Map<string, (value?: unknown) => void>();
             const request = {
-                data: plan.data ?? { ok: true },
+                data: JSON.stringify(plan.data ?? { ok: true }),
                 http: { status: plan.status ?? 200, abort: vi.fn() },
                 once(type: string, _caller: unknown, listener: (value?: unknown) => void): void {
                     listeners.set(type, listener);

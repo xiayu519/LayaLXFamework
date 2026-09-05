@@ -4,10 +4,15 @@ import {
 } from "./BaseGameWindow";
 import { UILayer } from "./UILayer";
 import { TipQueue, type TipQueueSnapshot } from "./TipQueue";
+import { awaitBinding, BindingCancelledError } from "../../application/ui/AsyncBindingGuard";
+import { UIRequestTracker, type UIRequest, type UIRequestInfo } from "./UIRequestTracker";
+import { syncModalOrder } from "./UIModalOrder";
+import { destroyManagedWindow, getWindowCleanupDiagnostic,
+    type CleanupWindowRecord, type UIWindowCleanupDiagnostic } from "./UIWindowCleanup";
 
 export type UIWindowMultiplicity = "singleton" | "multiple";
 export type UIWindowRetention = "hide" | "destroy";
-export type UIWindowState = "visible" | "hidden-retained";
+export type UIWindowState = "visible" | "hidden-retained" | "cleanup-failed";
 
 export interface UIRoute<TArgs> {
     readonly id: string;
@@ -29,11 +34,19 @@ export interface UIWindowInfo {
 
 export interface UIRouterSnapshot {
     readonly loading: Readonly<Record<string, number>>;
+    readonly pendingRequests: readonly UIRequestInfo[];
+    readonly nativeLoads: number;
+    readonly cleanupFailures: number;
     readonly managed: readonly UIWindowInfo[];
     readonly visible: readonly UIWindowInfo[];
     readonly top?: UIWindowInfo;
     readonly bottom?: UIWindowInfo;
     readonly tips: TipQueueSnapshot;
+}
+
+export interface UIShowOptions {
+    /** Cancels the pending show; once shown, close the window through its normal lifecycle. */
+    readonly signal?: AbortSignal;
 }
 
 export class UIRouterCleanupError extends Error {
@@ -43,7 +56,7 @@ export class UIRouterCleanupError extends Error {
     }
 }
 
-interface WindowRecord {
+interface WindowRecord extends CleanupWindowRecord {
     readonly route: UnknownRoute;
     readonly window: UnknownWindow;
 }
@@ -56,16 +69,15 @@ export class UIRouter implements WindowLifecycleObserver {
     private readonly singletonWindows = new Map<string, UnknownWindow>();
     private readonly multipleWindows = new Map<string, Set<UnknownWindow>>();
     private readonly records = new Map<UnknownWindow, WindowRecord>();
-    private readonly lifecycleVersions = new Map<string, number>();
-    private readonly singletonRequestVersions = new Map<string, number>();
+    private readonly requests = new UIRequestTracker();
     private readonly presentationVersions = new WeakMap<UnknownWindow, number>();
     private readonly pendingLoads = new Set<Promise<unknown>>();
-    private readonly loadingCounts = new Map<string, number>();
+    private readonly nativeLoads = new Set<Promise<unknown>>();
     private disposed = false;
 
     constructor(private readonly tips?: TipQueue) {}
 
-    register<TArgs>(route: UIRoute<TArgs>): void {
+    register<TArgs>(route: UIRoute<TArgs>): UIRoute<TArgs> {
         this.requireActive();
         if (!route.id || !route.url) {
             throw new Error("UI route id and url are required.");
@@ -77,12 +89,25 @@ export class UIRouter implements WindowLifecycleObserver {
             throw new Error(`Duplicate UI route '${route.id}'.`);
         }
         this.routes.set(route.id, route as unknown as UnknownRoute);
-        this.lifecycleVersions.set(route.id, 0);
+        return route;
     }
 
-    show<TArgs>(routeId: string, args: TArgs): Promise<BaseGameWindow<TArgs>> {
+    show<TArgs>(route: UIRoute<TArgs>, args: NoInfer<TArgs>, options?: UIShowOptions): Promise<BaseGameWindow<TArgs>>;
+    show<TArgs>(routeId: string, args: TArgs, options?: UIShowOptions): Promise<BaseGameWindow<TArgs>>;
+    show<TArgs>(
+        routeOrId: string | UIRoute<TArgs>, args: TArgs, options: UIShowOptions = {},
+    ): Promise<BaseGameWindow<TArgs>> {
         this.requireActive();
-        const operation = this.showRoute(routeId, args);
+        const routeId = typeof routeOrId === "string" ? routeOrId : routeOrId.id;
+        const route = this.requireRoute(routeId);
+        if (typeof routeOrId !== "string" && route !== (routeOrId as unknown as UnknownRoute)) {
+            throw new Error(`UI route '${routeId}' is not the registered route object.`);
+        }
+        if (options.signal?.aborted) return Promise.reject(new BindingCancelledError());
+        if (route.multiplicity === "singleton") this.requests.cancel(routeId);
+        const request = this.requests.begin(routeId, options.signal);
+        const operation = this.showRoute(routeId, args, request)
+            .finally(() => this.requests.finish(request));
         this.pendingLoads.add(operation);
         operation.then(
             () => this.pendingLoads.delete(operation),
@@ -106,7 +131,7 @@ export class UIRouter implements WindowLifecycleObserver {
             if (target && this.singletonWindows.get(routeId) !== target) {
                 throw new Error(`UI window does not belong to route '${routeId}'.`);
             }
-            this.invalidateRoute(routeId);
+            this.requests.cancel(routeId);
             const window = this.singletonWindows.get(routeId);
             if (window) {
                 this.closeWindow(route, window);
@@ -119,10 +144,11 @@ export class UIRouter implements WindowLifecycleObserver {
             if (!windows?.has(target)) {
                 throw new Error(`UI window does not belong to route '${routeId}'.`);
             }
+            this.requests.cancel(routeId, target);
             this.closeWindow(route, target);
             return;
         }
-        this.invalidateRoute(routeId);
+        this.requests.cancel(routeId);
         for (const window of Array.from(windows ?? [])) {
             this.closeWindow(route, window);
         }
@@ -162,16 +188,27 @@ export class UIRouter implements WindowLifecycleObserver {
 
     snapshot(): UIRouterSnapshot {
         const visible = this.listVisible();
+        const pendingRequests = this.requests.snapshot();
+        const loading: Record<string, number> = {};
+        for (const request of pendingRequests) {
+            if (request.phase === "loading") loading[request.routeId] = (loading[request.routeId] ?? 0) + 1;
+        }
         return Object.freeze({
-            loading: Object.freeze(Object.fromEntries(
-                Array.from(this.loadingCounts.entries()).sort(([left], [right]) => left.localeCompare(right)),
-            )),
+            loading: Object.freeze(loading),
+            pendingRequests,
+            nativeLoads: this.nativeLoads.size,
+            cleanupFailures: this.cleanupDiagnostics().length,
             managed: this.listManaged(),
             visible,
             top: visible[visible.length - 1],
             bottom: visible[0],
             tips: this.tips?.snapshot() ?? Object.freeze({ queued: 0, active: 0, shown: 0, dropped: 0 }),
         });
+    }
+
+    cleanupDiagnostics(): readonly UIWindowCleanupDiagnostic[] {
+        return Array.from(this.records.values(), getWindowCleanupDiagnostic)
+            .filter((entry): entry is UIWindowCleanupDiagnostic => entry !== undefined);
     }
 
     dispose(): void {
@@ -183,9 +220,7 @@ export class UIRouter implements WindowLifecycleObserver {
             } catch (error) {
                 errors.push(error);
             }
-            for (const routeId of this.routes.keys()) {
-                this.invalidateRoute(routeId);
-            }
+            this.requests.cancel();
         }
         for (const record of Array.from(this.records.values())) {
             try {
@@ -195,8 +230,6 @@ export class UIRouter implements WindowLifecycleObserver {
             }
         }
         this.routes.clear();
-        this.lifecycleVersions.clear();
-        this.singletonRequestVersions.clear();
         if (errors.length > 0) {
             throw new UIRouterCleanupError(errors);
         }
@@ -204,8 +237,8 @@ export class UIRouter implements WindowLifecycleObserver {
     }
 
     async waitForPendingLoads(): Promise<void> {
-        while (this.pendingLoads.size > 0) {
-            await Promise.allSettled(Array.from(this.pendingLoads));
+        while (this.pendingLoads.size > 0 || this.nativeLoads.size > 0) {
+            await Promise.allSettled([...this.pendingLoads, ...this.nativeLoads]);
         }
         await this.tips?.waitForPending();
     }
@@ -221,84 +254,88 @@ export class UIRouter implements WindowLifecycleObserver {
     onDestroyed(window: UnknownWindow): void {
         const record = this.records.get(window);
         if (record) {
+            if (!window.destructionComplete) throw window.destructionFailure
+                ?? new Error("Cannot untrack a UI window before destruction completes.");
             this.untrackWindow(record);
         }
     }
 
-    private async showRoute<TArgs>(routeId: string, args: TArgs): Promise<BaseGameWindow<TArgs>> {
+    onOrderChanged(): void {
+        this.syncModalLayer();
+    }
+
+    private async showRoute<TArgs>(routeId: string, args: TArgs, request: UIRequest): Promise<BaseGameWindow<TArgs>> {
         const route = this.requireRoute(routeId) as UIRoute<TArgs>;
+        if (request.controller.signal.aborted) throw new BindingCancelledError();
         if (route.multiplicity === "singleton") {
             const cached = this.singletonWindows.get(routeId) as BaseGameWindow<TArgs> | undefined;
             if (cached?.destroyed) {
-                this.onDestroyed(cached as unknown as UnknownWindow);
+                const record = this.records.get(cached as unknown as UnknownWindow);
+                if (record) this.destroyWindow(record);
             } else if (cached) {
-                return this.presentWindow(route, cached, args);
+                return this.presentWindow(route, cached, args, request);
             }
         }
 
-        const lifecycleVersion = this.lifecycleVersions.get(routeId) ?? 0;
-        const requestVersion = route.multiplicity === "singleton"
-            ? (this.singletonRequestVersions.get(routeId) ?? 0) + 1
-            : 0;
-        if (route.multiplicity === "singleton") {
-            this.singletonRequestVersions.set(routeId, requestVersion);
+        const prefab = await awaitBinding(this.loadPrefab(route), request.controller.signal);
+        if (request.controller.signal.aborted || this.disposed) throw new BindingCancelledError();
+        if (!prefab) {
+            throw new Error(`UI asset '${route.url}' did not load as a Prefab.`);
         }
-
-        this.changeLoading(routeId, 1);
+        const content = prefab.create();
+        if (!(content instanceof Laya.GWidget)) {
+            content.destroy();
+            throw new Error(`UI asset '${route.url}' root must be a GWidget.`);
+        }
+        let window: BaseGameWindow<TArgs>;
         try {
-            const prefab = await this.loadPrefab(route);
-            if (!prefab) {
-                throw new Error(`UI asset '${route.url}' did not load as a Prefab.`);
-            }
-            const content = prefab.create();
-            if (!(content instanceof Laya.GWidget)) {
-                content.destroy();
-                throw new Error(`UI asset '${route.url}' root must be a GWidget.`);
-            }
-            if (this.requestExpired(route, lifecycleVersion, requestVersion)) {
-                content.destroy();
-                throw new Error(`UI request '${routeId}' was superseded.`);
-            }
-
-            let window: BaseGameWindow<TArgs>;
-            try {
-                window = route.create(content);
-            } catch (error) {
-                content.destroy();
-                throw error;
-            }
-            if (window.destroyed) {
-                content.destroy();
-                throw new Error(`UI route '${routeId}' created a destroyed window.`);
-            }
-            this.trackWindow(route, window);
-            return await this.presentWindow(route, window, args);
-        } finally {
-            this.changeLoading(routeId, -1);
+            window = route.create(content);
+        } catch (error) {
+            content.destroy();
+            throw error;
         }
+        if (window.destroyed) {
+            content.destroy();
+            throw new Error(`UI route '${routeId}' created a destroyed window.`);
+        }
+        if (request.controller.signal.aborted || this.disposed) {
+            window.destroy();
+            throw new BindingCancelledError();
+        }
+        this.trackWindow(route, window);
+        return this.presentWindow(route, window, args, request);
     }
 
-    private async loadPrefab(route: UnknownRoute): Promise<Laya.Prefab | null> {
-        return Laya.loader.load(route.url, {
+    private loadPrefab(route: UnknownRoute): Promise<Laya.Prefab | null> {
+        const operation = Laya.loader.load(route.url, {
             type: Laya.Loader.HIERARCHY,
         }) as Promise<Laya.Prefab | null>;
+        this.nativeLoads.add(operation);
+        operation.then(
+            () => this.nativeLoads.delete(operation),
+            () => this.nativeLoads.delete(operation),
+        );
+        return operation;
     }
 
     private async presentWindow<TArgs>(
         route: UIRoute<TArgs>,
         window: BaseGameWindow<TArgs>,
         args: TArgs,
+        request: UIRequest,
     ): Promise<BaseGameWindow<TArgs>> {
         const unknownWindow = window as unknown as UnknownWindow;
         const version = (this.presentationVersions.get(unknownWindow) ?? 0) + 1;
         this.presentationVersions.set(unknownWindow, version);
+        request.phase = "binding";
+        request.window = window;
         window.modal = route.modal ?? resolveLayer(route) === UILayer.Popup;
         window.zOrder = resolveLayer(route) * 1000;
         try {
-            const shown = await window.present(args);
+            const shown = await window.present(args, request.controller.signal);
             if (!shown || window.destroyed || this.disposed
                 || this.presentationVersions.get(unknownWindow) !== version) {
-                throw new Error(`UI request '${route.id}' was superseded.`);
+                throw new BindingCancelledError();
             }
             this.syncModalLayer();
             return window;
@@ -306,7 +343,8 @@ export class UIRouter implements WindowLifecycleObserver {
             if (this.presentationVersions.get(unknownWindow) === version) {
                 const record = this.records.get(unknownWindow);
                 if (record) {
-                    this.destroyWindow(record);
+                    if (error instanceof BindingCancelledError && !this.disposed) this.closeWindow(route, unknownWindow);
+                    else this.destroyWindow(record);
                 }
             }
             throw error;
@@ -347,9 +385,7 @@ export class UIRouter implements WindowLifecycleObserver {
     }
 
     private destroyWindow(record: WindowRecord): void {
-        if (!record.window.destroyed) {
-            record.window.destroy();
-        }
+        destroyManagedWindow(record);
         if (this.records.has(record.window)) {
             this.untrackWindow(record);
         }
@@ -371,27 +407,6 @@ export class UIRouter implements WindowLifecycleObserver {
         this.syncModalLayer();
     }
 
-    private requestExpired(route: UnknownRoute, lifecycleVersion: number, requestVersion: number): boolean {
-        return this.disposed
-            || this.lifecycleVersions.get(route.id) !== lifecycleVersion
-            || (route.multiplicity === "singleton"
-                && this.singletonRequestVersions.get(route.id) !== requestVersion);
-    }
-
-    private invalidateRoute(routeId: string): void {
-        this.lifecycleVersions.set(routeId, (this.lifecycleVersions.get(routeId) ?? 0) + 1);
-        this.singletonRequestVersions.set(routeId, (this.singletonRequestVersions.get(routeId) ?? 0) + 1);
-    }
-
-    private changeLoading(routeId: string, delta: number): void {
-        const count = (this.loadingCounts.get(routeId) ?? 0) + delta;
-        if (count <= 0) {
-            this.loadingCounts.delete(routeId);
-        } else {
-            this.loadingCounts.set(routeId, count);
-        }
-    }
-
     private requireRoute(routeId: string): UnknownRoute {
         const route = this.routes.get(routeId);
         if (!route) {
@@ -411,9 +426,7 @@ export class UIRouter implements WindowLifecycleObserver {
         if (!root) {
             return;
         }
-        const modalWindows = this.listVisible().filter((info) => info.modal);
-        const topModal = modalWindows[modalWindows.length - 1];
-        root.modalLayer.zOrder = topModal?.window.zOrder ?? 0;
+        syncModalOrder(root);
     }
 }
 
@@ -426,7 +439,8 @@ function toWindowInfo(record: WindowRecord): UIWindowInfo {
         routeId: record.route.id,
         layer: resolveLayer(record.route),
         modal: record.window.modal,
-        state: record.window.isShowing ? "visible" : "hidden-retained",
+        state: getWindowCleanupDiagnostic(record) ? "cleanup-failed"
+            : record.window.isShowing ? "visible" : "hidden-retained",
         window: record.window,
     });
 }

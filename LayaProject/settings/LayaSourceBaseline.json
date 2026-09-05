@@ -3,6 +3,11 @@
   "officialCommit": "f368b43098fe6bde7b961546114e71907c5f8a98",
   "normalization": "crlf-to-lf-trim-line-end-and-final-newline",
   "sources": [
+    { "library": "laya.core.js.map", "source": "src/layaAir/laya/display/Node.ts", "sha256": "735fe97f89956f7e8a106cbe606a0198a6a9a872c2722b142adf3bb5ceb7258e" },
+    { "library": "laya.core.js.map", "source": "src/layaAir/laya/display/Sprite.ts", "sha256": "6bf14492439b2292a2206035885ea43369d0b850fac69e29a0a2765e762d757d" },
+    { "library": "laya.core.js.map", "source": "src/layaAir/laya/layagl/StatisticsContext.ts", "sha256": "5c94b0dcc61981114a0825267a7c8fccd50aa4f1d236c5bab94ee162af3ebb57" },
+    { "library": "laya.webgl_2D.js.map", "source": "src/layaAir/laya/RenderDriver/WebGLDriver/RenderDevice/WebGLInternalTex.ts", "sha256": "48c7a954dca1a87edd5c258a93ece1c5b12834a1334432ae759e8c7df3cba942" },
+    { "library": "laya.webgl_2D.js.map", "source": "src/layaAir/laya/RenderDriver/WebGLDriver/RenderDevice/WebGLEngine/GLBuffer.ts", "sha256": "57ecbc92b5693e6bb81355eee786cf4f9cba7439700741b8aaa7d63d6aa0c2ca" },
     { "library": "laya.core.js.map", "source": "src/layaAir/laya/utils/Timer.ts", "sha256": "2d106adb8b2f776b11bf940e3bf25d3a158ae325797a79e309fbd306fa5a6ca6" },
     { "library": "laya.core.js.map", "source": "src/layaAir/laya/events/EventDispatcher.ts", "sha256": "b567b3fdd0f68e69ae8750581d2115facedb6ffe62beab53c52f2d24bf32bca6" },
     { "library": "laya.core.js.map", "source": "src/layaAir/laya/tween/Tween.ts", "sha256": "b9652135f839a914971ed754c0a38347e684aa83271ee445c38c06d004ad440f" },

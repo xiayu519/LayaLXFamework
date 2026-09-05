@@ -37,6 +37,19 @@ export class UnsupportedSaveVersionError extends Error {
     }
 }
 
+export type SaveStorageOperation = "read" | "write" | "verify-write" | "remove" | "verify-remove";
+
+export class SaveStorageError extends Error {
+    constructor(
+        readonly key: string,
+        readonly operation: SaveStorageOperation,
+        readonly cause?: unknown,
+    ) {
+        super(`Save storage '${key}' failed during ${operation}.`);
+        this.name = "SaveStorageError";
+    }
+}
+
 export class SaveStore<T> {
     constructor(
         private readonly driver: StorageDriver,
@@ -48,7 +61,7 @@ export class SaveStore<T> {
     }
 
     load(): SaveLoadResult<T> {
-        const raw = this.driver.getItem(this.schema.key);
+        const raw = this.readStored();
         if (raw === null) {
             return this.createDefault(true);
         }
@@ -102,11 +115,50 @@ export class SaveStore<T> {
             version: this.schema.currentVersion,
             data: value,
         };
-        this.driver.setItem(this.schema.key, JSON.stringify(envelope));
+        const serialized = JSON.stringify(envelope);
+        // Read immediately before writing: a different client may have upgraded
+        // since load(). LocalStorage has no transaction/CAS across browser tabs.
+        this.assertWritableVersion(this.readStored());
+        try {
+            this.driver.setItem(this.schema.key, serialized);
+        } catch (cause) {
+            throw new SaveStorageError(this.schema.key, "write", cause);
+        }
+        if (this.readStored("verify-write") !== serialized) {
+            throw new SaveStorageError(this.schema.key, "verify-write");
+        }
     }
 
     clear(): void {
-        this.driver.removeItem(this.schema.key);
+        try {
+            this.driver.removeItem(this.schema.key);
+        } catch (cause) {
+            throw new SaveStorageError(this.schema.key, "remove", cause);
+        }
+        if (this.readStored("verify-remove") !== null) {
+            throw new SaveStorageError(this.schema.key, "verify-remove");
+        }
+    }
+
+    private readStored(operation: SaveStorageOperation = "read"): string | null {
+        try {
+            return this.driver.getItem(this.schema.key);
+        } catch (cause) {
+            throw new SaveStorageError(this.schema.key, operation, cause);
+        }
+    }
+
+    private assertWritableVersion(raw: string | null): void {
+        if (raw === null) return;
+        let parsed: unknown;
+        try {
+            parsed = JSON.parse(raw);
+        } catch {
+            return;
+        }
+        if (this.isEnvelope(parsed) && parsed.version > this.schema.currentVersion) {
+            throw new UnsupportedSaveVersionError(parsed.version, this.schema.currentVersion);
+        }
     }
 
     private createDefault(persist: boolean, recovery?: SaveRecoveryReason): SaveLoadResult<T> {

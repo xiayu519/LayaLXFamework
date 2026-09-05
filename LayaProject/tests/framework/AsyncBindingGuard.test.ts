@@ -22,4 +22,19 @@ describe("AsyncBindingGuard", () => {
         guard.dispose();
         expect(() => guard.next()).toThrow("after disposal");
     });
+
+    it("aborts each superseded token and follows an external cancellation signal", () => {
+        const guard = new AsyncBindingGuard();
+        const first = guard.next();
+        const controller = new AbortController();
+        const second = guard.next(controller.signal);
+        expect(first.signal.aborted).toBe(true);
+        expect(second.signal.aborted).toBe(false);
+        controller.abort();
+        expect(second.signal.aborted).toBe(true);
+        expect(second.isCurrent()).toBe(false);
+        const third = guard.next();
+        guard.dispose();
+        expect(third.signal.aborted).toBe(true);
+    });
 });

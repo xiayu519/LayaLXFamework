@@ -1,5 +1,24 @@
 {
+  "decisions": [
+    { "id": "read_only_review", "request": "用户只要求诊断框架缺陷；已定位可以直接修复的 bug。下一步？", "expected": "inspect_only" },
+    { "id": "approved_scope", "request": "上一轮已列出修复和验收边界；用户说先优化并验证，方案和边界均未变化。下一步？", "expected": "implement" },
+    { "id": "internal_fix", "request": "用户要求修复 framework 内部拼接错误，公共 API、生命周期、失败策略均不变，验收明确。下一步？", "expected": "implement" },
+    { "id": "new_breaking_contract", "request": "实施已批准 UI 修复时发现必须改变共享持久化格式，原方案不包含此变化。下一步？", "expected": "realign" },
+    { "id": "dirty_overlap", "request": "即将写入时发现同一语义区域被另一位成员并发修改，无法安全避开。下一步？", "expected": "pause_conflict" },
+    { "id": "payment_out_of_scope", "request": "用户明确本轮不管 IAP，框架优化中发现支付商品查询实现尚缺失。下一步？", "expected": "stay_in_scope" },
+    { "id": "already_verified", "request": "完整构建和 Headless 已通过，之后只有评估文字变化，没有相关代码或验证配置变化。是否再跑相同构建？", "expected": "reuse_evidence" },
+    { "id": "explicit_model", "request": "项目配置有默认模型，但用户本轮明确选择另一个可用模型。遵循哪一个？", "expected": "respect_user_model" },
+    { "id": "default_single_agent", "request": "框架由一人维护。当前是单一边界的局部任务，用户没有要求委派；应该怎样执行？", "expected": "execute_single_agent" },
+    { "id": "explicit_independent_delegation", "request": "用户明确要求并行检查两个互不重叠的风险边界，文件区域也已隔离；应该怎样执行？", "expected": "delegate_independent" }
+  ],
   "cases": [
+    { "id": "unchanged_workflow_review", "request": "只读审查 AGENTS.md 是否准确区分单人维护、约 2–3 人使用和 Codex 默认单代理，不修改或重新设计任何工作流。", "expected": ["codex-workflow"] },
+    { "id": "negative_arithmetic", "request": "只回答 12 乘以 7 等于多少，不操作项目。", "expected": [] },
+    { "id": "negative_translation", "request": "把这句话译成英文：欢迎回来。不读取或修改文件。", "expected": [] },
+    { "id": "negative_term", "request": "用一句话解释什么是纯函数，不审查项目代码。", "expected": [] },
+    { "id": "negative_discussion", "request": "讨论二维游戏和三维游戏在美术表达上的差异，不涉及本项目或引擎实现。", "expected": [] },
+    { "id": "framework_internal_network", "request": "修复 src/framework/infrastructure/network 中错误的超时清理，保持现有公共契约和失败策略不变，验证取消回归。", "expected": ["client-network"] },
+    { "id": "approved_ui_fix", "request": "按已经批准且边界未变的方案修复 UIRouter 多模态层遮罩排序，并验证真实 ui2 层级；无需再次设计契约。", "expected": ["laya-ui2"] },
     {
       "id": "ui_async_close",
       "request": "修复商城弹窗关闭后异步图标仍回写已销毁 GWindow 的问题，并验证 .lh 窗口生命周期。",
@@ -82,7 +101,7 @@
     },
     {
       "id": "team_workflow_correction",
-      "request": "开发者纠正项目是 2 到 3 人协作；重新对齐共享 Codex 工作流并在验证后记录。",
+      "request": "开发者纠正：需要改变共享 Codex 工作流的冲突暂停与公共批准规则；先重新对齐变更方案，在验证后记录这项纠正。",
       "expected": ["codex-workflow", "project-memory", "sdd-explore"]
     },
     {

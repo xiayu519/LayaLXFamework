@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
     SaveStore,
+    SaveStorageError,
     UnsupportedSaveVersionError,
     type SaveSchema,
     type StorageDriver,
@@ -81,6 +82,52 @@ describe("SaveStore", () => {
 
         expect(() => new SaveStore(storage, schema).load()).toThrow(UnsupportedSaveVersionError);
         expect(storage.getItem("save")).toBe(raw);
+    });
+
+    it("protects a newer version on every write, including after an earlier successful load", () => {
+        const storage = new MemoryStorage();
+        const store = new SaveStore(storage, schema);
+        const loaded = store.load().value;
+        const raw = JSON.stringify({ version: 3, data: { name: "future", coins: 99 } });
+        storage.setItem("save", raw);
+
+        expect(() => store.save(loaded)).toThrow(UnsupportedSaveVersionError);
+        expect(() => store.load()).toThrow(UnsupportedSaveVersionError);
+        expect(() => store.save(loaded)).toThrow(UnsupportedSaveVersionError);
+        expect(storage.getItem("save")).toBe(raw);
+    });
+
+    it("reports writes that silently do not persist", () => {
+        const storage: StorageDriver = {
+            getItem: () => null,
+            setItem: () => {},
+            removeItem: () => {},
+        };
+        const store = new SaveStore(storage, schema);
+
+        expect(() => store.save({ name: "player", coins: 3 })).toThrow("verify-write");
+        expect(() => store.load()).toThrow("verify-write");
+        expect(() => store.save({ name: "player", coins: 3 })).toThrow(SaveStorageError);
+    });
+
+    it("reports storage read, write and remove failures without claiming persistence", () => {
+        const storage = new MemoryStorage();
+        const store = new SaveStore(storage, schema);
+        storage.getItem = () => { throw new Error("storage denied"); };
+        expect(() => store.load()).toThrow("read");
+        storage.getItem = () => null;
+        storage.setItem = () => { throw new Error("quota exceeded"); };
+        expect(() => store.save({ name: "player", coins: 3 })).toThrow("write");
+        storage.removeItem = () => { throw new Error("storage denied"); };
+        expect(() => store.clear()).toThrow("remove");
+    });
+
+    it("does not claim a successful clear if the driver silently retains data", () => {
+        const storage = new MemoryStorage();
+        const store = new SaveStore(storage, schema);
+        store.load();
+        storage.removeItem = () => {};
+        expect(() => store.clear()).toThrow("verify-remove");
     });
 
     it("preserves raw data when migration is missing or fails", () => {

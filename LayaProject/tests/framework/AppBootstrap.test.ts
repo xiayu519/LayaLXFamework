@@ -1,10 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
     AppBootstrap,
     BootstrapStartError,
     BootstrapStopError,
     type AppService,
 } from "../../src/framework/bootstrap/AppBootstrap";
+
+afterEach(() => vi.useRealTimers());
 
 function service(name: string, events: string[], failStart = false, failStop = false): AppService {
     return {
@@ -25,6 +27,20 @@ function service(name: string, events: string[], failStart = false, failStop = f
 }
 
 describe("AppBootstrap", () => {
+    it("publishes shared tasks before synchronous service re-entry", async () => {
+        let nestedStart: Promise<void> | undefined;
+        let nestedStop: Promise<void> | undefined;
+        const bootstrap = new AppBootstrap([{
+            name: "reentrant", start() { nestedStart = bootstrap.start(); },
+            stop() { nestedStop = bootstrap.stop(); },
+        }]);
+        const start = bootstrap.start();
+        expect(nestedStart).toBe(start);
+        await start;
+        const stop = bootstrap.stop();
+        await stop;
+        expect(nestedStop).toBe(stop);
+    });
     it("starts in order and stops in reverse order", async () => {
         const events: string[] = [];
         const bootstrap = new AppBootstrap([
@@ -51,7 +67,7 @@ describe("AppBootstrap", () => {
 
         expect(error).toBeInstanceOf(BootstrapStartError);
         expect((error as BootstrapStartError).serviceName).toBe("two");
-        expect(events).toEqual(["start:one", "start:two", "stop:one"]);
+        expect(events).toEqual(["start:one", "start:two", "stop:two", "stop:one"]);
         expect(bootstrap.state).toBe("stopped");
     });
 
@@ -69,7 +85,7 @@ describe("AppBootstrap", () => {
         expect(events.slice(-2)).toEqual(["stop:two", "stop:one"]);
     });
 
-    it("shares an in-flight start and stops after startup completes", async () => {
+    it("shares startup, cancels waiting on stop and compensates a late completion", async () => {
         const events: string[] = [];
         let finishStart!: () => void;
         const startGate = new Promise<void>((resolve) => { finishStart = resolve; });
@@ -86,14 +102,17 @@ describe("AppBootstrap", () => {
 
         const firstStart = bootstrap.start();
         const secondStart = bootstrap.start();
+        const failure = firstStart.catch((error: unknown) => error);
         const stop = bootstrap.stop();
 
         expect(secondStart).toBe(firstStart);
-        expect(bootstrap.state).toBe("starting");
+        await stop;
+        expect(await failure).toBeInstanceOf(BootstrapStartError);
+        expect(bootstrap.snapshot().pending).toHaveLength(1);
         finishStart();
-        await Promise.all([firstStart, secondStart, stop]);
+        await vi.waitFor(() => expect(bootstrap.snapshot().pending).toHaveLength(0));
 
-        expect(events).toEqual(["start:slow", "stop:slow"]);
+        expect(events).toEqual(["start:slow", "stop:slow", "stop:slow"]);
         expect(bootstrap.state).toBe("stopped");
     });
 
@@ -118,4 +137,131 @@ describe("AppBootstrap", () => {
         await firstStop;
         await expect(bootstrap.start()).rejects.toThrow("Cannot start while bootstrap state is 'stopped'.");
     });
+
+    it("times out startup with observable pending work and still rolls back", async () => {
+        vi.useFakeTimers();
+        const stopped = vi.fn();
+        const bootstrap = new AppBootstrap([{
+            name: "hung", start: () => new Promise<void>(() => {}), stop: stopped,
+        }], { startTimeoutMs: 20 });
+        const result = bootstrap.start().catch((error: unknown) => error);
+        await vi.advanceTimersByTimeAsync(25);
+        expect(await result).toBeInstanceOf(BootstrapStartError);
+        expect(stopped).toHaveBeenCalledOnce();
+        expect(bootstrap.snapshot().pending[0]).toMatchObject({ serviceName: "hung", phase: "start", abandoned: true });
+    });
+
+    it("bounds a hanging stop and continues stopping independent services", async () => {
+        vi.useFakeTimers();
+        const stopped = vi.fn();
+        const bootstrap = new AppBootstrap([
+            { name: "first", start() {}, stop: stopped },
+            { name: "hung", start() {}, stop: () => new Promise<void>(() => {}) },
+        ], { stopTimeoutMs: 20 });
+        await bootstrap.start();
+        const result = bootstrap.stop().catch((error: unknown) => error);
+        await vi.advanceTimersByTimeAsync(25);
+        expect(await result).toBeInstanceOf(BootstrapStopError);
+        expect(stopped).toHaveBeenCalledOnce();
+        expect(bootstrap.snapshot().failedStops).toContain("hung");
+    });
+
+    it("clears only the timed-out stop failure once its actual cleanup succeeds", async () => {
+        vi.useFakeTimers();
+        const cleanup = deferred();
+        const bootstrap = new AppBootstrap([{
+            name: "slow-stop", start() {}, stop: () => cleanup.promise,
+        }], { stopTimeoutMs: 20 });
+        await bootstrap.start();
+        const stopping = bootstrap.stop().catch((error: unknown) => error);
+        await vi.advanceTimersByTimeAsync(25);
+        expect(await stopping).toBeInstanceOf(BootstrapStopError);
+        expect(bootstrap.snapshot().failedStops).toEqual(["slow-stop"]);
+        cleanup.resolve();
+        await vi.advanceTimersByTimeAsync(0);
+        expect(bootstrap.snapshot()).toMatchObject({ pending: [], failedStops: [], lateCleanupErrors: 0 });
+    });
+
+    it("records the actual reason when an abandoned stop eventually rejects", async () => {
+        vi.useFakeTimers();
+        const cleanup = deferred();
+        const bootstrap = new AppBootstrap([{
+            name: "failed-stop", start() {}, stop: () => cleanup.promise,
+        }], { stopTimeoutMs: 20 });
+        await bootstrap.start();
+        const stopping = bootstrap.stop().catch((error: unknown) => error);
+        await vi.advanceTimersByTimeAsync(25);
+        await stopping;
+        cleanup.reject(new Error("late-stop-error"));
+        await vi.advanceTimersByTimeAsync(0);
+        expect(bootstrap.snapshot()).toMatchObject({ pending: [], failedStops: ["failed-stop"], lateCleanupErrors: 1 });
+        expect(bootstrap.snapshot().lateCleanupFailures[0]).toContain("late-stop-error");
+    });
+
+    it("does not re-add a timeout failure after cooperative stop already finished on abort", async () => {
+        vi.useFakeTimers();
+        const bootstrap = new AppBootstrap([{
+            name: "cooperative-stop", start() {},
+            stop: (context) => new Promise<void>((resolve) => {
+                context?.signal.addEventListener("abort", () => resolve(), { once: true });
+            }),
+        }], { stopTimeoutMs: 20 });
+        await bootstrap.start();
+        const stopping = bootstrap.stop().catch((error: unknown) => error);
+        await vi.advanceTimersByTimeAsync(25);
+        expect(await stopping).toBeInstanceOf(BootstrapStopError);
+        expect(bootstrap.snapshot()).toMatchObject({ pending: [], failedStops: [], lateCleanupErrors: 0 });
+    });
+
+    it("does not let an older stop success erase a newer failed compensation", async () => {
+        vi.useFakeTimers();
+        const startup = deferred();
+        const firstCleanup = deferred();
+        let stops = 0;
+        const bootstrap = new AppBootstrap([{
+            name: "owner", start: () => startup.promise,
+            stop() {
+                if (++stops === 1) return firstCleanup.promise;
+                throw new Error("new cleanup failed");
+            },
+        }], { stopTimeoutMs: 20 });
+        const starting = bootstrap.start().catch((error: unknown) => error);
+        const stopping = bootstrap.stop().catch((error: unknown) => error);
+        await vi.advanceTimersByTimeAsync(25);
+        await starting;
+        await stopping;
+        startup.resolve();
+        await vi.advanceTimersByTimeAsync(0);
+        expect(stops).toBe(2);
+        firstCleanup.resolve();
+        await vi.advanceTimersByTimeAsync(0);
+        expect(bootstrap.snapshot()).toMatchObject({ pending: [], failedStops: ["owner"], lateCleanupErrors: 1 });
+    });
+
+    it("keeps a timed-out compensation recoverable until its actual result arrives", async () => {
+        vi.useFakeTimers();
+        const startup = deferred();
+        const lateCleanup = deferred();
+        let stops = 0;
+        const bootstrap = new AppBootstrap([{
+            name: "owner", start: () => startup.promise,
+            stop: () => ++stops === 1 ? undefined : lateCleanup.promise,
+        }], { stopTimeoutMs: 20 });
+        const starting = bootstrap.start().catch((error: unknown) => error);
+        await bootstrap.stop();
+        await starting;
+        startup.resolve();
+        await vi.advanceTimersByTimeAsync(25);
+        expect(bootstrap.snapshot()).toMatchObject({ failedStops: ["owner"], lateCleanupErrors: 0 });
+        lateCleanup.resolve();
+        await vi.advanceTimersByTimeAsync(0);
+        expect(bootstrap.snapshot()).toMatchObject({ pending: [], failedStops: [], lateCleanupErrors: 0 });
+    });
 });
+
+function deferred() {
+    let resolve!: () => void;
+    let reject!: (error: unknown) => void;
+    const promise = new Promise<void>((done, fail) => { resolve = done; reject = fail; });
+    return { promise, resolve, reject };
+}

@@ -2,8 +2,33 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
-  "required": ["results"],
+  "required": ["results", "decisions"],
   "properties": {
+    "decisions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "action"],
+        "properties": {
+          "id": { "type": "string" },
+          "action": {
+            "type": "string",
+            "enum": [
+              "inspect_only",
+              "implement",
+              "realign",
+              "pause_conflict",
+              "stay_in_scope",
+              "reuse_evidence",
+              "respect_user_model",
+              "execute_single_agent",
+              "delegate_independent"
+            ]
+          }
+        }
+      }
+    },
     "results": {
       "type": "array",
       "items": {

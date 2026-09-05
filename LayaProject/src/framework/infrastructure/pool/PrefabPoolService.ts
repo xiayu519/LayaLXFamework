@@ -14,12 +14,30 @@ export interface PrefabPoolSnapshot {
     readonly pending: number;
     readonly idle: number;
     readonly loading: boolean;
+    readonly cleanupFailures: number;
+}
+
+export interface PrefabPoolCleanupDiagnostic {
+    readonly poolId: string;
+    readonly nodeName: string;
+    readonly attempts: number;
+    /** False means native destroy already set destroyed before throwing; retry cannot prove recovery. */
+    readonly retryable: boolean;
+    readonly error: unknown;
+}
+
+export class PrefabPoolCleanupError extends Error {
+    constructor(readonly errors: readonly unknown[]) {
+        super(`${errors.length} prefab pool operation(s) failed to clean up.`);
+        this.name = "PrefabPoolCleanupError";
+    }
 }
 
 interface PoolRecord {
     readonly definition: PrefabPoolDefinition;
     readonly sign: string;
     readonly active: Set<Laya.Node>;
+    readonly cleanupFailures: Map<Laya.Node, PrefabPoolCleanupDiagnostic>;
     pendingAcquires: number;
     loading?: Promise<Laya.Prefab>;
 }
@@ -37,6 +55,7 @@ export class PrefabPoolService {
     private readonly pendingLoads = new Set<Promise<unknown>>();
     private readonly serviceId = ++serviceSequence;
     private disposed = false;
+    private disposing = false;
 
     register<TNode extends Laya.Node>(definition: PrefabPoolDefinition<TNode>): void {
         this.requireActive();
@@ -57,6 +76,7 @@ export class PrefabPoolService {
             definition: definition as PrefabPoolDefinition,
             sign: `lx.prefab:${this.serviceId}:${definition.id}`,
             active: new Set<Laya.Node>(),
+            cleanupFailures: new Map(),
             pendingAcquires: 0,
         });
     }
@@ -89,13 +109,16 @@ export class PrefabPoolService {
             }
             owner.active = true;
             pool.active.add(node);
-            node.active = true;
             try {
+                node.active = true;
                 pool.definition.onAcquire?.(node);
+                this.requireActive();
+                if (node.destroyed) throw new Error(`Prefab pool '${id}' onAcquire destroyed its node.`);
             } catch (error) {
                 pool.active.delete(node);
                 owner.active = false;
-                node.destroy();
+                this.destroyNode(pool, node);
+                this.throwCleanupErrors(pool, [error]);
                 throw error;
             }
             return node as TNode;
@@ -118,16 +141,18 @@ export class PrefabPoolService {
         if (node.destroyed) {
             return;
         }
-        node.removeSelf();
         try {
+            node.removeSelf();
             pool.definition.onRelease?.(node);
+            node.active = false;
         } catch (error) {
-            node.destroy();
+            this.destroyNode(pool, node);
+            this.throwCleanupErrors(pool, [error]);
             throw error;
         }
-        node.active = false;
-        if (Laya.Pool.getPoolBySign(pool.sign).length >= pool.definition.maxIdle) {
-            node.destroy();
+        if (this.disposed || node.destroyed || Laya.Pool.getPoolBySign(pool.sign).length >= pool.definition.maxIdle) {
+            this.destroyNode(pool, node);
+            this.throwCleanupErrors(pool);
             return;
         }
         Laya.Pool.recover(pool.sign, node);
@@ -142,7 +167,9 @@ export class PrefabPoolService {
                 + `${pool.pendingAcquires} pending node(s).`,
             );
         }
+        this.retryCleanup(pool);
         this.destroyIdle(pool);
+        this.throwCleanupErrors(pool);
     }
 
     snapshot(): readonly PrefabPoolSnapshot[] {
@@ -153,8 +180,13 @@ export class PrefabPoolService {
                 pending: pool.pendingAcquires,
                 idle: Laya.Pool.getPoolBySign(pool.sign).length,
                 loading: pool.loading !== undefined,
+                cleanupFailures: pool.cleanupFailures.size,
             }))
             .sort((left, right) => left.id.localeCompare(right.id));
+    }
+
+    cleanupDiagnostics(): readonly PrefabPoolCleanupDiagnostic[] {
+        return Array.from(this.pools.values()).flatMap((pool) => Array.from(pool.cleanupFailures.values()));
     }
 
     async waitForPendingLoads(): Promise<void> {
@@ -164,20 +196,26 @@ export class PrefabPoolService {
     }
 
     dispose(): void {
-        if (this.disposed) {
-            return;
-        }
+        if (this.disposing) return;
         this.disposed = true;
-        for (const pool of this.pools.values()) {
-            for (const node of pool.active) {
-                if (!node.destroyed) {
-                    node.destroy();
+        this.disposing = true;
+        try {
+            for (const pool of this.pools.values()) {
+                this.retryCleanup(pool);
+                for (const node of Array.from(pool.active)) {
+                    this.destroyNode(pool, node);
+                    const owner = this.ownership.get(node);
+                    if (owner) owner.active = false;
                 }
+                pool.active.clear();
+                this.destroyIdle(pool);
+                if (pool.cleanupFailures.size === 0) this.pools.delete(pool.definition.id);
             }
-            pool.active.clear();
-            this.destroyIdle(pool);
+            const errors = this.cleanupDiagnostics().map((diagnostic) => diagnostic.error);
+            if (errors.length > 0) throw new PrefabPoolCleanupError(errors);
+        } finally {
+            this.disposing = false;
         }
-        this.pools.clear();
     }
 
     private takeIdle(pool: PoolRecord): Laya.Node | undefined {
@@ -212,13 +250,46 @@ export class PrefabPoolService {
     }
 
     private destroyIdle(pool: PoolRecord): void {
-        const idle = Laya.Pool.getPoolBySign(pool.sign) as Laya.Node[];
-        for (const node of idle) {
-            if (!node.destroyed) {
-                node.destroy();
-            }
+        let node = Laya.Pool.getItem(pool.sign) as Laya.Node | null;
+        while (node) {
+            this.destroyNode(pool, node);
+            node = Laya.Pool.getItem(pool.sign) as Laya.Node | null;
         }
         Laya.Pool.clearBySign(pool.sign);
+    }
+
+    private retryCleanup(pool: PoolRecord): void {
+        for (const [node, diagnostic] of Array.from(pool.cleanupFailures)) {
+            if (diagnostic.retryable) this.destroyNode(pool, node);
+        }
+    }
+
+    private destroyNode(pool: PoolRecord, node: Laya.Node): void {
+        const previous = pool.cleanupFailures.get(node);
+        if (previous && !previous.retryable) return;
+        try {
+            if (node.destroyed && previous) {
+                throw new Error("Node became destroyed after an incomplete cleanup; recovery cannot be verified.");
+            }
+            if (!node.destroyed) node.destroy();
+            if (!node.destroyed) throw new Error("Node.destroy() returned without destroying the node.");
+            pool.cleanupFailures.delete(node);
+        } catch (error) {
+            this.pools.set(pool.definition.id, pool);
+            pool.cleanupFailures.set(node, Object.freeze({
+                poolId: pool.definition.id,
+                nodeName: node.name ?? "",
+                attempts: (previous?.attempts ?? 0) + 1,
+                retryable: !node.destroyed,
+                error,
+            }));
+        }
+    }
+
+    private throwCleanupErrors(pool: PoolRecord, initialErrors: unknown[] = []): void {
+        if (pool.cleanupFailures.size === 0) return;
+        const errors = [...initialErrors, ...Array.from(pool.cleanupFailures.values(), (failure) => failure.error)];
+        if (errors.length > 0) throw new PrefabPoolCleanupError(errors);
     }
 
     private requirePool(id: string): PoolRecord {

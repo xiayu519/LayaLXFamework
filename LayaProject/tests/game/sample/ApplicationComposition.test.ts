@@ -38,7 +38,7 @@ vi.stubGlobal("Laya", {
     GWidget: FakeGWidget,
     GTextField: FakeTextField,
     GWindow: FakeGWindow,
-    GRoot: { inst: { modalLayer: new FakeGWidget() } },
+    GRoot: { inst: { children: [], modalLayer: Object.assign(new FakeGWidget(), { removeSelf: vi.fn() }) } },
     TextResource: FakeTextResource,
     Loader: { HIERARCHY: "HIERARCHY", BUFFER: "arraybuffer", JSON: "json" },
     loader: {
@@ -78,11 +78,16 @@ vi.stubGlobal("Laya", {
     },
 });
 
-const { LX } = await import("../../../src/framework/LX");
-const { createApplication } = await import("../../../src/game/bootstrap/createApplication");
-const { createRuntime } = await import("../../../src/framework/bootstrap/createRuntime");
+let { LX } = await import("../../../src/framework/LX");
+let { createApplication } = await import("../../../src/game/bootstrap/createApplication");
+let { createRuntime } = await import("../../../src/framework/bootstrap/createRuntime");
 
-beforeEach(() => {
+beforeEach(async () => {
+    // Fault-injection cases deliberately quarantine broken runtimes; production has no reset bypass.
+    vi.resetModules();
+    ({ LX } = await import("../../../src/framework/LX"));
+    ({ createApplication } = await import("../../../src/game/bootstrap/createApplication"));
+    ({ createRuntime } = await import("../../../src/framework/bootstrap/createRuntime"));
     sceneGc.mockReset();
     clearRes.mockReset();
 });
@@ -198,10 +203,20 @@ describe("createApplication", () => {
         await expect(runtime.stop()).rejects.toThrow("service(s) failed to stop");
 
         expect(events).toEqual([
-            "ui", "pending-ui", "ui-retry",
-            "pool", "pending-pool", "pool-retry",
-            "audio", "config", "pending-config", "gc",
+            "ui", "pool", "audio", "config",
+            "pending-ui", "pending-pool", "pending-config", "ui-retry", "pool-retry", "gc",
         ]);
         expect(LX.Ready).toBe(false);
+    });
+
+    it("stops owners before bounded waiting and skips GC while a load is unresolved", async () => {
+        const runtime = createRuntime({ lifecycle: { pendingLoadTimeoutMs: 20, stopTimeoutMs: 100 } });
+        const audioStop = vi.spyOn(runtime.audio, "dispose");
+        vi.spyOn(runtime.ui, "waitForPendingLoads").mockReturnValue(new Promise<void>(() => {}));
+        await runtime.start();
+        await expect(runtime.stop()).rejects.toThrow("service(s) failed to stop");
+        expect(audioStop).toHaveBeenCalledOnce();
+        expect(sceneGc).not.toHaveBeenCalled();
+        expect(runtime.snapshot()).toMatchObject({ pendingCleanup: ["ui"], gc: "skipped" });
     });
 });

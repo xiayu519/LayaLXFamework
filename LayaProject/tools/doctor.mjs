@@ -22,9 +22,10 @@ function readJson(path) {
     }
 }
 
-const nodeMajor = Number(process.versions.node.split(".")[0]);
-if (nodeMajor < 20) {
-    errors.push(`Node.js 20+ is required; found ${process.versions.node}.`);
+const nodeEngine = readJson(join(projectRoot, "package.json")).engines?.node;
+const requiredNodeMajor = /^\^(\d+)\.0\.0$/.exec(nodeEngine ?? "")?.[1];
+if (!requiredNodeMajor || process.versions.node.split(".")[0] !== requiredNodeMajor) {
+    errors.push(`Project Node.js baseline '${nodeEngine}' is required; found ${process.versions.node}.`);
 }
 
 try {

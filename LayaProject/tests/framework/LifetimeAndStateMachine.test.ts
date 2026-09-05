@@ -61,6 +61,39 @@ describe("StateMachine", () => {
         expect(() => new StateMachine("idle", []).dispatch("start", undefined))
             .toThrow(InvalidStateTransitionError);
     });
+
+    it.each(["can", "dispatch"] as const)("rejects guard dispatch reentrancy during %s without changing state", (operation) => {
+        const machine = new StateMachine("idle", [
+            {
+                from: "idle", event: "outer", to: "running",
+                guard: () => { machine.dispatch("inner", undefined); return true; },
+            },
+            { from: "idle", event: "inner", to: "stopped" },
+        ]);
+
+        expect(() => machine[operation]("outer", undefined)).toThrow("reentrant");
+        expect(machine.snapshot()).toEqual({ state: "idle", sequence: 0 });
+        expect(machine.dispatch("inner", undefined).to).toBe("stopped");
+    });
+
+    it("rejects recursive can and effect reentrancy, releasing the lock after failure", () => {
+        const machine = new StateMachine("idle", [
+            {
+                from: "idle", event: "guard", to: "running",
+                guard: (): boolean => machine.can("guard", undefined),
+            },
+            {
+                from: "idle", event: "effect", to: "running",
+                effect: () => { machine.can("finish", undefined); },
+            },
+            { from: "idle", event: "finish", to: "stopped" },
+        ]);
+
+        expect(() => machine.can("guard", undefined)).toThrow("reentrant");
+        expect(() => machine.dispatch("effect", undefined)).toThrow("reentrant");
+        expect(machine.snapshot()).toEqual({ state: "idle", sequence: 0 });
+        expect(machine.dispatch("finish", undefined).to).toBe("stopped");
+    });
 });
 
 function captureError(action: () => void): unknown {

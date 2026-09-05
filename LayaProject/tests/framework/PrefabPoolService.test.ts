@@ -119,4 +119,89 @@ describe("PrefabPoolService", () => {
         await pool.waitForPendingLoads();
         expect(pool.snapshot()).toEqual([]);
     });
+
+    it("isolates destroy failures and retries nodes that have not entered native destruction", async () => {
+        loaderLoad.mockResolvedValue({ create: () => new FakeNode() });
+        const pool = new PrefabPoolService();
+        pool.register({ id: "one", url: "one.lh", maxIdle: 1 });
+        pool.register({ id: "two", url: "two.lh", maxIdle: 1 });
+        const failed = await pool.acquire("one") as unknown as FakeNode;
+        const other = await pool.acquire("one") as unknown as FakeNode;
+        const idle = await pool.acquire("two") as unknown as FakeNode;
+        pool.release("two", idle as unknown as Laya.Node);
+        const destroy = vi.spyOn(failed, "destroy").mockImplementationOnce(() => { throw new Error("destroy failed"); });
+        expect(() => pool.dispose()).toThrow("clean up");
+        expect(other.destroyed).toBe(true);
+        expect(idle.destroyed).toBe(true);
+        expect(pool.snapshot()[0].cleanupFailures).toBe(1);
+        expect(pool.cleanupDiagnostics()).toEqual([
+            expect.objectContaining({ poolId: "one", attempts: 1, retryable: true }),
+        ]);
+        expect(() => pool.dispose()).not.toThrow();
+        expect(destroy).toHaveBeenCalledTimes(2);
+        expect(pool.snapshot()).toEqual([]);
+    });
+
+    it("keeps a partial native destruction visible and never silently succeeds on retry", async () => {
+        loaderLoad.mockResolvedValue({ create: () => new FakeNode() });
+        const pool = new PrefabPoolService();
+        pool.register({ id: "partial", url: "partial.lh", maxIdle: 1 });
+        const partial = await pool.acquire("partial") as unknown as FakeNode;
+        const other = await pool.acquire("partial") as unknown as FakeNode;
+        const destroy = vi.spyOn(partial, "destroy").mockImplementation(() => {
+            partial.destroyed = true;
+            throw new Error("onDisable failed after destroyed flag");
+        });
+        expect(() => pool.dispose()).toThrow("clean up");
+        expect(other.destroyed).toBe(true);
+        expect(() => pool.dispose()).toThrow("clean up");
+        expect(destroy).toHaveBeenCalledOnce();
+        expect(pool.cleanupDiagnostics()).toEqual([
+            expect.objectContaining({ poolId: "partial", attempts: 1, retryable: false }),
+        ]);
+    });
+
+    it("drains remaining idle nodes even if the first idle destruction fails", async () => {
+        loaderLoad.mockResolvedValue({ create: () => new FakeNode() });
+        const pool = new PrefabPoolService();
+        pool.register({ id: "idle", url: "idle.lh", maxIdle: 2 });
+        const good = await pool.acquire("idle") as unknown as FakeNode;
+        const failed = await pool.acquire("idle") as unknown as FakeNode;
+        pool.release("idle", good as unknown as Laya.Node);
+        pool.release("idle", failed as unknown as Laya.Node);
+        vi.spyOn(failed, "destroy").mockImplementationOnce(() => { throw new Error("idle destroy failed"); });
+        expect(() => pool.drain("idle")).toThrow("clean up");
+        expect(good.destroyed).toBe(true);
+        expect(pool.snapshot()[0]).toMatchObject({ idle: 0, cleanupFailures: 1 });
+        expect(() => pool.drain("idle")).not.toThrow();
+        expect(failed.destroyed).toBe(true);
+    });
+
+    it("does not return a destroyed acquisition or recover a node after a reset callback disposes the service", async () => {
+        loaderLoad.mockResolvedValue({ create: () => new FakeNode() });
+        const acquiring = new PrefabPoolService();
+        acquiring.register({ id: "acquire-stop", url: "one.lh", maxIdle: 1, onAcquire: () => acquiring.dispose() });
+        await expect(acquiring.acquire("acquire-stop")).rejects.toThrow("disposed");
+        const releasing = new PrefabPoolService();
+        releasing.register({ id: "release-stop", url: "two.lh", maxIdle: 1, onRelease: () => releasing.dispose() });
+        const node = await releasing.acquire("release-stop");
+        releasing.release("release-stop", node);
+        expect(node.destroyed).toBe(true);
+        expect(releasing.snapshot()).toEqual([]);
+        expect(nativePool.recover).not.toHaveBeenCalled();
+    });
+
+    it("keeps destruction idempotent when a node synchronously reenters dispose", async () => {
+        loaderLoad.mockResolvedValue({ create: () => new FakeNode() });
+        const pool = new PrefabPoolService();
+        pool.register({ id: "reentrant", url: "one.lh", maxIdle: 1 });
+        const node = await pool.acquire("reentrant") as unknown as FakeNode;
+        const destroy = vi.spyOn(node, "destroy").mockImplementation(() => {
+            pool.dispose();
+            node.destroyed = true;
+        });
+        expect(() => pool.dispose()).not.toThrow();
+        expect(destroy).toHaveBeenCalledOnce();
+        expect(pool.snapshot()).toEqual([]);
+    });
 });

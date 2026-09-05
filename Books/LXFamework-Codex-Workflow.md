@@ -32,10 +32,9 @@ Codex 对两类文件采用不同的官方发现顺序：`AGENTS.md` 从 Git 根
 
 ## 模型与语义路由
 
-- 主线程和任务门禁：`gpt-5.6-sol/high`。
-- Plan mode：`xhigh`。
-- 低风险、局部、边界明确且可直接验收的小任务，可使用 `gpt-5.6-sol/medium` 或 `gpt-5.6-terra/medium`；验收标准不降低。
-- 框架/公共契约、工作流、持久化 schema、IAP、安全和跨模块决策不降级。
+- 模型与推理强度默认值只在 `LayaProject/.codex/config.toml` 维护；用户显式选择优先，Skill 不重置当前模型。
+- Codex 默认单代理执行；只有任务跨独立风险边界或用户明确要求时才委派。委派时子代理默认继承主线程模型；用户授权降成本后才显式选择较低档执行模型，最终验收标准不降低。
+- 框架目录不是高风险的充分条件：保契约内部修复走最窄领域 Skill；共享 API、生命周期、schema 或工作流语义变化才需要 Change Contract。已批准且边界未变直接实施，不重复索要批准。
 
 请求只需说明业务目标、目标平台、可观察验收结果与硬约束，不需要指定 Skill 名称。Codex 依据各 Skill 的 `description` 选择范围最窄的工作流。
 
@@ -43,7 +42,7 @@ Codex 对两类文件采用不同的官方发现顺序：`AGENTS.md` 从 Git 根
 
 框架代码位于 `src/framework/`，业务代码位于 `src/game/`。业务实现发现公共能力不足时，先暂停公共边界写入：不能证明稳定复用就保留在 game；能够证明才提交 Change Contract，取得批准后修改 framework 或共享工作流。
 
-2–3 人协作时，写入前重新读取目标文件。同一语义区域已被他人修改时停止并报告，不猜测覆盖。`git init`、commit 与 push 只在开发者明确要求时执行。
+框架由一人维护；投入使用后约 2–3 人可能协作，这不表示每个 Codex 任务需要多个代理。多人并行写入时先重新读取目标文件；同一语义区域已被他人修改时停止并报告，不猜测覆盖。`git init`、commit 与 push 只在开发者明确要求时执行。
 
 下游仓库存在 `.framework-lock.json` 时，manifest 管理内容为只读；框架缺口反馈上游，待上游验证并发布 Tag 后再同步。目录所有权、启动扩展点和同步命令只在 [框架发行与下游同步](../LayaProject/docs/framework-distribution.md) 维护。
 
@@ -61,6 +60,8 @@ npm run verify
 
 Windows 与 macOS 共用同一套 AGENTS、Skills 和 npm 命令；平台差异只由工具内部的可执行文件发现处理，双平台 CI 分别执行完整 `npm run verify`。
 
+工作流变更另外运行 `npm run test:skill-routing`：一次只读调用覆盖正向/负向路由与批准、只读、越界、默认单代理及受控委派决策，记录模型和 token；可用 `LX_CODEX_EVAL_MODEL` / `LX_CODEX_EVAL_EFFORT` 显式覆盖评测配置。分类成绩不代表真实任务行为，不能替代执行审查。CI 的无 Secret job 生成不含 expected 的 prompt/schema artifact；持有 `CODEX_API_KEY` 的 job 不 checkout、不运行 npm 或仓库脚本，只下载该 artifact 并通过 `openai/codex-action@v1` 的 Responses API proxy 评测。结构化结果再交给无 Secret job 验证，缺失凭据时明确失败。`push` 只在 `main` 触发，功能分支由 `pull_request` 触发，避免同一次分支提交重复付费；不含工作流变化的普通验证不运行该评测。
+
 真实商店、小游戏容器或 Native 签名等无法由 Headless 证明的行为应列为未验证项，不自动切换到 GUI。
 
 ## 项目记忆
@@ -72,6 +73,7 @@ Windows 与 macOS 共用同一套 AGENTS、Skills 和 npm 命令；平台差异�
 - [OpenAI：Codex AGENTS.md 分层项目指令](https://learn.chatgpt.com/docs/agent-configuration/agents-md)
 - [OpenAI：Codex 项目配置层级](https://learn.chatgpt.com/docs/config-file/config-basic)
 - [OpenAI：Codex Subagents](https://learn.chatgpt.com/docs/agent-configuration/subagents)
+- [OpenAI：Codex GitHub Action](https://learn.chatgpt.com/docs/github-action)
 - [LayaAir：项目工程目录说明](https://layaair.com/3.x/doc/basics/IDE/projecFolders/)
 - [LayaAir：源码模板导出规则](https://layaair.com/3.x/doc/IDE/layapackage/exportToStore/readme.html)
 - [Luban v4.11.0](https://github.com/focus-creative-games/luban/tree/v4.11.0)

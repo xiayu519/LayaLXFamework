@@ -46,30 +46,32 @@ export class StateMachine<TState, TEvent, TPayload = void> {
     }
 
     can(event: TEvent, payload: TPayload): boolean {
-        return this.findCandidates(event, payload).length === 1;
+        this.beginOperation();
+        try {
+            return this.findCandidates(event, payload).length === 1;
+        } finally {
+            this.dispatching = false;
+        }
     }
 
     dispatch(event: TEvent, payload: TPayload): StateTransitionResult<TState, TEvent> {
-        if (this.dispatching) {
-            throw new Error("StateMachine does not allow reentrant dispatch.");
-        }
-        const candidates = this.findCandidates(event, payload);
-        if (candidates.length === 0) {
-            throw new InvalidStateTransitionError(this.currentState, event);
-        }
-        if (candidates.length > 1) {
-            throw new Error(`Ambiguous state transition for event '${String(event)}'.`);
-        }
-
-        const transition = candidates[0];
-        const result: StateTransitionResult<TState, TEvent> = Object.freeze({
-            from: this.currentState,
-            event,
-            to: transition.to,
-            sequence: this.sequenceValue + 1,
-        });
-        this.dispatching = true;
+        this.beginOperation();
         try {
+            const candidates = this.findCandidates(event, payload);
+            if (candidates.length === 0) {
+                throw new InvalidStateTransitionError(this.currentState, event);
+            }
+            if (candidates.length > 1) {
+                throw new Error(`Ambiguous state transition for event '${String(event)}'.`);
+            }
+
+            const transition = candidates[0];
+            const result: StateTransitionResult<TState, TEvent> = Object.freeze({
+                from: this.currentState,
+                event,
+                to: transition.to,
+                sequence: this.sequenceValue + 1,
+            });
             transition.effect?.(payload, result);
             this.currentState = transition.to;
             this.sequenceValue = result.sequence;
@@ -81,6 +83,13 @@ export class StateMachine<TState, TEvent, TPayload = void> {
 
     snapshot(): StateMachineSnapshot<TState> {
         return Object.freeze({ state: this.currentState, sequence: this.sequenceValue });
+    }
+
+    private beginOperation(): void {
+        if (this.dispatching) {
+            throw new Error("StateMachine does not allow reentrant can/dispatch.");
+        }
+        this.dispatching = true;
     }
 
     private findCandidates(event: TEvent, payload: TPayload): StateTransition<TState, TEvent, TPayload>[] {
