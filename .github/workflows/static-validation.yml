@@ -23,6 +23,11 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: "8.0.x"
+      - name: Install LayaAir CLI 3.4.1
+        shell: pwsh
+        run: |
+          Invoke-RestMethod https://raw.githubusercontent.com/layabox/layaair-cli/a46451e060fa9f5dcb6537a71074b44eaf6a3d36/install.ps1 | Invoke-Expression
+          & "$env:USERPROFILE\.layaair\layaair.cmd" install 3.4.1
       - run: npm ci
       - run: npm run tables:check
       - run: npm run typecheck
