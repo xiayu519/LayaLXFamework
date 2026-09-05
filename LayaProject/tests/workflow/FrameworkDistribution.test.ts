@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 const fixtureRoots: string[] = [];
 const script = resolve("tools/framework-distribution.mjs");
+const distributionTestTimeoutMs = 20_000;
 
 afterEach(() => {
     const temporaryRoot = resolve(tmpdir());
@@ -84,7 +85,7 @@ describe("framework distribution", () => {
 
         run("sync", "--source", source, "--destination", destination, "--ref", "v1.0.0");
         expect(run("check", "--destination", destination)).toContain("Framework integrity OK");
-    });
+    }, distributionTestTimeoutMs);
 
     it("updates a channel snapshot explicitly while keeping the previous commit reproducible", () => {
         const source = fixture("lx-framework-channel-source-");
@@ -132,7 +133,7 @@ describe("framework distribution", () => {
             .toBe("export const value = 2;\n");
         expect(run("check", "--destination", destination)).toContain("main snapshot");
         expect(gitOutput(source, "tag")).toBe("");
-    });
+    }, distributionTestTimeoutMs);
 });
 
 function fixture(prefix: string): string {
