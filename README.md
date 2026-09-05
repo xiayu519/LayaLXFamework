@@ -1,6 +1,6 @@
 # LayaLXFamework
 
-LayaLXFamework 是基于 **LayaAir 3.4.1** 的 2D 游戏客户端框架，面向 2–3 人小团队，提供 UI、Prefab 对象池、音频、JSON、Luban Tables、客户端设置、网络和性能检查等常用能力。
+LayaLXFamework 是基于 **LayaAir 3.4.1** 的 2D 游戏客户端框架，提供 UI、Prefab 对象池、音频、JSON、Luban Tables、客户端设置、网络和性能检查等常用能力。
 
 项目继续使用 LayaAir 原生 `.ls/.lh`、ui2、`Laya.loader`、`Laya.Scene`、`Laya.timer`、`Laya.Tween`、`Laya.Pool` 和 `Laya.SoundManager`。业务通过 `LX` 访问已组装的公共能力。
 
