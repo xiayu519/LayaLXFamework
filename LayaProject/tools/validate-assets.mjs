@@ -1,12 +1,16 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, extname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { runLayaAir } from "./layaair.mjs";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const assetsRoot = join(projectRoot, "assets");
 const sourceRoot = join(projectRoot, "src");
 const failures = [];
+const args = process.argv.slice(2);
+if (args.length > 1 || (args.length === 1 && args[0] !== "--laya")) {
+    throw new Error("Usage: node tools/validate-assets.mjs [--laya]");
+}
+const useLayaParser = args[0] === "--laya";
 
 function walk(directory) {
     const files = [];
@@ -200,16 +204,19 @@ if (failures.length > 0) {
     process.exitCode = 1;
 } else {
     console.log(`Source assets OK: ${hierarchyFiles.length} hierarchy file(s), ${metaByUuid.size} unique meta uuid(s).`);
-    const relativeFiles = hierarchyFiles.map((path) => relative(projectRoot, path));
-    const result = runLayaAir(
-        ["validate", ...relativeFiles, "-p", projectRoot, "--skip-package-install"],
-        { cwd: projectRoot, stdio: "pipe" },
-    );
-    process.stdout.write(result.stdout);
-    const officialResults = JSON.parse(result.stdout);
-    const invalidResults = officialResults.filter((item) => item.valid !== true);
-    if (invalidResults.length > 0) {
-        console.error(`LayaAir CLI rejected ${invalidResults.length} hierarchy asset(s).`);
-        process.exitCode = 1;
+    if (useLayaParser) {
+        const { runLayaAir } = await import("./layaair.mjs");
+        const relativeFiles = hierarchyFiles.map((path) => relative(projectRoot, path));
+        const result = runLayaAir(
+            ["validate", ...relativeFiles, "-p", projectRoot, "--skip-package-install"],
+            { cwd: projectRoot, stdio: "pipe" },
+        );
+        process.stdout.write(result.stdout);
+        const officialResults = JSON.parse(result.stdout);
+        const invalidResults = officialResults.filter((item) => item.valid !== true);
+        if (invalidResults.length > 0) {
+            console.error(`LayaAir CLI rejected ${invalidResults.length} hierarchy asset(s).`);
+            process.exitCode = 1;
+        }
     }
 }

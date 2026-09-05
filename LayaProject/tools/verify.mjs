@@ -18,7 +18,7 @@ const releaseChecks = [
     "test",
     "check:architecture",
     "check:engine-source",
-    "validate:assets",
+    "validate:assets:laya",
     "validate:content-assets",
     "validate:resource-layout",
     "validate:performance",

@@ -10,4 +10,4 @@ description: 创建或修改 LayaAir ui2 的 .lh 界面、GWindow/GRoot、UIRout
 3. singleton 可 Hide 或 Destroy；multiple 只允许 Destroy。窗口长期副作用归 `lifetime`，每次展示副作用归 `presentation`。
 4. 异步绑定必须用 `BindingToken.commit()`；动态图片直接使用 `GLoader.src`，换图/Hide/Destroy 时清空或销毁 owner。
 5. 瞬时公共提示调用 `LX.UI.tip()`；Tip 固定在 Toast 层，队列、Tween 和回池状态由框架管理，不建业务副本。
-6. 修改源资产运行 `npm run validate:assets`；修改窗口行为运行 `npm run typecheck && npm test && npm run test:headless`。
+6. 修改 `.lh` 源资产运行 `npm run validate:assets:laya`；修改窗口行为运行 `npm run typecheck && npm test && npm run test:headless`。

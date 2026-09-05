@@ -17,6 +17,7 @@ source: user-confirmed
 ## Decision
 
 - `npm run verify` 是默认快速门禁，不检测或调用 LayaAir CLI、.NET、Python、浏览器或模型；静态任务最多 3 路并发。
+- 快速档按命令的传递执行路径而不是脚本名称判定依赖；`tests/workflow/CodexWorkflow.test.ts` 必须在无效 `LAYAAIR_INSTALL_DIR`/`PYTHON_PATH` 下实跑完整 `npm run verify`。`validate:assets` 只做 Node 静态检查，LayaAir 3.4.1 官方解析由 `validate:assets:laya` 显式升级。
 - AGENTS、Skills、memory 与 workflow 只在相关路径变化时进入独立 Workflow validation；模型语义评测仍只在本地显式执行一次。
 - Luban 只在表源、生成物、配置或工具变化时运行 `npm run tables:check`。
 - `npm run verify:release` 才执行环境检查、完整测试、引擎源码、Luban 和一次真实 Headless 构建；双平台 CI 仅由 `v*` Tag 或手动触发。

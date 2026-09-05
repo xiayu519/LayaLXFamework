@@ -41,3 +41,5 @@ npm run validate:assets
 npm run validate:content-assets
 npm run validate:resource-layout
 ```
+
+上述命令均不需要 Laya CLI；只有 `.ls/.lh`、其 `.meta` 或脚本挂载发生变化时，才追加 `npm run validate:assets:laya` 调用 LayaAir 3.4.1 官方解析器。

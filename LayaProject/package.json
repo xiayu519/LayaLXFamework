@@ -25,6 +25,7 @@
     "check:architecture": "node tools/check-architecture.mjs",
     "check:engine-source": "node tools/check-engine-source.mjs",
     "validate:assets": "node tools/validate-assets.mjs",
+    "validate:assets:laya": "node tools/validate-assets.mjs --laya",
     "validate:content-assets": "node tools/validate-content-assets.mjs",
     "validate:resource-layout": "node tools/validate-resource-layout.mjs",
     "validate:performance": "node tools/validate-performance-budgets.mjs",

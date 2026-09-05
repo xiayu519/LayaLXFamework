@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
     assertRoutingResult,
@@ -45,16 +46,20 @@ describe("Codex workflow policy", () => {
         expect(pkg.scripts.verify).toBe("node tools/verify.mjs --profile fast");
         expect(pkg.scripts["check:project"]).toBe("node tools/doctor.mjs --project-only");
         expect(pkg.scripts["verify:release"]).toBe("node tools/verify.mjs --profile release");
+        expect(pkg.scripts["validate:assets"]).toBe("node tools/validate-assets.mjs");
+        expect(pkg.scripts["validate:assets:laya"]).toBe("node tools/validate-assets.mjs --laya");
         expect(pkg.scripts["test:unit"]).toContain("tests/framework tests/game");
         expect(pkg.scripts["test:workflow"]).toBe("vitest run tests/workflow");
         expect(verifier).toContain("runLimited(profile.checks, 3)");
         const fastChecks = verifier.split("const fastChecks = [")[1]?.split("];", 1)[0] ?? "";
         for (const releaseOnlyCheck of [
             "doctor", "tables:check", "check:engine-source", "test:headless",
-            "check:skills", "check:memory", "validate:game-workflow",
+            "check:skills", "check:memory", "validate:game-workflow", "validate:assets:laya",
         ]) {
             expect(fastChecks).not.toContain(releaseOnlyCheck);
         }
+        const releaseChecks = verifier.split("const releaseChecks = [")[1]?.split("];", 1)[0] ?? "";
+        expect(releaseChecks).toContain('"validate:assets:laya"');
 
         expect(fastWorkflow).toContain("name: Fast validation");
         expect(fastWorkflow).toContain("npm run verify");
@@ -99,6 +104,25 @@ describe("Codex workflow policy", () => {
             },
         });
         expect(output).toContain("Project configuration OK");
+    });
+
+    it("runs the complete fast profile without a LayaAir installation", () => {
+        const npmCli = process.env.npm_execpath;
+        if (!npmCli) {
+            throw new Error("npm_execpath is missing; run this test through npm run test:workflow.");
+        }
+        const output = execFileSync(process.execPath, [npmCli, "run", "verify"], {
+            cwd: resolve("."),
+            encoding: "utf8",
+            env: {
+                ...process.env,
+                LAYAAIR_INSTALL_DIR: resolve("__missing_layaair__"),
+                PYTHON_PATH: resolve("__missing_python__"),
+            },
+            timeout: 60_000,
+        });
+        expect(output).toContain("[verify] fast profile passed.");
+        expect(output).not.toContain("LayaAir CLI is not installed");
     });
 
 });

@@ -5,7 +5,8 @@
 - 环境：`npm run doctor`
 - 引擎源码：`npm run check:engine-source`
 - 静态：`npm run typecheck && npm test && npm run check:architecture`
-- 资产：`npm run validate:assets && npm run validate:resource-layout`
+- 静态资产：`npm run validate:assets && npm run validate:resource-layout`
+- Laya 源资产解析：`npm run validate:assets:laya`
 - 发布：`npm run build:web && npm run validate:build && npm run test:browser`
 - 原地全链路：`npm run test:headless`
 - 快速门禁：`npm run verify`

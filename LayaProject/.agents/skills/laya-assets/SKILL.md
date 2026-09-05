@@ -9,4 +9,4 @@ description: 编辑或诊断 LayaAir .ls/.lh 源资产、UUID、_$ref、res://�
 2. 保持 UUID 唯一；`_$ref`、`res://`、startup scene 与脚本组件 UUID 必须能解析到真实源文件。
 3. 固定节点与组件直接声明在 `.ls` / `.lh`，不以运行时补建绕过序列化问题。
 4. 字符串动态加载的启动资源进入 `alwaysIncluded`；延迟包使用 Laya `subpackages[].packAllAssets`，源目录存在不能替代发布包收集验证。
-5. 修改后运行 `npm run validate:assets`；改动资源位置时再运行 `npm run validate:resource-layout`，需要发布验收时运行 `npm run test:headless`。
+5. 普通资产修改先运行无 Laya 依赖的 `npm run validate:assets`；修改 `.ls/.lh`、其 `.meta` 或脚本挂载时，再运行一次 `npm run validate:assets:laya`。改动资源位置时追加 `npm run validate:resource-layout`，需要发布验收时运行 `npm run test:headless`。
