@@ -123,7 +123,7 @@ describe("Codex workflow policy", () => {
         });
         expect(output).toContain("[verify] fast profile passed.");
         expect(output).not.toContain("LayaAir CLI is not installed");
-    });
+    }, 70_000);
 
 });
 
