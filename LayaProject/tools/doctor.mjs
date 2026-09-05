@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { LAYA_VERSION, resolveLayaRuntime } from "./layaair.mjs";
 import { resolvePythonRuntime } from "./python-runtime.mjs";
+import { parseGameProject } from "./game-project.mjs";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const errors = [];
@@ -84,28 +85,14 @@ const build = readJson(join(projectRoot, "settings", "BuildSettings.json"));
 const resourceLayout = readJson(join(projectRoot, "settings", "ResourceLayout.json"));
 const gameProject = readJson(join(projectRoot, "settings", "GameProject.json"));
 const headlessValidation = readJson(join(projectRoot, "settings", "HeadlessValidation.json"));
-if (gameProject.schemaVersion !== 1
-    || typeof gameProject.gameId !== "string"
-    || !/^[a-z][a-z0-9-]*$/.test(gameProject.gameId)
-    || typeof gameProject.luban?.runtimeSupport !== "string"
-    || typeof gameProject.luban?.codeDestination !== "string"
-    || typeof gameProject.luban?.dataDestination !== "string") {
-    errors.push("GameProject must define one game id and its Luban runtime/code/data destinations.");
+let gameProjectConfig;
+try {
+    gameProjectConfig = parseGameProject(gameProject);
+} catch (error) {
+    errors.push(error.message);
 }
-const configuredGameRoot = typeof gameProject.gameId === "string"
-    && /^[a-z][a-z0-9-]*$/.test(gameProject.gameId)
-    ? `src/game/${gameProject.gameId}`
-    : undefined;
-if (configuredGameRoot) {
-    for (const [label, destination] of [
-        ["runtimeSupport", gameProject.luban?.runtimeSupport],
-        ["codeDestination", gameProject.luban?.codeDestination],
-    ]) {
-        if (typeof destination === "string" && !destination.startsWith(`${configuredGameRoot}/`)) {
-            errors.push(`GameProject luban.${label} must stay inside ${configuredGameRoot}.`);
-        }
-    }
-}
+const configuredLogicRoot = gameProjectConfig?.logicRoot;
+const configuredGameRoot = gameProjectConfig?.gameRoot;
 if (headlessValidation.schemaVersion !== 1
     || typeof headlessValidation.readyConsole !== "string"
     || typeof headlessValidation.uiProbe?.prefabUrl !== "string"
@@ -208,6 +195,12 @@ const requiredPaths = [
     ".agents/skills/luban-tables/SKILL.md",
     "tools/create-game.mjs",
 ];
+if (configuredLogicRoot) {
+    requiredPaths.push(
+        configuredLogicRoot,
+        `${configuredLogicRoot}/bootstrap/createGameApplication.ts`,
+    );
+}
 if (configuredGameRoot) {
     requiredPaths.push(
         configuredGameRoot,
@@ -223,9 +216,9 @@ for (const path of [
     headlessValidation.runtimeConfig?.url && `assets/${headlessValidation.runtimeConfig.url}`,
     headlessValidation.tables?.url && `assets/${headlessValidation.tables.url}`,
     headlessValidation.uiProbe?.prefabUrl && `assets/${headlessValidation.uiProbe.prefabUrl}`,
-    gameProject.luban?.runtimeSupport,
-    gameProject.luban?.codeDestination,
-    gameProject.luban?.dataDestination,
+    gameProjectConfig?.luban.runtimeSupport,
+    gameProjectConfig?.luban.codeDestination,
+    gameProjectConfig?.luban.dataDestination,
 ].filter(Boolean)) {
     requiredPaths.push(path);
 }

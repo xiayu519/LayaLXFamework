@@ -4,7 +4,7 @@
 
 项目固定使用 LayaAir `3.4.1`、2D、`laya.ui = ui2`，不启用 `laya.d3`。设计顺序是：先确认 Laya 官方源码与公开 API，再添加有明确业务语义、失败边界和验证方式的薄扩展。
 
-`src/framework/` 是 2–3 人共享层，不依赖 `src/game/`；`src/game/logic/` 是当前产品必须保留的真实业务根。`src/Main.ts` 是稳定生命周期外壳，只调用下游所有的 `src/game/bootstrap/createApplication.ts`。该桥接入口默认委托给 `src/game/logic/bootstrap/createGameApplication.ts`，后者通过 `createRuntime(definition, adapters)` 显式组装，不使用 DI 容器。
+`src/framework/` 是 2–3 人共享层，不依赖 `src/game/`；`src/game/logic/` 是不可删除、可被具体游戏调用的业务逻辑脚本库，不代表一个游戏。用户命名后的具体游戏位于 `src/game/<game-id>/`，可依赖 logic；logic 不得反向依赖具体游戏，具体游戏之间也不得互相依赖。`src/Main.ts` 是稳定生命周期外壳，只调用下游所有的 `src/game/bootstrap/createApplication.ts`。在尚未接入命名游戏时，该桥接入口委托给 `src/game/logic/bootstrap/createGameApplication.ts` 保持模板可运行；具体游戏开始后由其显式接管组合，不使用 DI 容器。
 
 ## Laya 原生边界
 
@@ -49,7 +49,7 @@ Laya.loader.load(.lh, HIERARCHY)
 
 `LX.Config` 只处理通用 JSON 文档，适用于外部游戏数据、地图/关卡编辑器输出和业务配置。它通过 `ContentCatalog` 的 `data` ID 调用原生 `Loader.JSON`，可在消费边界提供校验器，并支持并发合并、查询、显式释放和晚到结果失效。
 
-`LX.Tables` 只保存 Luban TypeScript-bin 生成的 `Tables`。人工源位于 `Design/Tables`；具体生成位置由下游 `settings/GameProject.json` 指定，当前默认业务根为 `src/game/logic/generated/tables`，数据输出到 `assets/bootstrap/game/tables`。两条数据链没有依赖关系。
+`LX.Tables` 只保存 Luban TypeScript-bin 生成的 `Tables`。人工源位于 `Design/Tables`；具体生成位置由下游 `settings/GameProject.json` 指定，模板默认把可调用的表逻辑生成到 `src/game/logic/generated/tables`，数据输出到 `assets/bootstrap/game/tables`。命名游戏需要独立表代码时再显式调整配置。两条数据链没有依赖关系。
 
 ## 资源与释放
 

@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
@@ -12,7 +12,7 @@ describe("Codex workflow policy", () => {
         const agents = readFileSync("AGENTS.md", "utf8");
         const bounded = readFileSync(".agents/skills/bounded-task/SKILL.md", "utf8");
         const rules = readFileSync(".agents/skills/codex-workflow/references/workflow-rules.md", "utf8");
-        expect(agents).toContain("框架由一人维护，使用时约 2–3 人协作");
+        expect(agents).toContain("框架一人维护、约 2–3 人协作");
         expect(agents).toContain("Codex 默认单代理");
         expect(agents).toContain("仅跨独立风险边界或用户明确要求时委派");
         expect(bounded).toContain("默认由当前代理直接完成");
@@ -75,6 +75,23 @@ describe("Codex workflow policy", () => {
         const releaseChecks = verifier.split("const releaseChecks = [")[1]?.split("];", 1)[0] ?? "";
         expect(releaseChecks).toContain('"validate:assets:laya"');
 
+    });
+
+    it("creates a named game scope only after an explicit business name", () => {
+        const agents = readFileSync("AGENTS.md", "utf8");
+        const rules = readFileSync(".agents/skills/codex-workflow/references/workflow-rules.md", "utf8");
+        const pkg = JSON.parse(readFileSync("package.json", "utf8"));
+        const project = JSON.parse(readFileSync("settings/GameProject.json", "utf8"));
+
+        expect(agents).toContain("`src/game/logic/` 是不可删除的可调用脚本库，不是游戏");
+        expect(rules).toContain("仅当用户明确开始业务并给出名称时");
+        expect(rules).toContain("--name <原名> --id <english-id>");
+        expect(pkg.scripts["validate:game-workflow"])
+            .toContain('--name "Workflow Probe" --id workflow-probe --dry-run');
+        expect(project).toMatchObject({ schemaVersion: 2, logicRoot: "src/game/logic" });
+        expect(project).not.toHaveProperty("gameId");
+        expect(existsSync("src/game/logic/AGENTS.md")).toBe(false);
+        expect(existsSync("src/game/logic/.codex/memory/INDEX.md")).toBe(false);
     });
 
     it("checks project structure without requiring external toolchains", () => {

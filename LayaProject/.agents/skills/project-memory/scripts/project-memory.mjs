@@ -5,6 +5,9 @@ import { fileURLToPath } from "node:url";
 const skillRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const projectRoot = resolve(skillRoot, "..", "..", "..");
 const gameRoot = join(projectRoot, "src", "game");
+const reservedGameDirectories = new Set([
+    "application", "bootstrap", "domain", "generated", "infrastructure", "logic", "platform", "presentation",
+]);
 const publicMemory = memoryAt(join(projectRoot, ".codex", "memory"));
 const entryKinds = new Map([
     ["problems", "problem"],
@@ -36,7 +39,7 @@ function gameMemories() {
         return [];
     }
     return readdirSync(gameRoot, { withFileTypes: true })
-        .filter((entry) => entry.isDirectory())
+        .filter((entry) => entry.isDirectory() && !reservedGameDirectories.has(entry.name))
         .map((entry) => memoryAt(join(gameRoot, entry.name, ".codex", "memory")))
         .filter((memory) => existsSync(memory.root));
 }
@@ -48,7 +51,7 @@ function activeMemories() {
         && local !== ".."
         && !local.startsWith(`..${sep}`)
         && !isAbsolute(local);
-    if (!insideGame || !segments[0]) {
+    if (!insideGame || !segments[0] || reservedGameDirectories.has(segments[0])) {
         return [publicMemory];
     }
     const gameMemory = memoryAt(join(gameRoot, segments[0], ".codex", "memory"));

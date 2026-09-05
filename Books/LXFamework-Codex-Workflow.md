@@ -10,13 +10,14 @@ npm ci
 npm run doctor
 ```
 
-框架任务从 `LayaProject` 启动。当前游戏任务直接从固定业务根启动：
+框架任务从 `LayaProject` 启动。`src/game/logic/` 只是不可删除的可调用逻辑脚本库，不是具体游戏，也不从该目录启动游戏 Codex 层。用户明确开始业务并提供名称时，Codex 先将名称整理成英文 kebab-case，再执行：
 
 ```shell
-codex --cd src/game/logic
+npm run game:create -- --name "用户提供的名称" --id english-game-name
+codex --cd src/game/english-game-name
 ```
 
-只有需要增加另一个独立游戏作用域时，才运行 `npm run game:create -- --id my-game` 并从新目录启动。
+没有明确的业务名称时不预建游戏目录。命名游戏可以调用 `src/game/logic/`，logic 不得反向依赖具体游戏，两个具体游戏也不得互相依赖。
 
 Codex 对两类文件采用不同的官方发现顺序：`AGENTS.md` 从 Git 根目录向当前目录合并，所以 `LayaProject/AGENTS.md` 先于游戏文件生效，冲突时更近的规则优先；Skills 从当前目录向仓库根扫描，所以公共与游戏 Skills 同时可用。从 `LayaProject` 根启动不会加载游戏层。游戏规则不得复制公共规则，游戏 Skill 使用独立名称。
 

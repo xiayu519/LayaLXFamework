@@ -3,12 +3,14 @@ type: decision
 scope: codex-workflow
 description: 每个游戏在 src/game/<game-id> 追加自己的 AGENTS.md 和 Skills，并从该目录启动 Codex 以叠加公共工作流。
 trigger: 创建新游戏、添加游戏专属规则或 Skill，或排查公共与游戏工作流加载范围时
-status: active
+status: superseded
 last_verified: 2026-09-05
 source: external-verified
 ---
 
 # Game workflow layering
+
+Superseded by [Named game workspaces](named-game-workspaces.md).
 
 ## Context
 
@@ -16,9 +18,9 @@ source: external-verified
 
 ## Decision
 
-当前项目使用必须保留的 `src/game/logic` 作为默认真实业务根；从该目录启动 Codex 时叠加游戏规则和记忆。
+旧决定曾把必须保留的 `src/game/logic` 当作默认真实业务根，并从该目录叠加游戏规则和记忆；这部分语义已经废止。
 
-使用 `npm run game:create -- --id <game-id>` 创建 `src/game/<game-id>/AGENTS.md` 和 `.agents/skills/`。游戏任务从该目录启动 Codex；公共 `LayaProject/AGENTS.md` 先加载，游戏文件随后叠加，公共与游戏 Skills 同时参与语义匹配。游戏 Skill 必须使用独立名称和精确 description。
+旧命令仅接收 `--id <game-id>` 创建游戏作用域。现行命令和触发条件见 [Named game workspaces](named-game-workspaces.md)。
 
 ## Evidence
 

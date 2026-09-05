@@ -30,8 +30,11 @@
 - [Luban source of truth](decisions/luban-source-of-truth.md)：已被 bootstrap 输出路径的新版本替代。
 - [Luban source of truth v2](decisions/luban-source-of-truth-v2.md)：已被 JSON/Tables 分离的新版本替代。
 - [Data pipelines v3](decisions/data-pipelines-v3.md)：已被游戏级生成路径的新版本替代。
-- [Data pipelines v4](decisions/data-pipelines-v4.md)：JSON/Tables 分离，Luban 输出由当前游戏配置指定。
-- [Game workflow layering](decisions/game-workflow-layering.md)：游戏目录追加独立 AGENTS/Skills，并从该目录启动以叠加公共工作流。
+- [Data pipelines v4](decisions/data-pipelines-v4.md)：旧的 gameId 生成路径决定，已由 logicRoot 与命名游戏路径替代。
+- [Data pipelines v5](decisions/data-pipelines-v5.md)：JSON/Tables 分离；模板表逻辑进入 logicRoot，命名游戏可显式使用自己的生成目录。
+- [Game workflow layering](decisions/game-workflow-layering.md)：旧的 logic 默认游戏分层，已由命名游戏工作区替代。
+- [Logic default game history](decisions/logic-default-game-history.md)：保留 sample 到 logic 默认游戏的历史决定及其废止原因。
+- [Named game workspaces](decisions/named-game-workspaces.md)：logic 只提供可调用脚本；用户命名业务后才创建英文游戏目录和独立 Codex 层。
 - [Cross-platform development workflow](decisions/cross-platform-development-workflow.md)：旧的每次双平台完整 CI，已由分层验证策略替代。
 - [Validation profiles](decisions/validation-profiles.md)：旧的 GitHub 分层验证方案，已由本地验收与 GitHub 同步专用契约替代。
 - [Local validation and GitHub sync-only contract](decisions/local-validation-github-sync-only.md)：GitHub 只校验框架同步；本机环境与全部开发、领域和发布验收均留在本地。

@@ -13,6 +13,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseGameProject } from "./game-project.mjs";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repositoryRoot = resolve(projectRoot, "..");
@@ -46,15 +47,7 @@ if (!outputRoot.startsWith(`${temporaryRoot}${sep}`)) {
 function readGameProject() {
     const path = join(projectRoot, "settings", "GameProject.json");
     const value = JSON.parse(readFileSync(path, "utf8"));
-    if (value?.schemaVersion !== 1
-        || typeof value?.gameId !== "string"
-        || !/^[a-z][a-z0-9-]*$/.test(value.gameId)
-        || typeof value?.luban?.runtimeSupport !== "string"
-        || typeof value?.luban?.codeDestination !== "string"
-        || typeof value?.luban?.dataDestination !== "string") {
-        throw new Error("settings/GameProject.json has an invalid game or Luban destination contract.");
-    }
-    return value;
+    return parseGameProject(value);
 }
 
 function resolveProjectPath(local, label) {

@@ -19,11 +19,12 @@
 ```text
 src/Main.ts
   -> src/game/bootstrap/createApplication.ts
-  -> src/game/logic/bootstrap/createGameApplication.ts
+  -> 未接入命名游戏时调用 src/game/logic 中的可调用模板逻辑
+  -> 开始业务后由 src/game/<game-id>/bootstrap 接管组合
   -> src/framework/bootstrap/createRuntime.ts
 ```
 
-`Main.ts` 只处理 Laya Script 的启动、停止和失败回滚。固定桥接与具体游戏组合都归下游；framework 不依赖 game。
+`Main.ts` 只处理 Laya Script 的启动、停止和失败回滚。`logic` 不是游戏目录；固定桥接与命名游戏组合都归下游，framework 不依赖 game。
 
 ## 发布与同步
 

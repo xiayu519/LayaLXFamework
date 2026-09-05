@@ -3,12 +3,14 @@ type: decision
 scope: game-data
 description: JSON 与 Luban Tables 保持独立；Luban 生成位置由当前游戏配置指定并进入 game 所有权目录。
 trigger: 接入 JSON、地图数据、Luban 表，或修改 GameProject、生成路径、加载入口与释放策略时。
-status: active
+status: superseded
 last_verified: 2026-09-05
 source: code-verified
 ---
 
 # Data pipelines v4
+
+Superseded by [Data pipelines v5](data-pipelines-v5.md).
 
 替代 [Data pipelines v3](data-pipelines-v3.md)。
 

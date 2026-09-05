@@ -27,7 +27,7 @@ describe("project memory search", () => {
             mkdirSync(dirname(script), { recursive: true });
             copyFileSync(resolve(".agents/skills/project-memory/scripts/project-memory.mjs"), script);
 
-            const gameMemory = join(fixture, "src", "game", "logic", ".codex", "memory");
+            const gameMemory = join(fixture, "src", "game", "dream-rivers", ".codex", "memory");
             write(join(fixture, ".codex", "memory", "INDEX.md"), memoryIndex());
             write(join(gameMemory, "INDEX.md"), `${memoryIndex()}\n- [Logic ownership](decisions/logic-ownership.md)\n`);
             write(join(gameMemory, "decisions", "logic-ownership.md"), `---
@@ -49,9 +49,51 @@ The logic fixture is game-owned.
                 script,
                 "search",
                 "logic fixture ownership",
+            ], { cwd: join(fixture, "src", "game", "dream-rivers"), encoding: "utf8" });
+
+            expect(output).toContain("src/game/dream-rivers/.codex/memory/decisions/logic-ownership.md");
+        } finally {
+            const local = relative(temporaryRoot, resolve(fixture));
+            if (!local || local === ".." || local.startsWith(`..${sep}`) || isAbsolute(local)) {
+                throw new Error(`Refusing unsafe fixture cleanup: ${fixture}`);
+            }
+            rmSync(fixture, { recursive: true, force: true });
+        }
+    });
+
+    it("does not treat the reserved logic library as a game memory scope", () => {
+        const temporaryRoot = resolve(tmpdir());
+        const fixture = mkdtempSync(join(temporaryRoot, "lx-project-memory-logic-"));
+        try {
+            const script = join(fixture, ".agents", "skills", "project-memory", "scripts", "project-memory.mjs");
+            mkdirSync(dirname(script), { recursive: true });
+            copyFileSync(resolve(".agents/skills/project-memory/scripts/project-memory.mjs"), script);
+            const logicMemory = join(fixture, "src", "game", "logic", ".codex", "memory");
+            write(join(fixture, ".codex", "memory", "INDEX.md"), memoryIndex());
+            write(join(logicMemory, "INDEX.md"), `${memoryIndex()}\n- [Reserved](decisions/reserved.md)\n`);
+            write(join(logicMemory, "decisions", "reserved.md"), `---
+type: decision
+scope: fixture
+description: Reserved logic memory must not become a game scope.
+trigger: Testing reserved logic memory.
+status: active
+last_verified: 2026-09-05
+source: code-verified
+---
+
+# Reserved
+
+This entry must stay inactive.
+`);
+
+            const output = execFileSync(process.execPath, [
+                script,
+                "search",
+                "reserved logic memory",
             ], { cwd: join(fixture, "src", "game", "logic"), encoding: "utf8" });
 
-            expect(output).toContain("src/game/logic/.codex/memory/decisions/logic-ownership.md");
+            expect(output).toContain("No project memory matched.");
+            expect(output).not.toContain("src/game/logic/.codex/memory");
         } finally {
             const local = relative(temporaryRoot, resolve(fixture));
             if (!local || local === ".." || local.startsWith(`..${sep}`) || isAbsolute(local)) {

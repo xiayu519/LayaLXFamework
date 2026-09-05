@@ -9,6 +9,12 @@ export interface ModuleDependency {
     readonly line: number;
 }
 
+export function isAllowedGameScopeDependency(
+    sourceGameId: string,
+    targetGameId: string,
+    isCompositionBridge?: boolean,
+): boolean;
+
 export function readArchitectureCompilerOptions(projectRoot: string, host?: ts.ParseConfigHost): {
     readonly options: ts.CompilerOptions;
     readonly diagnostics: readonly string[];

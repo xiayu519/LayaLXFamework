@@ -9,6 +9,9 @@ import sys
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SKILLS_ROOT = PROJECT_ROOT / ".agents" / "skills"
 GAME_ROOT = PROJECT_ROOT / "src" / "game"
+RESERVED_GAME_DIRECTORIES = {
+    "application", "bootstrap", "domain", "generated", "infrastructure", "logic", "platform", "presentation"
+}
 VALIDATOR = Path.home() / ".codex" / "skills" / ".system" / "skill-creator" / "scripts" / "quick_validate.py"
 AGENTS = PROJECT_ROOT / "AGENTS.md"
 ROUTING_CASES = SKILLS_ROOT / "codex-workflow" / "evals" / "cases.json"
@@ -40,6 +43,9 @@ def main() -> int:
 
     public_skills = sorted(path.parent for path in SKILLS_ROOT.glob("*/SKILL.md"))
     game_skill_files = sorted(GAME_ROOT.glob("*/.agents/skills/*/SKILL.md"))
+    for game_skill in game_skill_files:
+        if game_skill.relative_to(GAME_ROOT).parts[0] in RESERVED_GAME_DIRECTORIES:
+            errors.append(f"{game_skill.relative_to(PROJECT_ROOT)} is inside a reserved non-game directory")
     game_skills = [path.parent for path in game_skill_files]
     skills = public_skills + game_skills
     if not public_skills:
@@ -105,6 +111,9 @@ def main() -> int:
 
     for game_agents in sorted(GAME_ROOT.glob("*/AGENTS.md")):
         game_directory = game_agents.parent
+        if game_directory.name in RESERVED_GAME_DIRECTORIES:
+            errors.append(f"{game_agents.relative_to(PROJECT_ROOT)} is inside a reserved non-game directory")
+            continue
         active_game_skills = [skill for skill in game_skills if game_directory in skill.parents]
         active_budget = public_budget + sum(len(descriptions.get(skill, "")) for skill in active_game_skills)
         if active_budget > 2500:

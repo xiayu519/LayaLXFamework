@@ -30,7 +30,7 @@
     "validate:content-assets": "node tools/validate-content-assets.mjs",
     "validate:resource-layout": "node tools/validate-resource-layout.mjs",
     "validate:performance": "node tools/validate-performance-budgets.mjs",
-    "validate:game-workflow": "node tools/create-game.mjs --id workflow-probe --dry-run",
+    "validate:game-workflow": "node tools/create-game.mjs --name \"Workflow Probe\" --id workflow-probe --dry-run",
     "analyze:packages": "node .agents/skills/laya-minigame-packaging/scripts/analyze-package-size.mjs",
     "check:skills": "node tools/run-python.mjs tools/validate-skills.py",
     "check:memory": "node .agents/skills/project-memory/scripts/project-memory.mjs check",

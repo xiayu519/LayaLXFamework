@@ -1,7 +1,12 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, extname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { analyzeModuleDependencies, findDependencyCycles, readArchitectureCompilerOptions } from "./architecture-analysis.mjs";
+import {
+    analyzeModuleDependencies,
+    findDependencyCycles,
+    isAllowedGameScopeDependency,
+    readArchitectureCompilerOptions,
+} from "./architecture-analysis.mjs";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const sourceRoot = join(projectRoot, "src");
@@ -148,7 +153,11 @@ for (const file of sourceFiles) {
                 const isCompositionBridge = file === gameCompositionBridgePath
                     && sourceLocation.gameId === "legacy"
                     && sourceLocation.layer === "bootstrap";
-                if (!isCompositionBridge) {
+                if (!isAllowedGameScopeDependency(
+                    sourceLocation.gameId,
+                    targetLocation.gameId,
+                    isCompositionBridge,
+                )) {
                     failures.push(
                         `${localPath(file)}: game '${sourceLocation.gameId}' cannot import game '${targetLocation.gameId}' (${specifier}).`,
                     );

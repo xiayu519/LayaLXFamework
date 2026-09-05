@@ -1,6 +1,6 @@
 {
-  "schemaVersion": 1,
-  "gameId": "logic",
+  "schemaVersion": 2,
+  "logicRoot": "src/game/logic",
   "luban": {
     "runtimeSupport": "src/game/logic/generated/luban/ByteBuf.ts",
     "codeDestination": "src/game/logic/generated/tables",

@@ -3,10 +3,19 @@ import { resolve, sep } from "node:path";
 import {
     analyzeModuleDependencies,
     findDependencyCycles,
+    isAllowedGameScopeDependency,
     readArchitectureCompilerOptions,
 } from "../../tools/architecture-analysis.mjs";
 
 describe("architecture module analysis", () => {
+    it("allows named games to call logic without allowing reverse or cross-game dependencies", () => {
+        expect(isAllowedGameScopeDependency("dream-rivers", "logic")).toBe(true);
+        expect(isAllowedGameScopeDependency("logic", "dream-rivers")).toBe(false);
+        expect(isAllowedGameScopeDependency("dream-rivers", "space-battle")).toBe(false);
+        expect(isAllowedGameScopeDependency("dream-rivers", "dream-rivers")).toBe(true);
+        expect(isAllowedGameScopeDependency("legacy", "dream-rivers", true)).toBe(true);
+    });
+
     it("resolves side effects, re-exports, dynamic imports, require and import=require using tsconfig aliases", () => {
         const fixture = createFixture({
             "src/framework/entry.ts": [

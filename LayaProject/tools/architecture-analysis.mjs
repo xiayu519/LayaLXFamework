@@ -2,6 +2,10 @@ import { isBuiltin } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import ts from "typescript";
 
+export function isAllowedGameScopeDependency(sourceGameId, targetGameId, isCompositionBridge = false) {
+    return sourceGameId === targetGameId || targetGameId === "logic" || isCompositionBridge;
+}
+
 export function readArchitectureCompilerOptions(projectRoot, host = ts.sys) {
     const configPath = join(projectRoot, "tsconfig.json");
     const config = ts.readConfigFile(configPath, host.readFile);
