@@ -1,24 +1,7 @@
-name: Codex workflow regression
+name: Workflow validation
 
 on:
   workflow_dispatch:
-  pull_request:
-    paths:
-      - 'Books/LXFamework-Codex-Workflow.md'
-      - 'LayaProject/AGENTS.md'
-      - 'LayaProject/.agents/**'
-      - 'LayaProject/.codex/**'
-      - 'LayaProject/src/game/**/AGENTS.md'
-      - 'LayaProject/src/game/**/.agents/**'
-      - 'LayaProject/src/game/**/.codex/**'
-      - 'LayaProject/package.json'
-      - 'LayaProject/package-lock.json'
-      - 'LayaProject/tools/create-game.mjs'
-      - 'LayaProject/tools/python-runtime.mjs'
-      - 'LayaProject/tools/run-python.mjs'
-      - 'LayaProject/tools/validate-skills.py'
-      - 'LayaProject/tests/workflow/**'
-      - '.github/workflows/codex-workflow.yml'
   push:
     branches:
       - main
@@ -37,13 +20,32 @@ on:
       - 'LayaProject/tools/run-python.mjs'
       - 'LayaProject/tools/validate-skills.py'
       - 'LayaProject/tests/workflow/**'
-      - '.github/workflows/codex-workflow.yml'
+      - '.github/workflows/**'
+      - 'framework.manifest.json'
+  pull_request:
+    paths:
+      - 'Books/LXFamework-Codex-Workflow.md'
+      - 'LayaProject/AGENTS.md'
+      - 'LayaProject/.agents/**'
+      - 'LayaProject/.codex/**'
+      - 'LayaProject/src/game/**/AGENTS.md'
+      - 'LayaProject/src/game/**/.agents/**'
+      - 'LayaProject/src/game/**/.codex/**'
+      - 'LayaProject/package.json'
+      - 'LayaProject/package-lock.json'
+      - 'LayaProject/tools/create-game.mjs'
+      - 'LayaProject/tools/python-runtime.mjs'
+      - 'LayaProject/tools/run-python.mjs'
+      - 'LayaProject/tools/validate-skills.py'
+      - 'LayaProject/tests/workflow/**'
+      - '.github/workflows/**'
+      - 'framework.manifest.json'
 
 permissions:
   contents: read
 
 jobs:
-  static-policy:
+  validate:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:
@@ -58,8 +60,11 @@ jobs:
           node-version: 24
           cache: npm
           cache-dependency-path: LayaProject/package-lock.json
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
       - run: npm ci
       - run: npm run check:skills
       - run: npm run check:memory
       - run: npm run validate:game-workflow
-      - run: npm test -- tests/workflow
+      - run: npm run test:workflow

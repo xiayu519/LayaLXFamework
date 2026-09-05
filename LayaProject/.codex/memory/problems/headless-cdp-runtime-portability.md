@@ -1,7 +1,7 @@
 ---
 type: problem
 scope: headless-validation
-description: Node 20 没有可依赖的全局 WebSocket，Headless CDP 客户端必须显式使用固定版本依赖才能在 Windows/macOS CI 一致运行。
+description: Headless CDP 客户端必须显式使用固定版本 WebSocket 依赖，不能依赖某个 Node 版本的全局对象。
 trigger: 修改 Node 版本、Headless Chromium、CDP 客户端、浏览器发现或双平台 CI 时
 status: active
 last_verified: 2026-09-05
@@ -16,7 +16,7 @@ Headless 浏览器已经启动，但 macOS 的 Node 20 runner 在创建 CDP sock
 
 ## Guard
 
-CDP 工具显式导入锁定版本的 `ws`，不依赖特定 Node 主版本提供全局 `WebSocket`。CI 同时在 Windows/macOS 的 Node 20 上执行完整 `npm run verify`。
+CDP 工具显式导入锁定版本的 `ws`，不依赖特定 Node 主版本提供全局 `WebSocket`。发布 Tag 或手动 release CI 在 Windows/macOS 上执行完整 `npm run verify:release`。
 
 ## Evidence
 

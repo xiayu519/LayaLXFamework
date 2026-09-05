@@ -27,7 +27,7 @@ src/Main.ts
 
 ## 发布与同步
 
-正式发布时，上游完成 `npm run verify`、提交并创建不可变 SemVer Tag。下游只在独立同步分支执行：
+正式发布时，上游完成 `npm run verify:release`、提交并创建不可变 SemVer Tag。下游只在独立同步分支执行：
 
 ```shell
 git switch -c sync/framework-0.2.0
@@ -46,6 +46,8 @@ npm run framework:sync -- --channel main
 npm run check:framework-integrity
 npm run verify
 ```
+
+这里的 `verify` 是无 Laya CLI 的快速门禁。只有同步内容影响运行时、资源或发布构建时，才追加一次 `npm run test:headless`；上游正式发布使用 `npm run verify:release`。
 
 同步工具从 manifest 复制发行文件，更新 `.framework-lock.json` 中的 repository、来源模式与 ref、commit、manifest 哈希及逐文件 SHA-256，并合并最小 JSON 契约。release 模式锁定 Tag；snapshot 模式在同步时解析 channel 最新提交并固定该 commit，channel 后续推进不会改变已有下游。若 npm 契约变化，下游在同步分支更新 `package-lock.json`。游戏回归通过后才合并主分支。
 

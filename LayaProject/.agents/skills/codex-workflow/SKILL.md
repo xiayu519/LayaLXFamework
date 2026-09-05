@@ -10,4 +10,4 @@ description: 创建、拆分、审查或验证本项目的 AGENTS.md、.codex �
 3. Skill `description` 先写正向触发，再写最易混淆的排除边界；一个 Skill 只处理一个独立风险边界。
 4. 主文件保持短小；按需知识放 `references/`，确定性工具放 `scripts/`。删除过期规则，不保留“当前没有什么”的说明。
 5. 收到开发者纠正时重判语义边界；涉及共享工作流先暂停写入并重新对齐，验证后再写项目记忆。
-6. 工作流改动运行 `npm run check:skills`、`npm run check:memory` 和 `npm run test:skill-routing`。评测用一次原地、ephemeral、read-only 调用，模型默认读取 `.codex/config.toml`；同时覆盖正向/负向路由及批准、只读、越界等决策。分类通过不等于真实任务执行通过，复杂变更补独立执行审查。
+6. 工作流改动先运行 `npm run check:skills`、`npm run check:memory`、`npm run validate:game-workflow` 和 `npm run test:workflow`。仅 AGENTS、Skill description、路由样例或决策语义变化时，追加一次原地、ephemeral、read-only 的 `npm run test:skill-routing`；普通 YAML、脚本或文档改动不调用模型。分类通过不等于真实任务执行通过，复杂变更补独立执行审查。

@@ -8,7 +8,12 @@ import { resolvePythonRuntime } from "./python-runtime.mjs";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const errors = [];
-const ideRoot = resolveIdeRoot();
+const mode = process.argv[2];
+if (process.argv.length > 3 || (mode && mode !== "--project-only")) {
+    throw new Error("Usage: node tools/doctor.mjs [--project-only]");
+}
+const checkEnvironment = mode !== "--project-only";
+const ideRoot = checkEnvironment ? resolveIdeRoot() : undefined;
 let verifiedIdeRoot;
 let verifiedCliRoot;
 let verifiedPython;
@@ -28,32 +33,34 @@ if (!requiredNodeMajor || process.versions.node.split(".")[0] !== requiredNodeMa
     errors.push(`Project Node.js baseline '${nodeEngine}' is required; found ${process.versions.node}.`);
 }
 
-try {
-    verifiedPython = resolvePythonRuntime();
-} catch (error) {
-    errors.push(error.message);
-}
-
-const dotnetVersion = spawnSync("dotnet", ["--version"], { encoding: "utf8", windowsHide: true });
-if (dotnetVersion.error || dotnetVersion.status !== 0) {
-    errors.push(".NET 8+ is required to run the pinned Luban generator.");
-} else if (Number((dotnetVersion.stdout ?? "").trim().split(".")[0]) < 8) {
-    errors.push(`.NET 8+ is required; found '${dotnetVersion.stdout.trim()}'.`);
-}
-
 const designToolRoot = resolve(projectRoot, "..", "Design", "tools");
 const lubanDll = join(designToolRoot, "Luban", "Luban.dll");
 const lubanVersionPath = join(designToolRoot, "LUBAN_VERSION");
-if (existsSync(lubanDll) && existsSync(lubanVersionPath)) {
-    const expectedLuban = readFileSync(lubanVersionPath, "utf8").trim();
-    const result = spawnSync("dotnet", [lubanDll, "--version"], {
-        cwd: designToolRoot,
-        encoding: "utf8",
-        windowsHide: true,
-    });
-    const actualLuban = `${result.stdout ?? ""}${result.stderr ?? ""}`.trim().replace(/^Luban\s+/, "");
-    if (result.error || actualLuban !== expectedLuban) {
-        errors.push(`Pinned Luban '${expectedLuban}' is not runnable; found '${actualLuban || "unknown"}'.`);
+if (checkEnvironment) {
+    try {
+        verifiedPython = resolvePythonRuntime();
+    } catch (error) {
+        errors.push(error.message);
+    }
+
+    const dotnetVersion = spawnSync("dotnet", ["--version"], { encoding: "utf8", windowsHide: true });
+    if (dotnetVersion.error || dotnetVersion.status !== 0) {
+        errors.push(".NET 8+ is required to run the pinned Luban generator.");
+    } else if (Number((dotnetVersion.stdout ?? "").trim().split(".")[0]) < 8) {
+        errors.push(`.NET 8+ is required; found '${dotnetVersion.stdout.trim()}'.`);
+    }
+
+    if (existsSync(lubanDll) && existsSync(lubanVersionPath)) {
+        const expectedLuban = readFileSync(lubanVersionPath, "utf8").trim();
+        const result = spawnSync("dotnet", [lubanDll, "--version"], {
+            cwd: designToolRoot,
+            encoding: "utf8",
+            windowsHide: true,
+        });
+        const actualLuban = `${result.stdout ?? ""}${result.stderr ?? ""}`.trim().replace(/^Luban\s+/, "");
+        if (result.error || actualLuban !== expectedLuban) {
+            errors.push(`Pinned Luban '${expectedLuban}' is not runnable; found '${actualLuban || "unknown"}'.`);
+        }
     }
 }
 
@@ -128,49 +135,51 @@ if (typescriptPackage.version !== "5.9.3") {
     errors.push(`Project TypeScript must be 5.9.3; found '${typescriptPackage.version}'.`);
 }
 
-try {
-    const runtime = resolveLayaRuntime();
-    verifiedCliRoot = runtime.runtimeRoot;
-    const engine = readJson(join(runtime.runtimeRoot, "Resources", "engine.json"));
-    const coreLib = join(runtime.runtimeRoot, "Resources", "engine", "libs", "laya.core.js");
-    const webgl2DLib = join(runtime.runtimeRoot, "Resources", "engine", "libs", "laya.webgl_2D.js");
-    const spineLib = join(runtime.runtimeRoot, "Resources", "engine", "libs", "laya.spine.js");
-    if (!existsSync(coreLib) || !existsSync(webgl2DLib) || !existsSync(spineLib)) {
-        errors.push("Installed CLI runtime is missing core, WebGL 2D or Spine engine libraries.");
-    }
-    if (engine.version && engine.version !== LAYA_VERSION) {
-        errors.push(`Installed CLI engine version is '${engine.version}', expected '${LAYA_VERSION}'.`);
-    }
-    if (existsSync(coreLib)) {
-        const coreSource = readFileSync(coreLib, "utf8");
-        if (!coreSource.includes(`LayaEnv.version = "${LAYA_VERSION}"`)) {
-            errors.push(`Installed CLI core library does not declare LayaAir ${LAYA_VERSION}.`);
+if (checkEnvironment) {
+    try {
+        const runtime = resolveLayaRuntime();
+        verifiedCliRoot = runtime.runtimeRoot;
+        const engine = readJson(join(runtime.runtimeRoot, "Resources", "engine.json"));
+        const coreLib = join(runtime.runtimeRoot, "Resources", "engine", "libs", "laya.core.js");
+        const webgl2DLib = join(runtime.runtimeRoot, "Resources", "engine", "libs", "laya.webgl_2D.js");
+        const spineLib = join(runtime.runtimeRoot, "Resources", "engine", "libs", "laya.spine.js");
+        if (!existsSync(coreLib) || !existsSync(webgl2DLib) || !existsSync(spineLib)) {
+            errors.push("Installed CLI runtime is missing core, WebGL 2D or Spine engine libraries.");
         }
-    }
-    if (ideRoot) {
-        const ideLayout = resolveIdeLayout(ideRoot);
-        const ideExecutable = ideLayout.executable;
-        const ideCoreLib = join(ideLayout.resources, "engine", "libs", "laya.core.js");
-        const ideTypes = join(ideLayout.resources, "engine", "types", "LayaAir.d.ts");
-        const cliTypes = join(runtime.runtimeRoot, "Resources", "engine", "types", "LayaAir.d.ts");
-        const projectTypes = join(projectRoot, "engine", "types", "LayaAir.d.ts");
-        if (!existsSync(ideExecutable) || !existsSync(ideCoreLib) || !existsSync(ideTypes)) {
-            errors.push(`LayaAir IDE installation is incomplete: ${ideRoot}.`);
-        } else {
-            const ideCoreSource = readFileSync(ideCoreLib, "utf8");
-            if (!ideCoreSource.includes(`LayaEnv.version = "${LAYA_VERSION}"`)) {
-                errors.push(`LayaAir IDE core library is not version ${LAYA_VERSION}: ${ideRoot}.`);
+        if (engine.version && engine.version !== LAYA_VERSION) {
+            errors.push(`Installed CLI engine version is '${engine.version}', expected '${LAYA_VERSION}'.`);
+        }
+        if (existsSync(coreLib)) {
+            const coreSource = readFileSync(coreLib, "utf8");
+            if (!coreSource.includes(`LayaEnv.version = "${LAYA_VERSION}"`)) {
+                errors.push(`Installed CLI core library does not declare LayaAir ${LAYA_VERSION}.`);
             }
-            const expectedTypes = readFileSync(projectTypes);
-            if (!expectedTypes.equals(readFileSync(ideTypes)) || !expectedTypes.equals(readFileSync(cliTypes))) {
-                errors.push("Project, IDE and CLI LayaAir.d.ts files do not match byte-for-byte.");
+        }
+        if (ideRoot) {
+            const ideLayout = resolveIdeLayout(ideRoot);
+            const ideExecutable = ideLayout.executable;
+            const ideCoreLib = join(ideLayout.resources, "engine", "libs", "laya.core.js");
+            const ideTypes = join(ideLayout.resources, "engine", "types", "LayaAir.d.ts");
+            const cliTypes = join(runtime.runtimeRoot, "Resources", "engine", "types", "LayaAir.d.ts");
+            const projectTypes = join(projectRoot, "engine", "types", "LayaAir.d.ts");
+            if (!existsSync(ideExecutable) || !existsSync(ideCoreLib) || !existsSync(ideTypes)) {
+                errors.push(`LayaAir IDE installation is incomplete: ${ideRoot}.`);
             } else {
-                verifiedIdeRoot = ideRoot;
+                const ideCoreSource = readFileSync(ideCoreLib, "utf8");
+                if (!ideCoreSource.includes(`LayaEnv.version = "${LAYA_VERSION}"`)) {
+                    errors.push(`LayaAir IDE core library is not version ${LAYA_VERSION}: ${ideRoot}.`);
+                }
+                const expectedTypes = readFileSync(projectTypes);
+                if (!expectedTypes.equals(readFileSync(ideTypes)) || !expectedTypes.equals(readFileSync(cliTypes))) {
+                    errors.push("Project, IDE and CLI LayaAir.d.ts files do not match byte-for-byte.");
+                } else {
+                    verifiedIdeRoot = ideRoot;
+                }
             }
         }
+    } catch (error) {
+        errors.push(error.message);
     }
-} catch (error) {
-    errors.push(error.message);
 }
 
 const requiredPaths = [
@@ -242,17 +251,23 @@ for (const path of requiredPaths) {
 
 if (errors.length > 0) {
     console.error("Doctor found configuration errors:");
-    console.error("Prepare local prerequisites using ../Books/LXFamework-Environment.md; this command never installs software.");
+    if (checkEnvironment) {
+        console.error("Prepare local prerequisites using ../Books/LXFamework-Environment.md; this command never installs software.");
+    }
     for (const error of errors) {
         console.error(`- ${error}`);
     }
     process.exitCode = 1;
 } else {
-    console.log(`Doctor OK: Node ${process.versions.node}, LayaAir ${LAYA_VERSION}, ui2, TypeScript 5.9.3.`);
-    console.log(`Python runtime: ${verifiedPython.command} ${verifiedPython.version}`);
-    console.log(`CLI runtime: ${verifiedCliRoot}`);
-    if (verifiedIdeRoot) {
-        console.log(`IDE runtime: ${verifiedIdeRoot}`);
+    if (checkEnvironment) {
+        console.log(`Doctor OK: Node ${process.versions.node}, LayaAir ${LAYA_VERSION}, ui2, TypeScript 5.9.3.`);
+        console.log(`Python runtime: ${verifiedPython.command} ${verifiedPython.version}`);
+        console.log(`CLI runtime: ${verifiedCliRoot}`);
+        if (verifiedIdeRoot) {
+            console.log(`IDE runtime: ${verifiedIdeRoot}`);
+        }
+    } else {
+        console.log(`Project configuration OK: Node ${process.versions.node}, LayaAir ${LAYA_VERSION}, ui2, TypeScript 5.9.3.`);
     }
 }
 

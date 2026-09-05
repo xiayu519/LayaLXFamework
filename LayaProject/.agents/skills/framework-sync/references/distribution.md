@@ -22,6 +22,8 @@ npm run check:framework-integrity
 npm run verify
 ```
 
+`npm run verify` 是不调用 Laya CLI 的同步后快速门禁；只有同步内容影响真实 Laya 发布链或准备正式发布时，再运行 `npm run test:headless` 或 `npm run verify:release`。
+
 远程同步默认使用 manifest/lock 中的 repository，也可显式传 `--repository <url>`。`--ref` 只接受不可变 SemVer Tag；`--channel` 解析分支当前提交并作为 snapshot 锁定，分支后续推进不会改变已有 lock。受控本地联调可用 `--source <上游仓库>` 搭配其中任一来源参数；工具会验证本地 HEAD 与所选 ref 一致且工作区干净。
 
 同步必须在独立 `sync/framework-x.y.z` 或 `sync/framework-main-<date>` 分支执行。若 manifest 的 npm 契约发生变化，在该分支更新 `package-lock.json`，再进行游戏专项回归。`CODEOWNERS` 和分支保护必须要求框架负责人审查 managed paths、manifest 与 lock；CI 负责拒绝缺失、新增和哈希变化。

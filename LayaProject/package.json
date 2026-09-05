@@ -9,6 +9,7 @@
   },
   "scripts": {
     "doctor": "node tools/doctor.mjs",
+    "check:project": "node tools/doctor.mjs --project-only",
     "tables:generate": "node tools/luban.mjs generate",
     "tables:check": "node tools/luban.mjs check",
     "tables:validate": "node tools/luban.mjs validate",
@@ -19,6 +20,8 @@
     "check:framework-upstream": "node tools/framework-distribution.mjs upstream",
     "typecheck": "node tools/typecheck.mjs",
     "test": "vitest run",
+    "test:unit": "vitest run tests/framework tests/game --exclude tests/framework/HttpTransportEngine.test.ts",
+    "test:workflow": "vitest run tests/workflow",
     "check:architecture": "node tools/check-architecture.mjs",
     "check:engine-source": "node tools/check-engine-source.mjs",
     "validate:assets": "node tools/validate-assets.mjs",
@@ -35,7 +38,8 @@
     "test:browser": "node tools/test-browser.mjs",
     "test:headless": "node tools/test-headless.mjs",
     "preview": "node tools/layaair.mjs run -p . --skip-package-install",
-    "verify": "node tools/verify.mjs"
+    "verify": "node tools/verify.mjs --profile fast",
+    "verify:release": "node tools/verify.mjs --profile release"
   },
   "devDependencies": {
     "@types/node": "26.4.1",

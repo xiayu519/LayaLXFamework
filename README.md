@@ -273,14 +273,14 @@ LX.Performance.assertBudget({
 
 ## 验证
 
-日常开发可以按改动范围执行 `typecheck`、`test` 和对应资产检查；交付前统一运行：
+日常开发按改动范围执行定向测试；通用快速门禁运行：
 
 ```shell
 cd LayaProject
 npm run verify
 ```
 
-`verify` 在当前工程原地构建，并使用纯 Headless Chromium 检查真实 LayaAir 2D 发布包。
+`verify` 不调用 LayaAir CLI、.NET、Python 或浏览器。只有改动影响 Laya 发布链或准备正式发布时才运行 `npm run verify:release`；该命令在当前工程原地构建，并使用纯 Headless Chromium 检查真实 LayaAir 2D 发布包。
 
 ## 开始游戏开发
 

@@ -15,6 +15,6 @@ LayaAirIDE 只在人工编辑 `.ls/.lh` 或明确要求 GUI 验证时需要；�
 
 可以将下面的提示交给当前机器上的 AI：
 
-> 请阅读 `Books/LXFamework-Environment.md`，根据当前 Windows 或 macOS 系统及 CPU 架构，从官方入口检查并准备缺失环境。不要修改仓库文件，不要写入个人绝对路径；完成后在 `LayaProject` 执行 `npm ci`、`npm run doctor` 和 `npm run verify`，并报告未通过项。
+> 请阅读 `Books/LXFamework-Environment.md`，根据当前 Windows 或 macOS 系统及 CPU 架构，从官方入口检查并准备缺失环境。不要修改仓库文件，不要写入个人绝对路径；完成后在 `LayaProject` 执行 `npm ci`、`npm run doctor` 和 `npm run verify:release`，并报告未通过项。
 
 `npm run doctor` 只读取并检查环境，不会安装软件；`npm ci` 只还原 `package-lock.json` 锁定的项目依赖。

@@ -49,19 +49,19 @@ Codex 对两类文件采用不同的官方发现顺序：`AGENTS.md` 从 Git 根
 
 ## 验证
 
-除非开发者明确要求 GUI，验证始终在当前 `LayaProject` 原地、纯 Headless 执行；不复制项目，不启动 LayaAirIDE 或可见浏览器。
+验证按改动范围选择最小命令；不复制项目，不启动 LayaAirIDE 或可见浏览器。日常快速门禁执行：
 
 ```shell
 npm run verify
 ```
 
-修改 Luban 表后先运行 `npm run tables:generate`；CI/交付的 `tables:check` 会在系统临时目录重生成并逐字节检查陈旧输出，不复制 Laya 项目。普通 JSON 与 Luban 无关，由 `LX.Config` 使用原生 `Loader.JSON` 加载并读取 `TextResource.data`；生成表只通过 `LX.Tables` 访问。
+`verify` 不检测或调用 Laya CLI、.NET、Python 或浏览器。AGENTS、Skills、memory 与 workflow 由相关路径专用门禁检查；修改 Luban 表后先运行 `npm run tables:generate`，再运行 `npm run tables:check`。普通 JSON 与 Luban 无关，由 `LX.Config` 使用原生 `Loader.JSON` 加载并读取 `TextResource.data`；生成表只通过 `LX.Tables` 访问。
 
-完整验证先检查环境，再并行运行 Tables 复现、类型、单测、架构、资产、资源分包、性能契约、游戏工作流、Skill 和记忆检查，全部通过后只构建一次，并由 Headless Chromium + SwiftShader 检查真实 LayaAir 3.4.1 2D 发布包。已通过且没有相关文件变化的检查不重复执行。
+只有改动影响 Laya 发布链或准备正式发布时才执行 `npm run verify:release`。它先检查环境，以最多 3 路并发运行完整静态检查，全部通过后只构建一次，并由 Headless Chromium + SwiftShader 检查真实 LayaAir 3.4.1 2D 发布包。已通过且没有相关文件变化的检查不重复执行。
 
-Windows 与 macOS 共用同一套 AGENTS、Skills 和 npm 命令；平台差异只由工具内部的可执行文件发现处理，双平台 CI 分别执行完整 `npm run verify`。
+Windows 与 macOS 共用同一套 AGENTS、Skills 和 npm 命令。普通 push 只在单个 Ubuntu runner 执行快速门禁；发布 Tag 或手动触发时，双平台 CI 才分别执行完整 `npm run verify:release`。
 
-工作流变更另外在开发者已登录的本地 Codex CLI 环境运行 `npm run test:skill-routing`：一次只读调用覆盖正向/负向路由与批准、只读、越界、默认单代理及受控委派决策，记录模型和 token；可用 `LX_CODEX_EVAL_MODEL` / `LX_CODEX_EVAL_EFFORT` 显式覆盖评测配置。分类成绩不代表真实任务行为，不能替代执行审查。GitHub CI 只运行确定性静态检查和 workflow 测试，不调用模型、不读取或要求 `CODEX_API_KEY`。
+AGENTS、Skill description、路由样例或决策语义变化时，才在开发者已登录的本地 Codex CLI 环境运行一次 `npm run test:skill-routing`；普通 YAML、脚本、测试实现和文档改动只运行确定性 workflow 门禁。语义评测覆盖正向/负向路由与批准、只读、越界、默认单代理及受控委派决策，记录模型和 token；可用 `LX_CODEX_EVAL_MODEL` / `LX_CODEX_EVAL_EFFORT` 显式覆盖。分类成绩不代表真实任务行为，不能替代执行审查。GitHub CI 不调用模型、不读取或要求 `CODEX_API_KEY`。
 
 真实商店、小游戏容器或 Native 签名等无法由 Headless 证明的行为应列为未验证项，不自动切换到 GUI。
 

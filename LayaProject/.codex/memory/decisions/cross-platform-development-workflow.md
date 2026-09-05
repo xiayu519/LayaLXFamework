@@ -3,12 +3,14 @@ type: decision
 scope: development-workflow
 description: Windows 与 macOS 共用同一框架、AGENTS、Skills 和 npm 命令，操作系统差异只留在工具内部并由双平台 CI 验证。
 trigger: 修改开发工具、路径、CLI、CI、Headless 验证、文档命令或游戏工作流时
-status: active
+status: superseded
 last_verified: 2026-09-05
 source: user-confirmed
 ---
 
 # Cross-platform development workflow
+
+Superseded by [Validation profiles](validation-profiles.md).
 
 ## Context
 

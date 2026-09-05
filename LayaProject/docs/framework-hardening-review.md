@@ -30,7 +30,7 @@ Skill 对实施的影响：领域 Skill 约束原生 API 与 owner 顺序；sdd-
 
 ## 本机验证
 
-- 最终 `npm run verify` 全部通过：24 个测试文件、147 项测试；两个 TypeScript 配置；架构、资产、表生成、Skills、记忆与 431 个 managed files 的发行契约检查。
+- 最终完整发布验收（现为 `npm run verify:release`）全部通过：24 个测试文件、147 项测试；两个 TypeScript 配置；架构、资产、表生成、Skills、记忆与 431 个 managed files 的发行契约检查。
 - 27 份引擎 TypeScript 与官方 v3.4.1 commit `f368b43098fe6bde7b961546114e71907c5f8a98` 哈希匹配；新增的 5 份先与官方原文核对，再加入基线。
 - 一次原地 CLI 发布构建成功，Headless Chromium + SwiftShader 真包通过，无项目复制、IDE 或可见浏览器。
 - HTTP 201/202/204/205、HEAD、JSON/二进制、响应校验、timeout/abort 探针通过。一次有效统计样本：2D drawCalls=1，triangles=137，GPU driver=4,465,643 bytes；Resource CPU=0，仅为该账面计量，不代表无 CPU 内存。

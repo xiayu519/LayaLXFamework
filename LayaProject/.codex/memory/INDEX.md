@@ -32,7 +32,8 @@
 - [Data pipelines v3](decisions/data-pipelines-v3.md)：已被游戏级生成路径的新版本替代。
 - [Data pipelines v4](decisions/data-pipelines-v4.md)：JSON/Tables 分离，Luban 输出由当前游戏配置指定。
 - [Game workflow layering](decisions/game-workflow-layering.md)：游戏目录追加独立 AGENTS/Skills，并从该目录启动以叠加公共工作流。
-- [Cross-platform development workflow](decisions/cross-platform-development-workflow.md)：Windows/macOS 共用框架和工作流，系统差异只由工具内部适配。
+- [Cross-platform development workflow](decisions/cross-platform-development-workflow.md)：旧的每次双平台完整 CI，已由分层验证策略替代。
+- [Validation profiles](decisions/validation-profiles.md)：日常使用无 Laya CLI 快速门禁，领域与双平台发布验证按风险显式升级。
 - [Laya resource package layout](decisions/resource-package-layout.md)：已被 framework/game 启动作用域的新版本替代。
 - [Laya resource package layout v2](decisions/resource-package-layout-v2.md)：bootstrap 拆分框架与游戏所有权，功能包仍按依赖边界组织。
 - [Framework distribution ownership](decisions/framework-distribution-ownership.md)：旧 Tag-only 同步决定，已由双轨发行模式替代。
@@ -42,7 +43,7 @@
 
 ## Feedback
 
-- [Workflow push gates](feedback/workflow-push-gates.md)：工作流改动推送前运行本地 CLI 语义回归；GitHub CI 不调用模型或要求 API key。
+- [Workflow push gates](feedback/workflow-push-gates.md)：语义输入改动才运行一次本地 CLI 回归；普通工作流只跑确定性门禁。
 - [Source-first Laya design](feedback/source-first-laya-design.md)：公共模块必须先审查固定版本源码，禁止重复造引擎轮子。
 - [In-place Headless validation](feedback/in-place-headless-validation.md)：验证必须在当前项目原地纯 Headless 执行。
 - [Semantic Skill routing](feedback/semantic-skill-routing.md)：业务请求按语义触发窄 Skill，不在 `AGENTS.md` 写死路由。

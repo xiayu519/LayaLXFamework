@@ -1,6 +1,17 @@
 import { spawn } from "node:child_process";
 
-const staticChecks = [
+const fastChecks = [
+    "check:project",
+    "check:framework-integrity",
+    "typecheck",
+    "test:unit",
+    "check:architecture",
+    "validate:assets",
+    "validate:content-assets",
+    "validate:resource-layout",
+    "validate:performance",
+];
+const releaseChecks = [
     "check:framework-integrity",
     "tables:check",
     "typecheck",
@@ -15,10 +26,18 @@ const staticChecks = [
     "check:skills",
     "check:memory",
 ];
+const profiles = {
+    fast: { checks: fastChecks, doctor: false, headless: false },
+    release: { checks: releaseChecks, doctor: true, headless: true },
+};
+const profileName = readProfile(process.argv.slice(2));
+const profile = profiles[profileName];
 const npmCli = process.env.npm_execpath;
 if (!npmCli) {
-    throw new Error("npm_execpath is missing; run verification through 'npm run verify'.");
+    throw new Error("npm_execpath is missing; run verification through an npm script.");
 }
+
+console.log(`[verify] profile=${profileName}; max-concurrency=3`);
 
 function run(check) {
     console.log(`[verify] start npm run ${check}`);
@@ -68,26 +87,53 @@ function report(result) {
     console.log(`[verify] ${result.check}: ${result.status === 0 ? "passed" : "failed"}`);
 }
 
-const doctor = await run("doctor");
-report(doctor);
-if (doctor.status !== 0) {
-    process.exit(doctor.status);
+if (profile.doctor) {
+    const doctor = await run("doctor");
+    report(doctor);
+    if (doctor.status !== 0) {
+        process.exit(doctor.status);
+    }
 }
 
-const staticResults = await Promise.all(staticChecks.map(run));
-for (const result of staticResults) {
+const results = await runLimited(profile.checks, 3);
+for (const result of results) {
     report(result);
 }
-const staticFailure = staticResults.find((result) => result.status !== 0);
-if (staticFailure) {
-    console.error("[verify] Headless release check skipped because a static check failed.");
-    process.exit(staticFailure.status);
+const failure = results.find((result) => result.status !== 0);
+if (failure) {
+    if (profile.headless) {
+        console.error("[verify] Headless release check skipped because a prerequisite failed.");
+    }
+    process.exit(failure.status);
 }
 
-const headless = await run("test:headless");
-report(headless);
-if (headless.status !== 0) {
-    process.exit(headless.status);
+if (profile.headless) {
+    const headless = await run("test:headless");
+    report(headless);
+    if (headless.status !== 0) {
+        process.exit(headless.status);
+    }
 }
 
-console.log("\n[verify] all checks passed.");
+console.log(`\n[verify] ${profileName} profile passed.`);
+
+async function runLimited(checks, limit) {
+    const results = new Array(checks.length);
+    let next = 0;
+    async function worker() {
+        while (next < checks.length) {
+            const index = next;
+            next += 1;
+            results[index] = await run(checks[index]);
+        }
+    }
+    await Promise.all(Array.from({ length: Math.min(limit, checks.length) }, worker));
+    return results;
+}
+
+function readProfile(args) {
+    if (args.length !== 2 || args[0] !== "--profile" || !(args[1] in profiles)) {
+        throw new Error("Usage: node tools/verify.mjs --profile <fast|release>");
+    }
+    return args[1];
+}
