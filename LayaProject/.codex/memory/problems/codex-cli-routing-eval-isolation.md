@@ -3,8 +3,8 @@ type: problem
 scope: codex-workflow
 description: 旧 Codex CLI 会因模型缓存 schema 不兼容失败，全局插件还会截短项目 Skill 描述并显著增加输入 token。
 trigger: 语义路由 eval 出现 base_instructions、MCP 启动错误、Skill description truncated 或异常高输入 token 时。
-status: active
-last_verified: 2026-09-04
+status: superseded
+last_verified: 2026-09-05
 source: code-verified
 ---
 
@@ -21,3 +21,7 @@ source: code-verified
 ## Verification
 
 14 个 case 全部精确匹配，单次评测为 13,588 input、537 output、333 reasoning tokens；项目未复制，未启动可见窗口。
+
+## Superseded by
+
+[Codex routing eval isolation v2](codex-routing-eval-isolation-v2.md) 以跨平台 Node 执行器替代 PowerShell 包装。

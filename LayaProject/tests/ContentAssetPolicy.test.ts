@@ -1,6 +1,6 @@
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
     readImageDimensions,
@@ -12,9 +12,10 @@ import {
 const fixtureRoots: string[] = [];
 
 afterEach(() => {
-    const tempRoot = `${resolve(tmpdir())}\\`;
+    const tempRoot = resolve(tmpdir());
     for (const fixture of fixtureRoots.splice(0)) {
-        if (!`${resolve(fixture)}\\`.startsWith(tempRoot)) {
+        const local = relative(tempRoot, resolve(fixture));
+        if (!local || local === ".." || local.startsWith(`..${sep}`) || isAbsolute(local)) {
             throw new Error(`Refusing unsafe fixture cleanup: ${fixture}`);
         }
         rmSync(fixture, { recursive: true, force: true });

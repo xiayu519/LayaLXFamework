@@ -7,11 +7,9 @@ import { LAYA_VERSION, resolveLayaRuntime } from "./layaair.mjs";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const errors = [];
-const defaultIdeRoot = "D:\\Soft\\Laya\\LayaAirIDE";
-const ideRoot = process.env.LAYAAIR_IDE_HOME
-    ? resolve(process.env.LAYAAIR_IDE_HOME)
-    : (existsSync(defaultIdeRoot) ? defaultIdeRoot : undefined);
+const ideRoot = resolveIdeRoot();
 let verifiedIdeRoot;
+let verifiedCliRoot;
 
 function readJson(path) {
     try {
@@ -91,6 +89,7 @@ if (typescriptPackage.version !== "5.9.3") {
 
 try {
     const runtime = resolveLayaRuntime();
+    verifiedCliRoot = runtime.runtimeRoot;
     const engine = readJson(join(runtime.runtimeRoot, "Resources", "engine.json"));
     const coreLib = join(runtime.runtimeRoot, "Resources", "engine", "libs", "laya.core.js");
     const webgl2DLib = join(runtime.runtimeRoot, "Resources", "engine", "libs", "laya.webgl_2D.js");
@@ -108,9 +107,10 @@ try {
         }
     }
     if (ideRoot) {
-        const ideExecutable = join(ideRoot, "LayaAirIDE.exe");
-        const ideCoreLib = join(ideRoot, "resources", "engine", "libs", "laya.core.js");
-        const ideTypes = join(ideRoot, "resources", "engine", "types", "LayaAir.d.ts");
+        const ideLayout = resolveIdeLayout(ideRoot);
+        const ideExecutable = ideLayout.executable;
+        const ideCoreLib = join(ideLayout.resources, "engine", "libs", "laya.core.js");
+        const ideTypes = join(ideLayout.resources, "engine", "types", "LayaAir.d.ts");
         const cliTypes = join(runtime.runtimeRoot, "Resources", "engine", "types", "LayaAir.d.ts");
         const projectTypes = join(projectRoot, "engine", "types", "LayaAir.d.ts");
         if (!existsSync(ideExecutable) || !existsSync(ideCoreLib) || !existsSync(ideTypes)) {
@@ -185,8 +185,40 @@ if (errors.length > 0) {
     process.exitCode = 1;
 } else {
     console.log(`Doctor OK: Node ${process.versions.node}, LayaAir ${LAYA_VERSION}, ui2, TypeScript 5.9.3.`);
-    console.log(`CLI runtime: ${join(homedir(), ".layaair", LAYA_VERSION)}`);
+    console.log(`CLI runtime: ${verifiedCliRoot}`);
     if (verifiedIdeRoot) {
         console.log(`IDE runtime: ${verifiedIdeRoot}`);
     }
+}
+
+function resolveIdeRoot() {
+    if (process.env.LAYAAIR_IDE_HOME) {
+        return resolve(process.env.LAYAAIR_IDE_HOME);
+    }
+    const candidates = process.platform === "win32"
+        ? [
+            "D:\\Soft\\Laya\\LayaAirIDE",
+            process.env.ProgramFiles ? join(process.env.ProgramFiles, "LayaAirIDE") : undefined,
+            process.env.LOCALAPPDATA ? join(process.env.LOCALAPPDATA, "Programs", "LayaAirIDE") : undefined,
+        ]
+        : process.platform === "darwin"
+            ? [
+                "/Applications/LayaAirIDE.app",
+                join(homedir(), "Applications", "LayaAirIDE.app"),
+            ]
+            : [];
+    return candidates.filter(Boolean).find((candidate) => existsSync(candidate));
+}
+
+function resolveIdeLayout(root) {
+    if (process.platform === "darwin" || root.endsWith(".app")) {
+        return {
+            executable: join(root, "Contents", "MacOS", "LayaAirIDE"),
+            resources: join(root, "Contents", "Resources"),
+        };
+    }
+    return {
+        executable: join(root, "LayaAirIDE.exe"),
+        resources: join(root, "resources"),
+    };
 }

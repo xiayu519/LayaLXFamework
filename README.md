@@ -6,8 +6,9 @@ LayaLXFamework 是基于 **LayaAir 3.4.1** 的 2D 游戏客户端框架，面向
 
 ## 环境与打开方式
 
-- Windows 10/11
+- Windows 10/11 或 macOS
 - LayaAirIDE 3.4.1
+- LayaAir CLI 3.4.1
 - Node.js 20+
 - .NET 8 Runtime
 - Edge、Chrome 或 Chromium
@@ -16,11 +17,13 @@ LayaAir 工程位于 `LayaProject/`。使用 LayaAirIDE 打开该目录或 `Laya
 
 首次拉取后执行：
 
-```powershell
+```shell
 cd LayaProject
 npm ci
 npm run doctor
 ```
+
+Windows 与 macOS 使用相同命令。非标准安装位置可通过 `LAYAAIR_INSTALL_DIR`、`LAYAAIR_IDE_HOME` 或 `BROWSER_PATH` 指定；`LAYAAIR_IDE_HOME` 在 macOS 指向 `LayaAirIDE.app`。
 
 ## 目录
 
@@ -177,7 +180,7 @@ LX.Config.release("map.level-001");
 
 修改 `Design/Tables/*.xlsx` 后执行：
 
-```powershell
+```shell
 cd LayaProject
 npm run tables:generate
 npm run tables:check
@@ -275,7 +278,7 @@ LX.Performance.assertBudget({
 
 日常开发可以按改动范围执行 `typecheck`、`test` 和对应资产检查；交付前统一运行：
 
-```powershell
+```shell
 cd LayaProject
 npm run verify
 ```
@@ -284,7 +287,7 @@ npm run verify
 
 ## 开始新游戏
 
-```powershell
+```shell
 cd LayaProject
 npm run game:create -- --id my-game
 ```

@@ -1,3 +1,6 @@
+* text=auto eol=lf
+*.bat text eol=crlf
+
 *.xlsx binary
 *.bin binary
 *.dll binary

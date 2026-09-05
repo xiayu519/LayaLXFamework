@@ -8,7 +8,7 @@ import {
     statSync,
 } from "node:fs";
 import { createServer } from "node:http";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { dirname, extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -399,17 +399,29 @@ async function runEngineLifecycleProbes(cdp) {
 
 function findBrowser() {
     const candidates = [
+        process.env.BROWSER_PATH,
         process.env.EDGE_PATH,
-        "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
-        "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
-        "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-        "/usr/bin/microsoft-edge",
-        "/usr/bin/google-chrome",
-        "/usr/bin/chromium",
+        ...(process.platform === "win32" ? [
+            "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+            "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
+            "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+        ] : []),
+        ...(process.platform === "darwin" ? [
+            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+            "/Applications/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing",
+            "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+            "/Applications/Chromium.app/Contents/MacOS/Chromium",
+            join(homedir(), "Applications", "Google Chrome.app", "Contents", "MacOS", "Google Chrome"),
+        ] : []),
+        ...(process.platform === "linux" ? [
+            "/usr/bin/microsoft-edge",
+            "/usr/bin/google-chrome",
+            "/usr/bin/chromium",
+        ] : []),
     ].filter(Boolean);
     const path = candidates.find((candidate) => existsSync(candidate));
     if (!path) {
-        throw new Error("Edge/Chrome/Chromium was not found. Set EDGE_PATH to a Chromium browser executable.");
+        throw new Error("Edge/Chrome/Chromium was not found. Set BROWSER_PATH to a Chromium browser executable.");
     }
     return path;
 }

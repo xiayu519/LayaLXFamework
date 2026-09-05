@@ -1,4 +1,4 @@
-name: Static validation
+name: Cross-platform validation
 
 on:
   push:
@@ -6,7 +6,12 @@ on:
 
 jobs:
   validate:
-    runs-on: windows-latest
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
     defaults:
       run:
         working-directory: LayaProject
@@ -23,20 +28,26 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: "8.0.x"
-      - name: Install LayaAir CLI 3.4.1
+      - name: Cache LayaAir CLI 3.4.1
+        uses: actions/cache@v5
+        with:
+          path: ~/.layaair
+          key: layaair-cli-${{ runner.os }}-${{ runner.arch }}-3.4.1-a46451e
+      - name: Install LayaAir CLI 3.4.1 on Windows
+        if: runner.os == 'Windows'
         shell: pwsh
         run: |
           Invoke-RestMethod https://raw.githubusercontent.com/layabox/layaair-cli/a46451e060fa9f5dcb6537a71074b44eaf6a3d36/install.ps1 | Invoke-Expression
-          & "$env:USERPROFILE\.layaair\layaair.cmd" install 3.4.1
+          if (!(Test-Path "$env:USERPROFILE\.layaair\3.4.1\Resources\cli-main.js")) {
+            & "$env:USERPROFILE\.layaair\layaair.cmd" install 3.4.1
+          }
+      - name: Install LayaAir CLI 3.4.1 on macOS
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/layabox/layaair-cli/a46451e060fa9f5dcb6537a71074b44eaf6a3d36/install.sh | bash
+          if [ ! -f "$HOME/.layaair/3.4.1/Resources/cli-main.js" ]; then
+            "$HOME/.layaair/layaair" install 3.4.1
+          fi
       - run: npm ci
-      - run: npm run tables:check
-      - run: npm run typecheck
-      - run: npm test
-      - run: npm run check:architecture
-      - run: npm run validate:assets
-      - run: npm run validate:content-assets
-      - run: npm run validate:resource-layout
-      - run: npm run validate:performance
-      - run: npm run validate:game-workflow
-      - run: npm run check:skills
-      - run: npm run check:memory
+      - run: npm run verify

@@ -6,8 +6,14 @@ import { spawnSync } from "node:child_process";
 
 export const LAYA_VERSION = "3.4.1";
 
+export function resolveLayaInstallRoot() {
+    return process.env.LAYAAIR_INSTALL_DIR
+        ? resolve(process.env.LAYAAIR_INSTALL_DIR)
+        : join(homedir(), ".layaair");
+}
+
 export function resolveLayaRuntime() {
-    const installRoot = join(homedir(), ".layaair");
+    const installRoot = resolveLayaInstallRoot();
     const versionsFile = join(installRoot, "versions.json");
     if (!existsSync(versionsFile)) {
         throw new Error(`LayaAir CLI is not installed: ${versionsFile}`);

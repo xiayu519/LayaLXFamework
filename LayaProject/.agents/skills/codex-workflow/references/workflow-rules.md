@@ -15,6 +15,7 @@
 - 不使用关键词表或硬编码路由；以代表性语义 eval 验证 description。
 - 主线和质量门禁为 `gpt-5.6-sol/high`。明确、低风险小任务可用 `sol/medium` 或 `terra/medium`，公共契约与最终验收不降级。
 - 静态检查可并行；一次完整发布验证足够，不重复无相关变化的通过项。
+- 工具默认使用 Node 跨平台 API 和 `node:path`；系统路径、可执行文件及安装命令必须按平台显式发现，不能让业务或 Skill 使用方式分叉。
 
 ## Collaboration
 
@@ -22,6 +23,7 @@
 - 公共候选先证明跨业务复用、稳定语义、Laya 无等价能力、失败边界与验证；否则留在 game。
 - 新游戏用 `src/game/<game-id>/AGENTS.md` 与该目录 `.agents/skills/` 追加专属规则；从游戏目录启动时，AGENTS 从根向下叠加，公共与游戏 Skills 从当前目录向根同时发现。根目录启动不加载游戏层。
 - 游戏层不复制公共规则且 Skill 不与公共层重名；生成与发现规则由 `npm run validate:game-workflow` 检查。
+- Windows/macOS 兼容结论必须来自双平台 CI；每个平台原地构建一次并执行同一 Headless 验收，不能用静态推断替代。
 - Git 操作仅在开发者明确要求时执行。
 
 ## References

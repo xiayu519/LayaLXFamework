@@ -4,7 +4,7 @@
 
 Git 仓库根目录是 `LayaLXFamework`，LayaAir 项目与完整 Codex 工作流位于 `LayaProject`。克隆后从项目目录启动 Codex：
 
-```powershell
+```shell
 cd LayaProject
 npm ci
 npm run doctor
@@ -12,7 +12,7 @@ npm run doctor
 
 框架任务从 `LayaProject` 启动。创建具体游戏时执行：
 
-```powershell
+```shell
 npm run game:create -- --id my-game
 codex --cd src/game/my-game
 ```
@@ -49,13 +49,15 @@ Codex 对两类文件采用不同的官方发现顺序：`AGENTS.md` 从 Git 根
 
 除非开发者明确要求 GUI，验证始终在当前 `LayaProject` 原地、纯 Headless 执行；不复制项目，不启动 LayaAirIDE 或可见浏览器。
 
-```powershell
+```shell
 npm run verify
 ```
 
 修改 Luban 表后先运行 `npm run tables:generate`；CI/交付的 `tables:check` 会在系统临时目录重生成并逐字节检查陈旧输出，不复制 Laya 项目。普通 JSON 与 Luban 无关，由 `LX.Config` 使用原生 `Loader.JSON` 加载并读取 `TextResource.data`；生成表只通过 `LX.Tables` 访问。
 
 完整验证先检查环境，再并行运行 Tables 复现、类型、单测、架构、资产、资源分包、性能契约、游戏工作流、Skill 和记忆检查，全部通过后只构建一次，并由 Headless Chromium + SwiftShader 检查真实 LayaAir 3.4.1 2D 发布包。已通过且没有相关文件变化的检查不重复执行。
+
+Windows 与 macOS 共用同一套 AGENTS、Skills 和 npm 命令；平台差异只由工具内部的可执行文件发现处理，双平台 CI 分别执行完整 `npm run verify`。
 
 真实商店、小游戏容器或 Native 签名等无法由 Headless 证明的行为应列为未验证项，不自动切换到 GUI。
 

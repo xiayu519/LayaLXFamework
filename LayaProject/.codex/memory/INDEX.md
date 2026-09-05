@@ -4,7 +4,8 @@
 
 ## Problems
 
-- [Codex CLI routing eval isolation](problems/codex-cli-routing-eval-isolation.md)：旧 CLI 模型缓存与全局插件会破坏或膨胀语义路由评测。
+- [Codex CLI routing eval isolation](problems/codex-cli-routing-eval-isolation.md)：旧 PowerShell 评测入口，已由跨平台版本替代。
+- [Codex routing eval isolation v2](problems/codex-routing-eval-isolation-v2.md)：固定 Codex CLI 由 Node 跨平台隔离执行并检查 token 预算。
 - [Laya Loader.BUFFER TextResource](problems/laya-buffer-text-resource.md)：LayaAir 3.4 二进制加载结果需从 `TextResource.data` 取出。
 - [Laya Loader group membership persists](problems/laya-loader-group-membership-persists.md)：group 清理不会移除 URL 成员；旧 ResourcePolicy 规避方案已被原生资源边界替代。
 - [ui2 default skins in bootstrap](problems/ui2-default-skins-in-bootstrap.md)：关闭默认皮肤开关后仍需清空组件引用，防止 `internal/UI` 扩大首包。
@@ -23,6 +24,7 @@
 - [Luban source of truth v2](decisions/luban-source-of-truth-v2.md)：已被 JSON/Tables 分离的新版本替代。
 - [Data pipelines v3](decisions/data-pipelines-v3.md)：普通 JSON 与 Luban Tables 分离，分别由 `LX.Config` 和 `LX.Tables` 管理。
 - [Game workflow layering](decisions/game-workflow-layering.md)：游戏目录追加独立 AGENTS/Skills，并从该目录启动以叠加公共工作流。
+- [Cross-platform development workflow](decisions/cross-platform-development-workflow.md)：Windows/macOS 共用框架和工作流，系统差异只由工具内部适配。
 - [Laya resource package layout](decisions/resource-package-layout.md)：以首次可交互为 bootstrap 边界，按功能包组织完整资源依赖。
 - [Content asset import policy](decisions/content-asset-import-policy.md)：图片、音频和 Spine 使用固定可执行导入规格与精确例外。
 - [HTTP retry idempotency](decisions/http-retry-idempotency.md)：默认不重试；只有幂等请求可进行有限瞬时失败重试。

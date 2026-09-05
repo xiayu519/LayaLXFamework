@@ -36,7 +36,7 @@ GPU 压缩由 Laya 发布转换生成，不提交 `.ktx/.dds/.pvr` 源文件。�
 
 例外必须精确到 `assets/` 相对路径，不能用目录通配掩盖新资产。修改资产至少运行：
 
-```powershell
+```shell
 npm run validate:assets
 npm run validate:content-assets
 npm run validate:resource-layout
