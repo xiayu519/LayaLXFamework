@@ -21,8 +21,9 @@ const toolRoot = join(designRoot, "tools");
 const lubanDll = join(toolRoot, "Luban", "Luban.dll");
 const configuration = join(toolRoot, "luban.conf");
 const pinnedVersion = readFileSync(join(toolRoot, "LUBAN_VERSION"), "utf8").trim();
-const codeDestination = join(projectRoot, "src", "game", "generated", "tables");
-const dataDestination = join(projectRoot, "assets", "bootstrap", "tables", "game");
+const gameProject = readGameProject();
+const codeDestination = resolveProjectPath(gameProject.luban.codeDestination, "luban.codeDestination");
+const dataDestination = resolveProjectPath(gameProject.luban.dataDestination, "luban.dataDestination");
 const mode = process.argv[2] ?? "validate";
 
 if (!["generate", "check", "validate"].includes(mode)) {
@@ -39,6 +40,28 @@ const temporaryRoot = resolve(tmpdir());
 const outputRoot = mkdtempSync(join(temporaryRoot, "lx-luban-"));
 if (!outputRoot.startsWith(`${temporaryRoot}${sep}`)) {
     throw new Error(`Luban output escaped the temporary directory: ${outputRoot}`);
+}
+
+function readGameProject() {
+    const path = join(projectRoot, "settings", "GameProject.json");
+    const value = JSON.parse(readFileSync(path, "utf8"));
+    if (value?.schemaVersion !== 1
+        || typeof value?.gameId !== "string"
+        || !/^[a-z][a-z0-9-]*$/.test(value.gameId)
+        || typeof value?.luban?.runtimeSupport !== "string"
+        || typeof value?.luban?.codeDestination !== "string"
+        || typeof value?.luban?.dataDestination !== "string") {
+        throw new Error("settings/GameProject.json has an invalid game or Luban destination contract.");
+    }
+    return value;
+}
+
+function resolveProjectPath(local, label) {
+    const path = resolve(projectRoot, local);
+    if (!path.startsWith(`${projectRoot}${sep}`)) {
+        throw new Error(`settings/GameProject.json ${label} escaped LayaProject: ${local}`);
+    }
+    return path;
 }
 
 try {

@@ -66,6 +66,11 @@
       "expected": ["codex-workflow", "sdd-explore"]
     },
     {
+      "id": "framework_consumer_sync",
+      "request": "把下游游戏仓库从锁定的 LayaLXFamework v0.1.0 同步到上游已发布的 v0.2.0，并检查 framework manifest、lock 和 CI 完整性。",
+      "expected": ["framework-sync"]
+    },
+    {
       "id": "memory_feedback",
       "request": "查找以前关于 Headless 验收的开发者纠正，并把这次验证过的新踩坑沉淀到项目记忆。",
       "expected": ["project-memory"]

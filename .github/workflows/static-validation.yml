@@ -50,6 +50,7 @@ jobs:
             "$HOME/.layaair/layaair" install 3.4.1
           fi
       - run: npm ci
+      - run: npm run check:framework-upstream
       - name: Verify Design table command on Windows
         if: runner.os == 'Windows'
         shell: cmd

@@ -29,11 +29,12 @@ LayaLXFamework/
 ├─ Design/Tables/                 Luban Excel 人工源
 ├─ Design/tools/                  固定 Luban 工具
 └─ LayaProject/
-   ├─ assets/bootstrap/           启动资源
+   ├─ assets/bootstrap/framework/ 上游只读启动资源
+   ├─ assets/bootstrap/game/      当前游戏启动资源
    ├─ assets/packages/<feature>/  按功能组织的延迟资源
    ├─ assets/shared/<domain>/     跨功能共享资源
    ├─ src/framework/              公共框架
-   ├─ src/game/                   游戏业务和组装
+   ├─ src/game/<game-id>/         游戏业务、规则和记忆
    ├─ settings/                   构建与检查配置
    ├─ tests/                      单元测试
    └─ docs/                       详细技术文档
@@ -288,4 +289,6 @@ cd LayaProject
 npm run game:create -- --id my-game
 ```
 
-业务脚本放入 `src/game/my-game/`，资源按功能放入 `assets/packages/<feature>/`。使用 Codex 时的入口和规则见 [Codex 工作流](Books/LXFamework-Codex-Workflow.md)。
+该命令只创建游戏所有的脚本、AGENTS、Skills 和记忆空间。业务脚本放入 `src/game/my-game/`，资源按功能放入 `assets/packages/<feature>/`；随后由游戏维护 `src/game/bootstrap/createApplication.ts`、`settings/GameProject.json` 和 `settings/HeadlessValidation.json`。使用 Codex 时的入口和规则见 [Codex 工作流](Books/LXFamework-Codex-Workflow.md)。
+
+实际游戏作为下游仓库时只按发布 Tag 同步公共框架，目录归属和命令见 [框架发行与下游同步](LayaProject/docs/framework-distribution.md)。

@@ -6,6 +6,10 @@
     "shared": "shared",
     "library": "library"
   },
+  "bootstrapScopes": {
+    "framework": "framework",
+    "game": "game"
+  },
   "assetTypes": [
     "scenes",
     "ui",
@@ -25,8 +29,8 @@
     "levels",
     "tables"
   ],
-  "startupScene": "bootstrap/scenes/Startup.ls",
-  "startupUI": "bootstrap/ui/FrameworkStatus.lh",
-  "tipUI": "bootstrap/ui/common/Tip.lh",
-  "generatedTables": "bootstrap/tables/game"
+  "startupScene": "bootstrap/framework/scenes/Startup.ls",
+  "startupUI": "bootstrap/game/ui/FrameworkStatus.lh",
+  "tipUI": "bootstrap/framework/ui/Tip.lh",
+  "generatedTables": "bootstrap/game/tables"
 }

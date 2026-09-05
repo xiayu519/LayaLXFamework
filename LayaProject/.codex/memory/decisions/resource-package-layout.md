@@ -3,12 +3,14 @@ type: decision
 scope: laya-resource-packaging
 description: Laya 资源按 bootstrap、功能包、共享包和开发素材分层；功能内部再按类型组织，以首次可交互为首包边界。
 trigger: 新建或移动 Scene、UI、Prefab、Spine、音频、数据资源，或配置小游戏分包时
-status: active
-last_verified: 2026-09-04
+status: superseded
+last_verified: 2026-09-05
 source: user-confirmed
 ---
 
 # Laya resource package layout
+
+已由 [Laya resource package layout v2](resource-package-layout-v2.md) 替代；新版本拆分 framework/game 启动资源所有权。
 
 ## Decision
 

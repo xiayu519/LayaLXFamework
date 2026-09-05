@@ -3,7 +3,7 @@ type: decision
 scope: game-data
 description: 普通或编辑器 JSON 与 Luban Tables 是独立数据链，分别由 LX.Config 和 LX.Tables 管理。
 trigger: 接入 JSON、地图数据、Luban 表，或修改数据目录、加载入口和释放策略时
-status: active
+status: superseded
 last_verified: 2026-09-05
 source: user-confirmed
 ---
@@ -11,6 +11,8 @@ source: user-confirmed
 # Data pipelines v3
 
 替代 [Luban source of truth v2](luban-source-of-truth-v2.md)。
+
+已由 [Data pipelines v4](data-pipelines-v4.md) 替代；新版本把生成位置放入游戏配置，并采用独立 game bootstrap 作用域。
 
 ## Decision
 

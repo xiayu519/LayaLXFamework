@@ -28,6 +28,7 @@ const frameworkAccessFromGame = {
 };
 const mainPath = join(sourceRoot, "Main.ts");
 const lxPath = join(sourceRoot, "framework", "LX.ts");
+const gameCompositionBridgePath = join(sourceRoot, "game", "bootstrap", "createApplication.ts");
 const runtimeHostPath = join(sourceRoot, "framework", "bootstrap", "LXRuntimeHost");
 const runtimeHostCallers = new Set([
     lxPath,
@@ -143,10 +144,15 @@ for (const file of sourceFiles) {
 
         if (sourceLocation.scope === targetLocation.scope) {
             if (sourceLocation.scope === "game" && sourceLocation.gameId !== targetLocation.gameId) {
-                failures.push(
-                    `${localPath(file)}: game '${sourceLocation.gameId}' cannot import game '${targetLocation.gameId}' (${specifier}).`,
-                );
-                continue;
+                const isCompositionBridge = file === gameCompositionBridgePath
+                    && sourceLocation.gameId === "legacy"
+                    && sourceLocation.layer === "bootstrap";
+                if (!isCompositionBridge) {
+                    failures.push(
+                        `${localPath(file)}: game '${sourceLocation.gameId}' cannot import game '${targetLocation.gameId}' (${specifier}).`,
+                    );
+                    continue;
+                }
             }
             const allowed = layerDependencies[sourceLocation.layer];
             if (allowed && !allowed.has(targetLocation.layer)) {

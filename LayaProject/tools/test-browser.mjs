@@ -16,6 +16,7 @@ import { WebSocket } from "ws";
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const releaseRoot = join(projectRoot, "release", "web");
 const performanceSettings = JSON.parse(readFileSync(join(projectRoot, "settings", "PerformanceBudgets.json"), "utf8"));
+const headlessValidation = JSON.parse(readFileSync(join(projectRoot, "settings", "HeadlessValidation.json"), "utf8"));
 const headlessProfile = performanceSettings.profiles[performanceSettings.headless.profile];
 const startupRenderBudget = headlessProfile.scenes[performanceSettings.headless.scene];
 const temporaryRoot = resolve(tmpdir());
@@ -151,20 +152,23 @@ try {
         || !runtimeState.uiReady
         || !runtimeState.configReady
         || !runtimeState.tablesReady
-        || runtimeState.configValue !== "LXFamework"
-        || runtimeState.tableValue !== "LXFamework"
+        || (headlessValidation.runtimeConfig
+            && runtimeState.configValue !== headlessValidation.runtimeConfig.expected)
+        || (headlessValidation.tables
+            && runtimeState.tableValue !== headlessValidation.tables.expected)
         || !runtimeState.spineReady
         || runtimeState.spineVersion !== "4.2"
         || !runtimeState.performanceReady
         || !runtimeState.ownershipReady
-        || runtimeState.statusText !== "READY"
+        || (headlessValidation.status
+            && runtimeState.statusText !== headlessValidation.status.expected)
         || runtimeState.engineVersion !== "3.4.1"
         || runtimeState.has3D
     ) {
         throw new Error(`unexpected runtime state: ${JSON.stringify(runtimeState)}`);
     }
-    if (!consoleLines.some((line) => line.includes("[LX] READY"))) {
-        throw new Error(`missing '[LX] READY' console marker (${consoleLines.join(" | ")})`);
+    if (!consoleLines.some((line) => line.includes(headlessValidation.readyConsole))) {
+        throw new Error(`missing '${headlessValidation.readyConsole}' console marker (${consoleLines.join(" | ")})`);
     }
     if (consoleErrors.length > 0 || runtimeErrors.length > 0 || failedRequests.length > 0) {
         throw new Error(`browser errors: ${consoleErrors.concat(runtimeErrors, failedRequests).join(" | ")}`);
@@ -172,6 +176,7 @@ try {
     await runEngineLifecycleProbes(cdp);
     const shutdown = await cdp.send("Runtime.evaluate", {
         expression: `(async () => {
+            const validation = ${JSON.stringify(headlessValidation)};
             const services = {
                 config: globalThis.LX.Config,
                 tables: globalThis.LX.Tables,
@@ -194,8 +199,12 @@ try {
                 managedUI: services.ui.snapshot().managed.length,
                 pools: services.pool.snapshot().length,
                 sfx: services.audio.snapshot().activeSfx,
-                configCached: Boolean(globalThis.Laya.loader.getRes("bootstrap/config/runtime.json")),
-                tablesCached: Boolean(globalThis.Laya.loader.getRes("bootstrap/tables/game/tbtableappconfig.bin")),
+                configCached: validation.runtimeConfig
+                    ? Boolean(globalThis.Laya.loader.getRes(validation.runtimeConfig.url))
+                    : false,
+                tablesCached: validation.tables
+                    ? Boolean(globalThis.Laya.loader.getRes(validation.tables.url))
+                    : false,
             };
         })()`,
         awaitPromise: true,
@@ -233,6 +242,7 @@ try {
 async function runEngineLifecycleProbes(cdp) {
     const evaluation = await cdp.send("Runtime.evaluate", {
         expression: `(async () => {
+            const validation = ${JSON.stringify(headlessValidation)};
             const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
             const waitUntil = async (predicate, timeoutMs, label) => {
                 const deadline = performance.now() + timeoutMs;
@@ -291,7 +301,7 @@ async function runEngineLifecycleProbes(cdp) {
             const poolId = "__lx_headless_prefab";
             globalThis.LX.Pool.register({
                 id: poolId,
-                url: "bootstrap/ui/FrameworkStatus.lh",
+                url: validation.uiProbe.prefabUrl,
                 maxIdle: 1,
                 maxActive: 1,
             });
@@ -354,23 +364,20 @@ async function runEngineLifecycleProbes(cdp) {
             );
 
             const statusInfo = globalThis.LX.UI.snapshot().managed
-                .find((entry) => entry.routeId === "lx.status");
+                .find((entry) => entry.routeId === validation.uiProbe.baseRouteId);
             if (!statusInfo) throw new Error("Status window was not available for the UI probe.");
             const ProbeWindow = class extends statusInfo.window.constructor {};
             const routeId = "__lx_headless_modal";
             globalThis.LX.UI.register({
                 id: routeId,
-                url: "bootstrap/ui/FrameworkStatus.lh",
+                url: validation.uiProbe.prefabUrl,
                 layer: 3,
                 modal: true,
                 multiplicity: "multiple",
                 retention: "destroy",
                 create: (pane) => new ProbeWindow(pane),
             });
-            const popup = await globalThis.LX.UI.show(routeId, {
-                status: "PROBE",
-                detail: "Headless lifecycle probe",
-            });
+            const popup = await globalThis.LX.UI.show(routeId, validation.uiProbe.args);
             await delay(40);
             const root = globalThis.Laya.GRoot.inst;
             const modalLayer = root.modalLayer;
@@ -571,9 +578,10 @@ async function waitForRuntime(cdp, timeoutMs) {
     while (Date.now() < deadline) {
         const evaluation = await cdp.send("Runtime.evaluate", {
             expression: `(() => {
+                const validation = ${JSON.stringify(headlessValidation)};
                 const findStatusText = (node, depth = 0) => {
                     if (!node || depth > 8) return null;
-                    if (node.name === "statusText") return node.text ?? null;
+                    if (validation.status && node.name === validation.status.childName) return node.text ?? null;
                     if (node.contentPane && node.contentPane !== node) {
                         const result = findStatusText(node.contentPane, depth + 1);
                         if (result !== null) return result;
@@ -590,24 +598,29 @@ async function waitForRuntime(cdp, timeoutMs) {
                     ?.getComponent?.(globalThis.Laya?.Script);
                 const statusText = findStatusText(globalThis.Laya?.GRoot?.inst);
                 const ready = globalThis.LX?.Ready === true;
-                const configReady = ready && globalThis.LX.Config.ready === true;
-                const tablesReady = ready && globalThis.LX.Tables.ready === true;
-                const configValue = configReady
-                    ? globalThis.LX.Config.require("lx.runtime-config")?.framework ?? null
+                const configReady = !validation.runtimeConfig
+                    || (ready && globalThis.LX.Config.ready === true);
+                const tablesReady = !validation.tables
+                    || (ready && globalThis.LX.Tables.ready === true);
+                const configValue = validation.runtimeConfig && configReady
+                    ? globalThis.LX.Config.require(validation.runtimeConfig.id)?.[validation.runtimeConfig.property] ?? null
                     : null;
-                const tableValue = tablesReady
-                    ? globalThis.LX.Tables.require().TbTableAppConfig.get(1)?.value ?? null
+                const tableValue = validation.tables && tablesReady
+                    ? globalThis.LX.Tables.require()?.[validation.tables.table]
+                        ?.get(validation.tables.key)?.[validation.tables.property] ?? null
                     : null;
                 let render = null;
                 let ownershipReady = false;
                 if (ready) {
                     render = globalThis.LX.Performance.assertBudget(${JSON.stringify(startupRenderBudget)});
                     const ui = globalThis.LX.UI.snapshot();
-                    ownershipReady = ui.loading["lx.status"] === undefined
-                        && ui.managed.length === 1
-                        && ui.visible.length === 1
-                        && ui.top?.routeId === "lx.status"
-                        && ui.bottom?.routeId === "lx.status"
+                    const expectedRoute = validation.uiProbe?.baseRouteId;
+                    ownershipReady = (!expectedRoute
+                        || (ui.loading[expectedRoute] === undefined
+                            && ui.managed.some((entry) => entry.routeId === expectedRoute)
+                            && ui.visible.some((entry) => entry.routeId === expectedRoute)
+                            && ui.top?.routeId === expectedRoute
+                            && ui.bottom?.routeId === expectedRoute))
                         && globalThis.LX.Res === globalThis.Laya.loader
                         && globalThis.LX.Scene === globalThis.Laya.Scene;
                 }
@@ -638,7 +651,11 @@ async function waitForRuntime(cdp, timeoutMs) {
         });
         const state = evaluation.result?.value;
         lastState = state;
-        if (state?.ready && state?.uiReady && state?.configReady && state?.tablesReady && state?.statusText === "READY") {
+        if (state?.ready
+            && state?.uiReady
+            && state?.configReady
+            && state?.tablesReady
+            && (!headlessValidation.status || state?.statusText === headlessValidation.status.expected)) {
             return state;
         }
         await delay(100);

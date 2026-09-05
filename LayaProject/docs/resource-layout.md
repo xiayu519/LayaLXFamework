@@ -5,11 +5,13 @@
 ```text
 assets/
   bootstrap/                     首次可交互前必需资源
-    scenes/Startup.ls
-    ui/FrameworkStatus.lh
-    ui/common/Tip.lh
-    config/*.json
-    tables/game/*.bin
+    framework/                   上游只读框架启动资源
+      scenes/Startup.ls
+      ui/Tip.lh
+    game/                        下游游戏启动资源
+      ui/*.lh
+      config/*.json
+      tables/*.bin
   packages/<feature>/            可延迟加载的完整业务功能
     scenes/  ui/  prefabs/
     spine/<name>/                .lh、.skel/.json、.atlas、纹理同目录
@@ -24,7 +26,7 @@ assets/
 
 ## 放置规则
 
-- 启动 Scene、Loading、启动错误兜底和首次交互前必需配置放入 `bootstrap`。
+- 框架启动 Scene 和公共 Tip 放入 `bootstrap/framework`；游戏 Loading、启动错误兜底、首个业务 UI、配置和 Tables 放入 `bootstrap/game`。下游不得修改前者。
 - JSON 按用途放进 `config/data/maps/levels`；扩展名不决定目录。Luban 二进制只进入 `tables`，与 JSON 分开。
 - 新业务 UI 放入 `assets/packages/<feature>/ui/<Name>.lh`；业务 Scene 放入 `scenes/<Name>.ls`；普通 Prefab 放入 `prefabs/<Name>.lh`。
 - Spine Prefab 与骨骼、图集、纹理放入同一 `spine/<name>/`，不得拆到全局类型目录。

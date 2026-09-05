@@ -45,6 +45,8 @@ Codex 对两类文件采用不同的官方发现顺序：`AGENTS.md` 从 Git 根
 
 2–3 人协作时，写入前重新读取目标文件。同一语义区域已被他人修改时停止并报告，不猜测覆盖。`git init`、commit 与 push 只在开发者明确要求时执行。
 
+下游仓库存在 `.framework-lock.json` 时，manifest 管理内容为只读；框架缺口反馈上游，待上游验证并发布 Tag 后再同步。目录所有权、启动扩展点和同步命令只在 [框架发行与下游同步](../LayaProject/docs/framework-distribution.md) 维护。
+
 ## 验证
 
 除非开发者明确要求 GUI，验证始终在当前 `LayaProject` 原地、纯 Headless 执行；不复制项目，不启动 LayaAirIDE 或可见浏览器。
@@ -63,7 +65,7 @@ Windows 与 macOS 共用同一套 AGENTS、Skills 和 npm 命令；平台差异�
 
 ## 项目记忆
 
-验证过的踩坑、开发者反馈和架构决定存放在 `.codex/memory/`。只检索与当前任务相关的条目；不记录临时进度、猜测、密钥或大段日志。
+公共框架经验存放在根 `.codex/memory/`，单个游戏经验存放在 `src/game/<game-id>/.codex/memory/`；从游戏目录启动时两者叠加查询。只记录经验证的长期内容，不记录临时进度、猜测、密钥或大段日志。
 
 ## 依据
 

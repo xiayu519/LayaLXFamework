@@ -74,6 +74,24 @@ if (player.modules?.["laya.spine"] !== true) {
 
 const build = readJson(join(projectRoot, "settings", "BuildSettings.json"));
 const resourceLayout = readJson(join(projectRoot, "settings", "ResourceLayout.json"));
+const gameProject = readJson(join(projectRoot, "settings", "GameProject.json"));
+const headlessValidation = readJson(join(projectRoot, "settings", "HeadlessValidation.json"));
+if (gameProject.schemaVersion !== 1
+    || typeof gameProject.gameId !== "string"
+    || !/^[a-z][a-z0-9-]*$/.test(gameProject.gameId)
+    || typeof gameProject.luban?.runtimeSupport !== "string"
+    || typeof gameProject.luban?.codeDestination !== "string"
+    || typeof gameProject.luban?.dataDestination !== "string") {
+    errors.push("GameProject must define one game id and its Luban runtime/code/data destinations.");
+}
+if (headlessValidation.schemaVersion !== 1
+    || typeof headlessValidation.readyConsole !== "string"
+    || typeof headlessValidation.uiProbe?.prefabUrl !== "string"
+    || typeof headlessValidation.uiProbe?.baseRouteId !== "string"
+    || !headlessValidation.uiProbe?.args
+    || typeof headlessValidation.uiProbe.args !== "object") {
+    errors.push("HeadlessValidation must define the ready marker and a real game UI route/prefab probe.");
+}
 const startupUuid = typeof build.startupScene === "string" && build.startupScene.startsWith("res://")
     ? build.startupScene.slice("res://".length)
     : "";
@@ -148,10 +166,10 @@ const requiredPaths = [
     ".agents/skills/sdd-explore/SKILL.md",
     ".codex/memory/INDEX.md",
     "settings/ResourceLayout.json",
+    "settings/GameProject.json",
+    "settings/HeadlessValidation.json",
     "settings/PerformanceBudgets.json",
     "settings/LayaSourceBaseline.json",
-    "assets/bootstrap/scenes/Startup.ls",
-    "assets/bootstrap/ui/FrameworkStatus.lh",
     "src/framework/LX.ts",
     "src/framework/bootstrap/AppBootstrap.ts",
     "src/game/bootstrap/createApplication.ts",
@@ -164,15 +182,26 @@ const requiredPaths = [
     ".agents/skills/laya-minigame-packaging/SKILL.md",
     ".agents/skills/laya-json-data/SKILL.md",
     ".agents/skills/luban-tables/SKILL.md",
-    "src/game/generated/luban/ByteBuf.ts",
-    "assets/bootstrap/tables/game/tbtableappconfig.bin",
-    "assets/bootstrap/config/runtime.json",
-    "assets/bootstrap/ui/common/Tip.lh",
     "tools/create-game.mjs",
 ];
 for (const path of [
+    resourceLayout.startupScene && `assets/${resourceLayout.startupScene}`,
+    resourceLayout.startupUI && `assets/${resourceLayout.startupUI}`,
+    resourceLayout.tipUI && `assets/${resourceLayout.tipUI}`,
+    resourceLayout.generatedTables && `assets/${resourceLayout.generatedTables}`,
+    headlessValidation.runtimeConfig?.url && `assets/${headlessValidation.runtimeConfig.url}`,
+    headlessValidation.tables?.url && `assets/${headlessValidation.tables.url}`,
+    headlessValidation.uiProbe?.prefabUrl && `assets/${headlessValidation.uiProbe.prefabUrl}`,
+    gameProject.luban?.runtimeSupport,
+    gameProject.luban?.codeDestination,
+    gameProject.luban?.dataDestination,
+].filter(Boolean)) {
+    requiredPaths.push(path);
+}
+for (const path of [
     "Design/Tables/__tables__.xlsx",
-    "Design/Tables/#TableAppConfig.xlsx",
+    "Design/Tables/__beans__.xlsx",
+    "Design/Tables/__enums__.xlsx",
     "Design/genBin.bat",
     "Design/genBin.command",
     "Design/tools/luban.conf",

@@ -29,8 +29,8 @@ LX.Config.release("map.level-001");
 ```text
 Design/Tables/*.xlsx
   -> npm run tables:generate
-  -> src/game/generated/tables/schema.ts
-  -> assets/bootstrap/tables/game/*.bin
+  -> src/game/<game-id>/generated/tables/schema.ts
+  -> assets/bootstrap/game/tables/*.bin
   -> GameTablesService
   -> LX.Tables
 ```

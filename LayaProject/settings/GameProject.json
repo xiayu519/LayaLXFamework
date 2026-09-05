@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "gameId": "sample",
+  "luban": {
+    "runtimeSupport": "src/game/sample/generated/luban/ByteBuf.ts",
+    "codeDestination": "src/game/sample/generated/tables",
+    "dataDestination": "assets/bootstrap/game/tables"
+  }
+}

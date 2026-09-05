@@ -103,6 +103,15 @@ const rootValues = requiredRootKeys.map((key) => roots[key]).filter((value) => t
 if (new Set(rootValues).size !== rootValues.length) {
     failures.push("settings/ResourceLayout.json: resource roots must be unique.");
 }
+const bootstrapScopes = layout?.bootstrapScopes ?? {};
+for (const key of ["framework", "game"]) {
+    if (typeof bootstrapScopes[key] !== "string" || !/^[a-z][a-z0-9-]*$/.test(bootstrapScopes[key])) {
+        failures.push(`settings/ResourceLayout.json: bootstrapScopes.${key} must be one lowercase path segment.`);
+    }
+}
+if (bootstrapScopes.framework === bootstrapScopes.game) {
+    failures.push("settings/ResourceLayout.json: framework and game bootstrap scopes must be different.");
+}
 const assetTypeList = Array.isArray(layout?.assetTypes) ? layout.assetTypes : [];
 const assetTypes = new Set(assetTypeList);
 if (assetTypes.size === 0 || assetTypes.size !== assetTypeList.length || [...assetTypes].some((item) => typeof item !== "string" || !/^[a-z][a-z0-9-]*$/.test(item))) {
@@ -129,6 +138,16 @@ if (tipUI && !tipUI.startsWith(`${roots.bootstrap}/`)) {
 }
 if (generatedTables && !generatedTables.startsWith(`${roots.bootstrap}/`)) {
     failures.push("settings/ResourceLayout.json: generatedTables must be inside the bootstrap root.");
+}
+for (const [label, path, scope] of [
+    ["startupScene", startupScene, bootstrapScopes.framework],
+    ["tipUI", tipUI, bootstrapScopes.framework],
+    ["startupUI", startupUI, bootstrapScopes.game],
+    ["generatedTables", generatedTables, bootstrapScopes.game],
+]) {
+    if (path && scope && !path.startsWith(`${roots.bootstrap}/${scope}/`)) {
+        failures.push(`settings/ResourceLayout.json: ${label} must be inside bootstrap/${scope}.`);
+    }
 }
 
 const topLevelEntries = readdirSync(assetsRoot, { withFileTypes: true });
@@ -158,7 +177,26 @@ function validateTypeDirectories(containerPath, label) {
     }
 }
 
-validateTypeDirectories(join(assetsRoot, roots.bootstrap ?? ""), `assets/${roots.bootstrap}`);
+const bootstrapRoot = join(assetsRoot, roots.bootstrap ?? "");
+if (existsSync(bootstrapRoot)) {
+    const allowedBootstrapScopes = new Set(Object.values(bootstrapScopes));
+    for (const entry of readdirSync(bootstrapRoot, { withFileTypes: true })) {
+        const directoryMeta = entry.isFile()
+            && entry.name.endsWith(".meta")
+            && allowedBootstrapScopes.has(entry.name.slice(0, -5));
+        if (directoryMeta) {
+            continue;
+        }
+        if (!entry.isDirectory() || !allowedBootstrapScopes.has(entry.name)) {
+            failures.push(`assets/${roots.bootstrap}/${entry.name}: bootstrap assets must use framework or game scope.`);
+            continue;
+        }
+        validateTypeDirectories(
+            join(bootstrapRoot, entry.name),
+            `assets/${roots.bootstrap}/${entry.name}`,
+        );
+    }
+}
 for (const rootKey of ["packages", "shared"]) {
     const rootName = roots[rootKey];
     if (typeof rootName !== "string") {
@@ -191,7 +229,7 @@ for (const path of allAssetFiles) {
         continue;
     }
     const segments = local.split("/");
-    const typeIndex = zone.kind === "bootstrap" ? 1 : 2;
+    const typeIndex = 2;
     const type = segments[typeIndex];
     const extension = extname(path).toLowerCase();
     if (extension === ".ls" && type !== "scenes") {

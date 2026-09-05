@@ -90,7 +90,7 @@ export function createRuntime(
     const platform = adapters.platform ?? new WebPlatformService();
     const purchase = adapters.purchase ?? new UnsupportedPurchasePlatform();
     const http = adapters.http ?? new LayaHttpTransport();
-    const tips = new TipQueue(pool, "bootstrap/ui/common/Tip.lh");
+    const tips = new TipQueue(pool, "bootstrap/framework/ui/Tip.lh");
     const ui = new UIRouter(tips);
 
     definition.configureUI?.(ui, content);

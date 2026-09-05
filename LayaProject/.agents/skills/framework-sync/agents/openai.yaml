@@ -1,0 +1,5 @@
+interface:
+  display_name: "Framework Sync"
+  short_description: "Pin and verify upstream framework releases"
+policy:
+  allow_implicit_invocation: true

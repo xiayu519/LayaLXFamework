@@ -1,11 +1,11 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
-import { dirname, join, relative, resolve, sep } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const skillRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const projectRoot = resolve(skillRoot, "..", "..", "..");
-const memoryRoot = join(projectRoot, ".codex", "memory");
-const indexPath = join(memoryRoot, "INDEX.md");
+const gameRoot = join(projectRoot, "src", "game");
+const publicMemory = memoryAt(join(projectRoot, ".codex", "memory"));
 const entryKinds = new Map([
     ["problems", "problem"],
     ["decisions", "decision"],
@@ -27,10 +27,38 @@ function portable(path) {
     return path.split(sep).join("/");
 }
 
-function entryFiles() {
+function memoryAt(root) {
+    return { root, indexPath: join(root, "INDEX.md") };
+}
+
+function gameMemories() {
+    if (!existsSync(gameRoot)) {
+        return [];
+    }
+    return readdirSync(gameRoot, { withFileTypes: true })
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => memoryAt(join(gameRoot, entry.name, ".codex", "memory")))
+        .filter((memory) => existsSync(memory.root));
+}
+
+function activeMemories() {
+    const local = relative(gameRoot, resolve(process.cwd()));
+    const segments = local.split(sep);
+    const insideGame = local !== ""
+        && local !== ".."
+        && !local.startsWith(`..${sep}`)
+        && !isAbsolute(local);
+    if (!insideGame || !segments[0]) {
+        return [publicMemory];
+    }
+    const gameMemory = memoryAt(join(gameRoot, segments[0], ".codex", "memory"));
+    return existsSync(gameMemory.root) ? [publicMemory, gameMemory] : [publicMemory];
+}
+
+function entryFiles(memory) {
     const files = [];
     for (const folder of entryKinds.keys()) {
-        const directory = join(memoryRoot, folder);
+        const directory = join(memory.root, folder);
         if (!existsSync(directory)) {
             continue;
         }
@@ -43,7 +71,7 @@ function entryFiles() {
     return files.sort();
 }
 
-function parseEntry(path) {
+function parseEntry(memory, path) {
     const source = readFileSync(path, "utf8");
     const match = source.match(/^---\r?\n([\s\S]*?)\r?\n---/);
     const metadata = {};
@@ -55,70 +83,81 @@ function parseEntry(path) {
             }
         }
     }
-    const title = source.match(/^#\s+(.+)$/m)?.[1] ?? portable(relative(memoryRoot, path));
+    const title = source.match(/^#\s+(.+)$/m)?.[1] ?? portable(relative(memory.root, path));
     return { path, source, metadata, title, hasFrontmatter: Boolean(match) };
 }
 
-function check() {
+function checkMemory(memory) {
     const errors = [];
-    if (!existsSync(indexPath)) {
-        errors.push("Missing .codex/memory/INDEX.md.");
-    } else if (statSync(indexPath).size > 8192) {
-        errors.push("Memory INDEX.md exceeds 8192 bytes.");
+    const localRoot = portable(relative(projectRoot, memory.root));
+    if (!existsSync(memory.indexPath)) {
+        errors.push(`${localRoot}/INDEX.md is missing.`);
+        return { errors, count: 0 };
+    }
+    if (statSync(memory.indexPath).size > 8192) {
+        errors.push(`${localRoot}/INDEX.md exceeds 8192 bytes.`);
     }
 
-    const indexSource = existsSync(indexPath) ? readFileSync(indexPath, "utf8") : "";
+    const indexSource = readFileSync(memory.indexPath, "utf8");
     for (const heading of ["## Problems", "## Decisions", "## Feedback"]) {
         if (!indexSource.includes(heading)) {
-            errors.push(`Memory INDEX.md is missing '${heading}'.`);
+            errors.push(`${localRoot}/INDEX.md is missing '${heading}'.`);
         }
     }
 
     const linked = new Set();
     for (const match of indexSource.matchAll(/\[[^\]]+\]\(([^)]+\.md)\)/g)) {
-        const target = resolve(memoryRoot, match[1]);
-        linked.add(portable(relative(memoryRoot, target)));
+        const target = resolve(memory.root, match[1]);
+        linked.add(portable(relative(memory.root, target)));
         if (!existsSync(target)) {
-            errors.push(`Memory index target does not exist: ${match[1]}`);
+            errors.push(`${localRoot}/INDEX.md target does not exist: ${match[1]}`);
         }
     }
 
-    for (const path of entryFiles()) {
-        const entry = parseEntry(path);
-        const relativePath = portable(relative(memoryRoot, path));
+    const files = entryFiles(memory);
+    for (const path of files) {
+        const entry = parseEntry(memory, path);
+        const relativePath = portable(relative(memory.root, path));
+        const displayPath = `${localRoot}/${relativePath}`;
         if (statSync(path).size > 4096) {
-            errors.push(`${relativePath} exceeds 4096 bytes.`);
+            errors.push(`${displayPath} exceeds 4096 bytes.`);
         }
         if (!entry.hasFrontmatter) {
-            errors.push(`${relativePath} is missing frontmatter.`);
+            errors.push(`${displayPath} is missing frontmatter.`);
             continue;
         }
         for (const field of requiredFields) {
             if (!entry.metadata[field]) {
-                errors.push(`${relativePath} is missing '${field}'.`);
+                errors.push(`${displayPath} is missing '${field}'.`);
             }
         }
         const folder = relativePath.split("/", 1)[0];
         if (entry.metadata.type !== entryKinds.get(folder)) {
-            errors.push(`${relativePath} type must be '${entryKinds.get(folder)}'.`);
+            errors.push(`${displayPath} type must be '${entryKinds.get(folder)}'.`);
         }
         if (!allowedStatuses.has(entry.metadata.status)) {
-            errors.push(`${relativePath} has invalid status '${entry.metadata.status}'.`);
+            errors.push(`${displayPath} has invalid status '${entry.metadata.status}'.`);
         }
         if (!allowedSources.has(entry.metadata.source)) {
-            errors.push(`${relativePath} has invalid source '${entry.metadata.source}'.`);
+            errors.push(`${displayPath} has invalid source '${entry.metadata.source}'.`);
         }
         if (!/^\d{4}-\d{2}-\d{2}$/.test(entry.metadata.last_verified ?? "")) {
-            errors.push(`${relativePath} last_verified must use YYYY-MM-DD.`);
+            errors.push(`${displayPath} last_verified must use YYYY-MM-DD.`);
         }
         if ((entry.metadata.description ?? "").length > 180 || (entry.metadata.trigger ?? "").length > 180) {
-            errors.push(`${relativePath} description/trigger exceeds 180 characters.`);
+            errors.push(`${displayPath} description/trigger exceeds 180 characters.`);
         }
         if (!linked.has(relativePath)) {
-            errors.push(`${relativePath} is not linked from INDEX.md.`);
+            errors.push(`${displayPath} is not linked from INDEX.md.`);
         }
     }
+    return { errors, count: files.length };
+}
 
+function check() {
+    const memories = [publicMemory, ...gameMemories()];
+    const results = memories.map(checkMemory);
+    const errors = results.flatMap((result) => result.errors);
     if (errors.length > 0) {
         console.error("Project memory validation failed:");
         for (const error of errors) {
@@ -127,7 +166,8 @@ function check() {
         process.exitCode = 1;
         return;
     }
-    console.log(`Project memory OK: ${entryFiles().length} indexed entries.`);
+    const count = results.reduce((total, result) => total + result.count, 0);
+    console.log(`Project memory OK: ${count} indexed entries across ${memories.length} scope(s).`);
 }
 
 function search(rawArguments) {
@@ -145,8 +185,8 @@ function search(rawArguments) {
         return;
     }
 
-    const matches = entryFiles()
-        .map(parseEntry)
+    const matches = activeMemories()
+        .flatMap((memory) => entryFiles(memory).map((path) => parseEntry(memory, path)))
         .map((entry) => {
             const metadata = entry.metadata;
             const fields = [metadata.scope, metadata.description, metadata.trigger, entry.title, entry.source]
@@ -170,8 +210,8 @@ function search(rawArguments) {
     for (const { entry } of matches) {
         const metadata = entry.metadata;
         console.log(
-            `${portable(relative(projectRoot, entry.path))} | ${metadata.type} | ${metadata.scope} | ` +
-            `${metadata.description} | trigger: ${metadata.trigger}`,
+            `${portable(relative(projectRoot, entry.path))} | ${metadata.type} | ${metadata.scope} | `
+            + `${metadata.description} | trigger: ${metadata.trigger}`,
         );
     }
 }

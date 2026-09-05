@@ -1,0 +1,130 @@
+{
+  "schemaVersion": 1,
+  "name": "LayaLXFamework",
+  "version": "0.1.0",
+  "repository": "https://github.com/xiayu519/LayaLXFamework.git",
+  "managedPaths": [
+    ".gitattributes",
+    ".github/CODEOWNERS",
+    ".github/workflows/static-validation.yml",
+    "Books/**",
+    "Design/genBin.bat",
+    "Design/genBin.command",
+    "Design/tools/**",
+    "framework.manifest.json",
+    "LayaProject/.agents/**",
+    "LayaProject/.codex/config.toml",
+    "LayaProject/.codex/memory/**",
+    "LayaProject/AGENTS.md",
+    "LayaProject/assets/bootstrap/framework/**",
+    "LayaProject/docs/**",
+    "LayaProject/engine/types/**",
+    "LayaProject/settings/AssetImportPolicy.json",
+    "LayaProject/settings/LayaSourceBaseline.json",
+    "LayaProject/settings/PerformanceBudgets.json",
+    "LayaProject/src/Main.ts",
+    "LayaProject/src/Main.ts.meta",
+    "LayaProject/src/framework/**",
+    "LayaProject/tests/framework/**",
+    "LayaProject/tests/workflow/**",
+    "LayaProject/tools/**"
+  ],
+  "jsonContracts": {
+    "LayaProject/LayaProject.laya": {
+      "version": "3.4.1"
+    },
+    "LayaProject/package.json": {
+      "engines": {
+        "node": ">=20"
+      },
+      "scripts": {
+        "doctor": "node tools/doctor.mjs",
+        "tables:generate": "node tools/luban.mjs generate",
+        "tables:check": "node tools/luban.mjs check",
+        "tables:validate": "node tools/luban.mjs validate",
+        "game:create": "node tools/create-game.mjs",
+        "framework:manifest": "node tools/framework-distribution.mjs manifest",
+        "framework:sync": "node tools/framework-distribution.mjs sync",
+        "check:framework-integrity": "node tools/framework-distribution.mjs check",
+        "check:framework-upstream": "node tools/framework-distribution.mjs upstream",
+        "typecheck": "node tools/typecheck.mjs",
+        "test": "vitest run",
+        "check:architecture": "node tools/check-architecture.mjs",
+        "check:engine-source": "node tools/check-engine-source.mjs",
+        "validate:assets": "node tools/validate-assets.mjs",
+        "validate:content-assets": "node tools/validate-content-assets.mjs",
+        "validate:resource-layout": "node tools/validate-resource-layout.mjs",
+        "validate:performance": "node tools/validate-performance-budgets.mjs",
+        "validate:game-workflow": "node tools/create-game.mjs --id workflow-probe --dry-run",
+        "analyze:packages": "node .agents/skills/laya-minigame-packaging/scripts/analyze-package-size.mjs",
+        "check:skills": "node tools/run-python.mjs tools/validate-skills.py",
+        "check:memory": "node .agents/skills/project-memory/scripts/project-memory.mjs check",
+        "test:skill-routing": "node .agents/skills/codex-workflow/scripts/test-skill-routing.mjs",
+        "build:web": "node tools/layaair.mjs build web -p . --skip-package-install",
+        "validate:build": "node tools/validate-build.mjs",
+        "test:browser": "node tools/test-browser.mjs",
+        "test:headless": "node tools/test-headless.mjs",
+        "preview": "node tools/layaair.mjs run -p . --skip-package-install",
+        "verify": "node tools/verify.mjs"
+      },
+      "devDependencies": {
+        "@types/node": "26.4.1",
+        "typescript": "5.9.3",
+        "vitest": "5.0.0",
+        "ws": "8.21.3"
+      }
+    },
+    "LayaProject/settings/ResourceLayout.json": {
+      "version": 1,
+      "roots": {
+        "bootstrap": "bootstrap",
+        "packages": "packages",
+        "shared": "shared",
+        "library": "library"
+      },
+      "bootstrapScopes": {
+        "framework": "framework",
+        "game": "game"
+      },
+      "assetTypes": [
+        "scenes",
+        "ui",
+        "prefabs",
+        "spine",
+        "animations",
+        "effects",
+        "images",
+        "atlas",
+        "fonts",
+        "audio",
+        "video",
+        "shaders",
+        "data",
+        "config",
+        "maps",
+        "levels",
+        "tables"
+      ]
+    },
+    "LayaProject/settings/PlayerSettings.json": {
+      "modules": {
+        "laya.ui": true,
+        "laya.spine": true,
+        "laya.d3": false
+      },
+      "addons": {
+        "laya.ui": "ui2"
+      },
+      "spineVersion": "4.2"
+    },
+    "LayaProject/tsconfig.json": {
+      "compilerOptions": {
+        "strict": true,
+        "strictNullChecks": true,
+        "noEmit": true,
+        "experimentalDecorators": true,
+        "useDefineForClassFields": false
+      }
+    }
+  }
+}

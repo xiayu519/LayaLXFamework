@@ -19,6 +19,7 @@ function readJson(path) {
 
 const buildSettings = readJson(join(projectRoot, "settings", "BuildSettings.json"));
 const resourceLayout = readJson(join(projectRoot, "settings", "ResourceLayout.json"));
+const headlessValidation = readJson(join(projectRoot, "settings", "HeadlessValidation.json"));
 const bootstrapRoot = resourceLayout?.roots?.bootstrap;
 if (typeof bootstrapRoot !== "string" || !buildSettings?.alwaysIncluded?.includes(bootstrapRoot)) {
     failures.push("settings/BuildSettings.json must always include the bootstrap resource root.");
@@ -76,13 +77,15 @@ const tipPath = join(releaseRoot, tipUI);
 if (!existsSync(tipPath) || readJson(tipPath)?._$type !== "GWidget") {
     failures.push(`release/web/${tipUI} must contain the pooled GWidget tip asset.`);
 }
-const runtimeConfig = "bootstrap/config/runtime.json";
-const runtimeConfigSource = join(assetsRoot, runtimeConfig);
-const runtimeConfigRelease = join(releaseRoot, runtimeConfig);
-if (!existsSync(runtimeConfigRelease)) {
-    failures.push(`release/web/${runtimeConfig} is missing; the bootstrap JSON config was not collected.`);
-} else if (JSON.stringify(readJson(runtimeConfigSource)) !== JSON.stringify(readJson(runtimeConfigRelease))) {
-    failures.push(`release/web/${runtimeConfig} differs from its source JSON.`);
+const runtimeConfig = headlessValidation?.runtimeConfig?.url;
+if (typeof runtimeConfig === "string") {
+    const runtimeConfigSource = join(assetsRoot, runtimeConfig);
+    const runtimeConfigRelease = join(releaseRoot, runtimeConfig);
+    if (!existsSync(runtimeConfigRelease)) {
+        failures.push(`release/web/${runtimeConfig} is missing; the bootstrap JSON config was not collected.`);
+    } else if (JSON.stringify(readJson(runtimeConfigSource)) !== JSON.stringify(readJson(runtimeConfigRelease))) {
+        failures.push(`release/web/${runtimeConfig} differs from its source JSON.`);
+    }
 }
 
 const indexPath = join(releaseRoot, "js", "index.js");

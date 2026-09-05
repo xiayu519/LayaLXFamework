@@ -52,7 +52,7 @@ export function validateContentAssetProject(projectRoot) {
         }
         const local = portable(relative(assetsRoot, path));
         const extension = extname(path).toLowerCase();
-        const location = locateAsset(local, layout.roots);
+        const location = locateAsset(local, layout.roots, layout.bootstrapScopes);
         if (!location) {
             continue;
         }
@@ -273,10 +273,18 @@ function validateSpineGroup(group, policy, exceptions, failures) {
     }
 }
 
-function locateAsset(local, roots) {
+function locateAsset(local, roots, bootstrapScopes) {
     const segments = local.split("/");
     if (segments[0] === roots.bootstrap) {
-        return { zone: "bootstrap", type: segments[1], relativeSegments: segments.slice(2) };
+        if (![bootstrapScopes?.framework, bootstrapScopes?.game].includes(segments[1])) {
+            return undefined;
+        }
+        return {
+            zone: "bootstrap",
+            scope: segments[1],
+            type: segments[2],
+            relativeSegments: segments.slice(3),
+        };
     }
     if (segments[0] === roots.packages || segments[0] === roots.shared) {
         return {

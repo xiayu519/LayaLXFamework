@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 
 const staticChecks = [
+    "check:framework-integrity",
     "tables:check",
     "typecheck",
     "test",

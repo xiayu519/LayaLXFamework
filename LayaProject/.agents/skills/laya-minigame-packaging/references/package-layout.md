@@ -2,7 +2,7 @@
 
 ## Stable paths
 
-- `assets/bootstrap/<type>/`：启动 Scene、Loading、错误兜底和首次交互前必需资源。它是唯一 `alwaysIncluded` 根。
+- `assets/bootstrap/framework/<type>/` 保存上游启动资源，`assets/bootstrap/game/<type>/` 保存游戏 Loading、错误兜底和首次交互前必需资源；`bootstrap` 是唯一 `alwaysIncluded` 根。
 - `assets/packages/<feature>/<type>/`：一个延迟业务功能及其完整依赖闭包。
 - `assets/shared/<domain>/<type>/`：被多个延迟功能稳定复用、值得承担额外包请求的资源。
 - `assets/library/`：开发模板，不参与运行时依赖。
