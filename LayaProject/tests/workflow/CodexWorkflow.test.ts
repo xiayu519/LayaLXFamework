@@ -1,7 +1,4 @@
-import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
     assertRoutingResult,
@@ -20,33 +17,31 @@ describe("Codex workflow policy", () => {
         expect(rules).toContain("使用团队规模不等于 Codex 代理数量");
     });
 
-    it("uses Codex Action without exposing the key to repository commands", () => {
+    it("keeps semantic evaluation in the authenticated local Codex CLI", () => {
         const workflow = readFileSync("../.github/workflows/codex-workflow.yml", "utf8");
-        expect(workflow).toContain("uses: openai/codex-action@v1");
-        expect(workflow).toContain("openai-api-key: ${{ secrets.CODEX_API_KEY }}");
-        expect(workflow).not.toMatch(/env:\s*\r?\n\s+(?:CODEX|OPENAI)_API_KEY:/);
+        expect(workflow).not.toContain("openai/codex-action");
+        expect(workflow).not.toContain("CODEX_API_KEY");
+        expect(workflow).not.toContain("secrets.");
+        expect(workflow).not.toContain("actions/upload-artifact");
+        expect(workflow).not.toContain("actions/download-artifact");
+        expect(workflow).not.toContain("semantic-evaluation");
         expect(workflow).not.toContain("npm run test:skill-routing");
-        expect(workflow.split(/\r?\n/).filter((line) => line.includes("secrets.CODEX_API_KEY")))
-            .toEqual([
-                "          openai-api-key: ${{ secrets.CODEX_API_KEY }}",
-            ]);
+        expect(workflow).toContain("npm run check:skills");
+        expect(workflow).toContain("npm test -- tests/workflow");
 
-        const semanticJob = workflow.split("  semantic-evaluation:")[1]?.split("\n  validate-semantic-result:")[0] ?? "";
-        const actionIndex = semanticJob.indexOf("uses: openai/codex-action@v1");
-        expect(actionIndex).toBeGreaterThan(0);
-        expect(semanticJob).toContain("uses: actions/download-artifact@v4");
-        expect(semanticJob).not.toContain("actions/checkout");
-        expect(semanticJob).not.toContain("actions/setup-node");
-        expect(semanticJob).not.toMatch(/\n\s+run:/);
-        expect(semanticJob).not.toContain("npm ");
-        expect(semanticJob).toContain("codex-version: 0.153.2");
-        expect(semanticJob).toContain('"--skip-git-repo-check"');
-        expect(semanticJob.slice(actionIndex)).not.toMatch(/\n\s{6}- (?:name:|run:|uses:)/);
+        const pkg = JSON.parse(readFileSync("package.json", "utf8"));
+        expect(pkg.scripts["test:skill-routing"])
+            .toBe("node .agents/skills/codex-workflow/scripts/test-skill-routing.mjs");
+        expect(pkg.scripts).not.toHaveProperty("prepare:skill-routing");
+        expect(pkg.scripts).not.toHaveProperty("validate:skill-routing");
 
-        const staticJob = workflow.split("  static-policy:")[1]?.split("\n  semantic-evaluation:")[0] ?? "";
-        expect(staticJob).toContain("uses: actions/upload-artifact@v4");
-        expect(staticJob).toContain("LayaProject/codex-eval/routing-prompt.md");
-        expect(staticJob).toContain("LayaProject/codex-eval/routing-output.schema.json");
+        const localRunner = readFileSync(
+            ".agents/skills/codex-workflow/scripts/test-skill-routing.mjs",
+            "utf8",
+        );
+        expect(localRunner).toContain("@openai/codex@${CODEX_CLI_VERSION}");
+        expect(localRunner).toContain('"--ephemeral"');
+        expect(localRunner).toContain('"--sandbox", "read-only"');
     });
 
     it("triggers on game workflow, package, validator, executor and deterministic tests", () => {
@@ -65,30 +60,6 @@ describe("Codex workflow policy", () => {
         }
     });
 
-    it("prepares only the sanitized prompt, schema and scalar policy outputs", () => {
-        const temporaryRoot = resolve(tmpdir());
-        const fixture = mkdtempSync(join(temporaryRoot, "lx-codex-artifact-"));
-        try {
-            const prompt = join(fixture, "routing-prompt.md");
-            const schema = join(fixture, "routing-output.schema.json");
-            const githubOutput = join(fixture, "github-output.txt");
-            execFileSync(process.execPath, [
-                resolve(".agents/skills/codex-workflow/scripts/prepare-skill-routing.mjs"),
-                "--prompt", prompt,
-                "--schema", schema,
-                "--github-output", githubOutput,
-            ]);
-            expect(readFileSync(prompt, "utf8")).not.toContain('"expected"');
-            expect(JSON.parse(readFileSync(schema, "utf8"))).toHaveProperty("properties.results");
-            expect(readFileSync(githubOutput, "utf8")).toMatch(/^model=[a-zA-Z0-9._-]+\neffort=(?:low|medium|high|xhigh|max|ultra)\n$/);
-        } finally {
-            const local = relative(temporaryRoot, resolve(fixture));
-            if (!local || local === ".." || local.startsWith(`..${sep}`) || isAbsolute(local)) {
-                throw new Error(`Refusing unsafe fixture cleanup: ${fixture}`);
-            }
-            rmSync(fixture, { recursive: true, force: true });
-        }
-    });
 });
 
 describe("structured routing evaluation", () => {

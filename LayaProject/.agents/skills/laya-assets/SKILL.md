@@ -1,6 +1,6 @@
 ---
 name: laya-assets
-description: 编辑或诊断 LayaAir .ls/.lh 源资产、UUID、_$ref、res://、脚本挂载、序列化和构建收集规则时使用；图片导入参数与运行时资源释放不触发。
+description: 编辑或诊断 LayaAir .ls/.lh 源资产、UUID、_$ref、res://、脚本挂载、序列化和构建收集规则时使用；Spine2DRenderNode、图片导入参数与运行时资源释放不触发。
 ---
 
 # Laya Assets

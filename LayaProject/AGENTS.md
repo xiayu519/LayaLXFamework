@@ -4,7 +4,7 @@
 
 业务请求说明目标、平台、可观察验收和硬约束。Codex 按 Skill `description` 选最窄工作流；仅跨独立风险边界时组合，只读所需 reference。
 
-共享框架在 `src/framework/`，业务在 `src/game/`；framework 不依赖 game，业务只经 `LX`。新游戏放在 `src/game/<game-id>/`，从该目录启动以叠加公共/游戏规则与 Skills。写前保留他人改动；同一区域并行冲突时停止。
+共享框架在 `src/framework/`，业务根 `src/game/logic/` 不得删除；framework 不依赖 game，业务只经 `LX`。新游戏放在 `src/game/<game-id>/`，从其目录启动以叠加公共/游戏规则与 Skills。写前保留他人改动；同一区域并行冲突时停止。
 
 根目录存在 `.framework-lock.json` 即为下游消费模式：禁止手改 manifest 管理文件和 lock；缺口反馈上游，只同步已确认 Tag 或已提交的 channel snapshot。
 

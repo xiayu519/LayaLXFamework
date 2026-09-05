@@ -8,7 +8,7 @@ const gameRoot = join(projectRoot, "src", "game");
 const argumentsByName = parseArguments(process.argv.slice(2));
 const id = argumentsByName.get("id");
 const dryRun = argumentsByName.has("dry-run");
-const reserved = new Set(["application", "bootstrap", "domain", "generated", "infrastructure", "platform", "presentation"]);
+const reserved = new Set(["application", "bootstrap", "domain", "generated", "infrastructure", "logic", "platform", "presentation"]);
 
 if (!id || !/^[a-z][a-z0-9-]*$/.test(id) || reserved.has(id)) {
     throw new Error("--id must be a non-reserved lowercase kebab-case game id.");

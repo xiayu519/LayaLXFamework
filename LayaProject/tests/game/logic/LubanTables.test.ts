@@ -2,8 +2,8 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { TablesRegistry } from "../../../src/framework/application/config/TablesRegistry";
-import { Tables } from "../../../src/game/sample/generated/tables/schema";
-import ByteBuf from "../../../src/game/sample/generated/luban/ByteBuf";
+import { Tables } from "../../../src/game/logic/generated/tables/schema";
+import ByteBuf from "../../../src/game/logic/generated/luban/ByteBuf";
 
 describe("Luban tables", () => {
     it("parses the committed binary through the browser-safe ByteBuf", () => {

@@ -19,7 +19,7 @@
 ```text
 src/Main.ts
   -> src/game/bootstrap/createApplication.ts
-  -> src/game/<game-id>/bootstrap/createGameApplication.ts
+  -> src/game/logic/bootstrap/createGameApplication.ts
   -> src/framework/bootstrap/createRuntime.ts
 ```
 

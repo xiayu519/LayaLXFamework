@@ -30,8 +30,6 @@
     "check:skills": "node tools/run-python.mjs tools/validate-skills.py",
     "check:memory": "node .agents/skills/project-memory/scripts/project-memory.mjs check",
     "test:skill-routing": "node .agents/skills/codex-workflow/scripts/test-skill-routing.mjs",
-    "prepare:skill-routing": "node .agents/skills/codex-workflow/scripts/prepare-skill-routing.mjs",
-    "validate:skill-routing": "node .agents/skills/codex-workflow/scripts/validate-skill-routing.mjs",
     "build:web": "node tools/layaair.mjs build web -p . --skip-package-install",
     "validate:build": "node tools/validate-build.mjs",
     "test:browser": "node tools/test-browser.mjs",

@@ -10,12 +10,13 @@ npm ci
 npm run doctor
 ```
 
-框架任务从 `LayaProject` 启动。创建具体游戏时执行：
+框架任务从 `LayaProject` 启动。当前游戏任务直接从固定业务根启动：
 
 ```shell
-npm run game:create -- --id my-game
-codex --cd src/game/my-game
+codex --cd src/game/logic
 ```
+
+只有需要增加另一个独立游戏作用域时，才运行 `npm run game:create -- --id my-game` 并从新目录启动。
 
 Codex 对两类文件采用不同的官方发现顺序：`AGENTS.md` 从 Git 根目录向当前目录合并，所以 `LayaProject/AGENTS.md` 先于游戏文件生效，冲突时更近的规则优先；Skills 从当前目录向仓库根扫描，所以公共与游戏 Skills 同时可用。从 `LayaProject` 根启动不会加载游戏层。游戏规则不得复制公共规则，游戏 Skill 使用独立名称。
 
@@ -60,7 +61,7 @@ npm run verify
 
 Windows 与 macOS 共用同一套 AGENTS、Skills 和 npm 命令；平台差异只由工具内部的可执行文件发现处理，双平台 CI 分别执行完整 `npm run verify`。
 
-工作流变更另外运行 `npm run test:skill-routing`：一次只读调用覆盖正向/负向路由与批准、只读、越界、默认单代理及受控委派决策，记录模型和 token；可用 `LX_CODEX_EVAL_MODEL` / `LX_CODEX_EVAL_EFFORT` 显式覆盖评测配置。分类成绩不代表真实任务行为，不能替代执行审查。CI 的无 Secret job 生成不含 expected 的 prompt/schema artifact；持有 `CODEX_API_KEY` 的 job 不 checkout、不运行 npm 或仓库脚本，只下载该 artifact 并通过 `openai/codex-action@v1` 的 Responses API proxy 评测。结构化结果再交给无 Secret job 验证，缺失凭据时明确失败。`push` 只在 `main` 触发，功能分支由 `pull_request` 触发，避免同一次分支提交重复付费；不含工作流变化的普通验证不运行该评测。
+工作流变更另外在开发者已登录的本地 Codex CLI 环境运行 `npm run test:skill-routing`：一次只读调用覆盖正向/负向路由与批准、只读、越界、默认单代理及受控委派决策，记录模型和 token；可用 `LX_CODEX_EVAL_MODEL` / `LX_CODEX_EVAL_EFFORT` 显式覆盖评测配置。分类成绩不代表真实任务行为，不能替代执行审查。GitHub CI 只运行确定性静态检查和 workflow 测试，不调用模型、不读取或要求 `CODEX_API_KEY`。
 
 真实商店、小游戏容器或 Native 签名等无法由 Headless 证明的行为应列为未验证项，不自动切换到 GUI。
 
@@ -73,7 +74,6 @@ Windows 与 macOS 共用同一套 AGENTS、Skills 和 npm 命令；平台差异�
 - [OpenAI：Codex AGENTS.md 分层项目指令](https://learn.chatgpt.com/docs/agent-configuration/agents-md)
 - [OpenAI：Codex 项目配置层级](https://learn.chatgpt.com/docs/config-file/config-basic)
 - [OpenAI：Codex Subagents](https://learn.chatgpt.com/docs/agent-configuration/subagents)
-- [OpenAI：Codex GitHub Action](https://learn.chatgpt.com/docs/github-action)
 - [LayaAir：项目工程目录说明](https://layaair.com/3.x/doc/basics/IDE/projecFolders/)
 - [LayaAir：源码模板导出规则](https://layaair.com/3.x/doc/IDE/layapackage/exportToStore/readme.html)
 - [Luban v4.11.0](https://github.com/focus-creative-games/luban/tree/v4.11.0)

@@ -23,7 +23,7 @@
 - 存储/状态：直接 save 也保护未来版本，读回发现静默写失败；不改变 envelope。状态机 guard/can/effect 全边界防重入。
 - 性能：等待统计首窗口，GPU 使用 driver 计量；拒绝非法数值及超预算，不把零值或平均值说成峰值证据。
 - 工具：AST 模块解析覆盖 alias、动态/side-effect import、export/require；发布标题跟随 BuildSettings.name。
-- 工作流：默认模型只在配置维护、尊重用户显式选择；默认单代理，只有独立风险边界或用户明确要求才委派；已批准边界不重复审批。评测禁止工具取答案；持 Key job 不 checkout、不运行仓库脚本，只消费 sanitized artifact 并调用官方 Action。
+- 工作流：默认模型只在配置维护、尊重用户显式选择；默认单代理，只有独立风险边界或用户明确要求才委派；已批准边界不重复审批。评测禁止工具取答案，并只在开发者已登录的本地 Codex CLI 环境执行；GitHub CI 只保留确定性检查。
 - 环境：修正 CI Node 20 与锁定 Vitest 5 不兼容的基线，package/lock/doctor/CI/文档统一 Node 24.x；新增一致性回归，不安装或更改本机系统环境。
 
 Skill 对实施的影响：领域 Skill 约束原生 API 与 owner 顺序；sdd-explore 保留批准边界；codex-workflow/skill-creator 要求正负触发和独立审查；project-memory 保留旧模型决定并显式替代；framework-sync 保证新增 CI 不漏发下游。
@@ -54,4 +54,4 @@ Skill 对实施的影响：领域 Skill 约束原生 API 与 owner 顺序；sdd-
 
 ## 未验证和交付边界
 
-本轮没有在 macOS、小游戏容器或 Native 容器实跑；新增 CI 仅落盘，未触发远程工作流，语义 CI 需要配置 `CODEX_API_KEY`。内容资产静态检查中纹理/音频/Spine 数量为0，不能把规则通过说成这些真实资产链路已验收。未创建发布 Tag，未 commit/push。后续文件仅报告/manifest 变动时复核相应静态项，不重复无关构建。
+本轮没有在 macOS、小游戏容器或 Native 容器实跑；语义评测只在本地 Codex CLI 完成，GitHub CI 不执行模型评测。内容资产静态检查中纹理/音频/Spine 数量为0，不能把规则通过说成这些真实资产链路已验收。未创建发布 Tag，未 commit/push。后续文件仅报告/manifest 变动时复核相应静态项，不重复无关构建。

@@ -85,6 +85,20 @@ if (gameProject.schemaVersion !== 1
     || typeof gameProject.luban?.dataDestination !== "string") {
     errors.push("GameProject must define one game id and its Luban runtime/code/data destinations.");
 }
+const configuredGameRoot = typeof gameProject.gameId === "string"
+    && /^[a-z][a-z0-9-]*$/.test(gameProject.gameId)
+    ? `src/game/${gameProject.gameId}`
+    : undefined;
+if (configuredGameRoot) {
+    for (const [label, destination] of [
+        ["runtimeSupport", gameProject.luban?.runtimeSupport],
+        ["codeDestination", gameProject.luban?.codeDestination],
+    ]) {
+        if (typeof destination === "string" && !destination.startsWith(`${configuredGameRoot}/`)) {
+            errors.push(`GameProject luban.${label} must stay inside ${configuredGameRoot}.`);
+        }
+    }
+}
 if (headlessValidation.schemaVersion !== 1
     || typeof headlessValidation.readyConsole !== "string"
     || typeof headlessValidation.uiProbe?.prefabUrl !== "string"
@@ -185,6 +199,13 @@ const requiredPaths = [
     ".agents/skills/luban-tables/SKILL.md",
     "tools/create-game.mjs",
 ];
+if (configuredGameRoot) {
+    requiredPaths.push(
+        configuredGameRoot,
+        `${configuredGameRoot}/AGENTS.md`,
+        `${configuredGameRoot}/bootstrap/createGameApplication.ts`,
+    );
+}
 for (const path of [
     resourceLayout.startupScene && `assets/${resourceLayout.startupScene}`,
     resourceLayout.startupUI && `assets/${resourceLayout.startupUI}`,

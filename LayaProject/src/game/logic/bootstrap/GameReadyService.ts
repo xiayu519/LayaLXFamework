@@ -9,8 +9,8 @@ interface RuntimeConfig {
     readonly framework: string;
 }
 
-export class SampleReadyService implements AppService {
-    readonly name = "sample-ready";
+export class GameReadyService implements AppService {
+    readonly name = "game-ready";
 
     constructor(private readonly statusRoute: string) {}
 

@@ -34,7 +34,7 @@ LayaLXFamework/
    ├─ assets/packages/<feature>/  按功能组织的延迟资源
    ├─ assets/shared/<domain>/     跨功能共享资源
    ├─ src/framework/              公共框架
-   ├─ src/game/<game-id>/         游戏业务、规则和记忆
+   ├─ src/game/logic/             当前游戏业务、规则和记忆
    ├─ settings/                   构建与检查配置
    ├─ tests/                      单元测试
    └─ docs/                       详细技术文档
@@ -282,13 +282,17 @@ npm run verify
 
 `verify` 在当前工程原地构建，并使用纯 Headless Chromium 检查真实 LayaAir 2D 发布包。
 
-## 开始新游戏
+## 开始游戏开发
+
+当前项目直接在固定业务根 `LayaProject/src/game/logic/` 开发。该目录由下游维护，可以修改但不得删除；`npm run doctor` 会检查其 `AGENTS.md`、组合入口和生成路径。
+
+确实需要在同一仓库增加另一个独立游戏作用域时再执行：
 
 ```shell
 cd LayaProject
 npm run game:create -- --id my-game
 ```
 
-该命令只创建游戏所有的脚本、AGENTS、Skills 和记忆空间。业务脚本放入 `src/game/my-game/`，资源按功能放入 `assets/packages/<feature>/`；随后由游戏维护 `src/game/bootstrap/createApplication.ts`、`settings/GameProject.json` 和 `settings/HeadlessValidation.json`。使用 Codex 时的入口和规则见 [Codex 工作流](Books/LXFamework-Codex-Workflow.md)。
+该命令只创建额外游戏所有的脚本、AGENTS、Skills 和记忆空间。业务脚本放入 `src/game/my-game/`，资源按功能放入 `assets/packages/<feature>/`；随后由游戏维护 `src/game/bootstrap/createApplication.ts`、`settings/GameProject.json` 和 `settings/HeadlessValidation.json`。使用 Codex 时的入口和规则见 [Codex 工作流](Books/LXFamework-Codex-Workflow.md)。
 
-实际游戏作为下游仓库时只按发布 Tag 同步公共框架，目录归属和命令见 [框架发行与下游同步](LayaProject/docs/framework-distribution.md)。
+实际游戏作为下游仓库时，稳定版本按发布 Tag 同步，开发联调可显式同步 channel snapshot；目录归属和命令见 [框架发行与下游同步](LayaProject/docs/framework-distribution.md)。

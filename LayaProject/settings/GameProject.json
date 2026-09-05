@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "gameId": "sample",
+  "gameId": "logic",
   "luban": {
-    "runtimeSupport": "src/game/sample/generated/luban/ByteBuf.ts",
-    "codeDestination": "src/game/sample/generated/tables",
+    "runtimeSupport": "src/game/logic/generated/luban/ByteBuf.ts",
+    "codeDestination": "src/game/logic/generated/tables",
     "dataDestination": "assets/bootstrap/game/tables"
   }
 }

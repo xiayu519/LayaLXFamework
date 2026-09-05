@@ -42,6 +42,7 @@
 
 ## Feedback
 
+- [Workflow push gates](feedback/workflow-push-gates.md)：工作流改动推送前运行本地 CLI 语义回归；GitHub CI 不调用模型或要求 API key。
 - [Source-first Laya design](feedback/source-first-laya-design.md)：公共模块必须先审查固定版本源码，禁止重复造引擎轮子。
 - [In-place Headless validation](feedback/in-place-headless-validation.md)：验证必须在当前项目原地纯 Headless 执行。
 - [Semantic Skill routing](feedback/semantic-skill-routing.md)：业务请求按语义触发窄 Skill，不在 `AGENTS.md` 写死路由。

@@ -16,6 +16,8 @@ source: external-verified
 
 ## Decision
 
+当前项目使用必须保留的 `src/game/logic` 作为默认真实业务根；从该目录启动 Codex 时叠加游戏规则和记忆。
+
 使用 `npm run game:create -- --id <game-id>` 创建 `src/game/<game-id>/AGENTS.md` 和 `.agents/skills/`。游戏任务从该目录启动 Codex；公共 `LayaProject/AGENTS.md` 先加载，游戏文件随后叠加，公共与游戏 Skills 同时参与语义匹配。游戏 Skill 必须使用独立名称和精确 description。
 
 ## Evidence

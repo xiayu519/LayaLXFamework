@@ -6,8 +6,8 @@ import {
 import type { UIRoute } from "../../../framework/presentation/ui/UIRouter";
 import {
     RUNTIME_CONFIG_ID,
-    SampleReadyService,
-} from "./SampleReadyService";
+    GameReadyService,
+} from "./GameReadyService";
 import {
     FrameworkStatusWindow,
     type FrameworkStatusArgs,
@@ -49,7 +49,7 @@ export function createGameApplication(adapters: ApplicationAdapters = {}): Appli
         createServices(context) {
             return [
                 new GameTablesService(context.tables),
-                new SampleReadyService(FRAMEWORK_STATUS_ROUTE),
+                new GameReadyService(FRAMEWORK_STATUS_ROUTE),
             ];
         },
     }, adapters);
