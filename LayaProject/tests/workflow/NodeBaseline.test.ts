@@ -11,9 +11,8 @@ describe("Node runtime baseline", () => {
         expect(major).toBeDefined();
         expect(lock.packages[""].engines.node).toBe(pkg.engines.node);
         expect(manifest.jsonContracts["LayaProject/package.json"].engines.node).toBe(pkg.engines.node);
-        for (const workflow of ["static-validation", "workflow-validation", "table-validation", "release-validation"]) {
-            expect(read(`../.github/workflows/${workflow}.yml`).match(/node-version:\s*(\d+)/)?.[1]).toBe(major);
-        }
+        expect(read("../.github/workflows/framework-sync.yml").match(/node-version:\s*(\d+)/)?.[1])
+            .toBe(major);
         // The pinned Vitest toolchain accepts 24.x; keep this explicit when upgrading tools.
         expect(major).toBe("24");
         expect(lock.packages["node_modules/vitest"].engines.node).toContain("^24.0.0");

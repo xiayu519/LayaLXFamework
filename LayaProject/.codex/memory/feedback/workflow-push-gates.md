@@ -3,12 +3,14 @@ type: feedback
 scope: codex-workflow
 description: 语义输入改动推送前运行一次本地 Codex CLI 回归；普通工作流改动只跑确定性门禁，GitHub CI 不调用模型。
 trigger: 修改 AGENTS、Skill description、路由样例、决策语义或其评测策略时。
-status: active
+status: superseded
 last_verified: 2026-09-05
 source: user-confirmed
 ---
 
 # Workflow push gates
+
+Superseded by [Local validation and GitHub sync-only contract](../decisions/local-validation-github-sync-only.md).
 
 ## Confirmed preference
 

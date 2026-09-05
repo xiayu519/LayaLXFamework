@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
@@ -33,15 +33,27 @@ describe("Codex workflow policy", () => {
         expect(localRunner).toContain("@openai/codex@${CODEX_CLI_VERSION}");
         expect(localRunner).toContain('"--ephemeral"');
         expect(localRunner).toContain('"--sandbox", "read-only"');
+        expect(localRunner).toContain("CODEX_API_KEY is not required");
+        expect(localRunner).toContain("../Books/LXFamework-Environment.md");
     });
 
-    it("separates fast, workflow, table and release validation", () => {
-        const fastWorkflow = readFileSync("../.github/workflows/static-validation.yml", "utf8");
-        const workflowWorkflow = readFileSync("../.github/workflows/workflow-validation.yml", "utf8");
-        const tableWorkflow = readFileSync("../.github/workflows/table-validation.yml", "utf8");
-        const releaseWorkflow = readFileSync("../.github/workflows/release-validation.yml", "utf8");
+    it("keeps GitHub limited to the framework sync contract", () => {
+        const workflowNames = readdirSync("../.github/workflows").sort();
+        const syncWorkflow = readFileSync("../.github/workflows/framework-sync.yml", "utf8");
         const verifier = readFileSync("tools/verify.mjs", "utf8");
         const pkg = JSON.parse(readFileSync("package.json", "utf8"));
+
+        expect(workflowNames).toEqual(["framework-sync.yml"]);
+        expect(syncWorkflow).toContain("name: Framework sync contract");
+        expect(syncWorkflow).toContain("npm run check:framework-upstream");
+        expect(syncWorkflow).toContain("npm run check:framework-integrity");
+        expect(syncWorkflow).toContain("npm run test:framework-sync");
+        for (const forbidden of [
+            "setup-python", "setup-dotnet", "LayaAir", "CODEX_API_KEY", "test:skill-routing",
+            "npm run verify", "npm run tables:", "npm run check:skills", "npm run test:headless",
+        ]) {
+            expect(syncWorkflow).not.toContain(forbidden);
+        }
 
         expect(pkg.scripts.verify).toBe("node tools/verify.mjs --profile fast");
         expect(pkg.scripts["check:project"]).toBe("node tools/doctor.mjs --project-only");
@@ -49,6 +61,8 @@ describe("Codex workflow policy", () => {
         expect(pkg.scripts["validate:assets"]).toBe("node tools/validate-assets.mjs");
         expect(pkg.scripts["validate:assets:laya"]).toBe("node tools/validate-assets.mjs --laya");
         expect(pkg.scripts["test:unit"]).toContain("tests/framework tests/game");
+        expect(pkg.scripts["test:framework-sync"])
+            .toBe("vitest run tests/workflow/FrameworkDistribution.test.ts");
         expect(pkg.scripts["test:workflow"]).toBe("vitest run tests/workflow");
         expect(verifier).toContain("runLimited(profile.checks, 3)");
         const fastChecks = verifier.split("const fastChecks = [")[1]?.split("];", 1)[0] ?? "";
@@ -61,33 +75,6 @@ describe("Codex workflow policy", () => {
         const releaseChecks = verifier.split("const releaseChecks = [")[1]?.split("];", 1)[0] ?? "";
         expect(releaseChecks).toContain('"validate:assets:laya"');
 
-        expect(fastWorkflow).toContain("name: Fast validation");
-        expect(fastWorkflow).toContain("npm run verify");
-        expect(fastWorkflow).not.toContain("verify:release");
-        expect(fastWorkflow).not.toContain("LayaAir CLI");
-        expect(fastWorkflow).not.toContain("setup-dotnet");
-        expect(fastWorkflow).not.toContain("setup-python");
-
-        expect(workflowWorkflow).toContain("name: Workflow validation");
-        expect(workflowWorkflow).toContain("npm run check:skills");
-        expect(workflowWorkflow).toContain("npm run check:memory");
-        expect(workflowWorkflow).toContain("npm run test:workflow");
-        expect(workflowWorkflow).not.toContain("test:skill-routing");
-        expect(workflowWorkflow).not.toContain("CODEX_API_KEY");
-        expect(workflowWorkflow).not.toContain("LayaAir CLI");
-
-        expect(tableWorkflow).toContain("name: Tables validation");
-        expect(tableWorkflow).toContain("npm run tables:check");
-        expect(tableWorkflow).not.toContain("npm run verify");
-        expect(tableWorkflow).not.toContain("LayaAir CLI");
-
-        expect(releaseWorkflow).toContain("name: Release validation");
-        expect(releaseWorkflow).toContain("workflow_dispatch:");
-        expect(releaseWorkflow).toContain("tags:");
-        expect(releaseWorkflow).not.toContain("pull_request:");
-        expect(releaseWorkflow).toContain("os: [windows-latest, macos-latest]");
-        expect(releaseWorkflow).toContain("steps.layaair-cache.outputs.cache-hit != 'true'");
-        expect(releaseWorkflow).toContain("npm run verify:release");
     });
 
     it("checks project structure without requiring external toolchains", () => {
@@ -104,6 +91,21 @@ describe("Codex workflow policy", () => {
             },
         });
         expect(output).toContain("Project configuration OK");
+    });
+
+    it("points missing local toolchains to the environment guide", () => {
+        for (const path of [
+            "tools/layaair.mjs",
+            "tools/python-runtime.mjs",
+            "tools/luban.mjs",
+            "tools/test-browser.mjs",
+            ".agents/skills/codex-workflow/scripts/test-skill-routing.mjs",
+        ]) {
+            expect(readFileSync(path, "utf8")).toContain("../Books/LXFamework-Environment.md");
+        }
+        const guide = readFileSync("../Books/LXFamework-Environment.md", "utf8");
+        expect(guide).toContain("GitHub Actions 不代表开发者本机");
+        expect(guide).toContain("不检查或安装 LayaAir、.NET、Python、浏览器和 Codex CLI");
     });
 
     it("runs the complete fast profile without a LayaAir installation", () => {

@@ -3,12 +3,14 @@ type: decision
 scope: development-workflow
 description: 日常验证使用无 Laya CLI 的快速门禁，领域工具按相关改动触发，完整双平台 Headless 只用于正式发布或手动验收。
 trigger: 选择本地验证命令，或修改 verify、测试分组、Laya/Luban/Codex CLI 与 GitHub Actions 时
-status: active
+status: superseded
 last_verified: 2026-09-05
 source: user-confirmed
 ---
 
 # Validation profiles
+
+Superseded by [Local validation and GitHub sync-only contract](local-validation-github-sync-only.md).
 
 ## Context
 

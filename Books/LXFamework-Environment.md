@@ -18,3 +18,5 @@ LayaAirIDE 只在人工编辑 `.ls/.lh` 或明确要求 GUI 验证时需要；�
 > 请阅读 `Books/LXFamework-Environment.md`，根据当前 Windows 或 macOS 系统及 CPU 架构，从官方入口检查并准备缺失环境。不要修改仓库文件，不要写入个人绝对路径；完成后在 `LayaProject` 执行 `npm ci`、`npm run doctor` 和 `npm run verify:release`，并报告未通过项。
 
 `npm run doctor` 只读取并检查环境，不会安装软件；`npm ci` 只还原 `package-lock.json` 锁定的项目依赖。
+
+GitHub Actions 不代表开发者本机，也不检查或安装 LayaAir、.NET、Python、浏览器和 Codex CLI。仓库只保留 framework manifest、lock、upstream 与同步工具契约检查；快速验证、表生成、语义评测和发布验收均在本地按需执行。语义评测复用本地 Codex CLI 登录态，不需要 `CODEX_API_KEY`。缺少依赖时，本地命令应指向本文档，而不是要求修改 GitHub Secrets 或让远端 Runner 代替本机环境。

@@ -59,9 +59,9 @@ npm run verify
 
 只有改动影响 Laya 发布链或准备正式发布时才执行 `npm run verify:release`。它先检查环境，以最多 3 路并发运行完整静态检查，全部通过后只构建一次，并由 Headless Chromium + SwiftShader 检查真实 LayaAir 3.4.1 2D 发布包。已通过且没有相关文件变化的检查不重复执行。
 
-Windows 与 macOS 共用同一套 AGENTS、Skills 和 npm 命令。普通 push 只在单个 Ubuntu runner 执行快速门禁；发布 Tag 或手动触发时，双平台 CI 才分别执行完整 `npm run verify:release`。
+Windows 与 macOS 共用同一套 AGENTS、Skills 和 npm 命令。GitHub Actions 只运行 framework manifest、lock、upstream 与同步工具的纯 Node 契约检查，不安装或检测 LayaAir、.NET、Python、浏览器和 Codex CLI。快速门禁、领域检查及 `npm run verify:release` 全部由开发者在相关本机按需执行；缺少环境时按 [开发环境说明](LXFamework-Environment.md) 准备。
 
-AGENTS、Skill description、路由样例或决策语义变化时，才在开发者已登录的本地 Codex CLI 环境运行一次 `npm run test:skill-routing`；普通 YAML、脚本、测试实现和文档改动只运行确定性 workflow 门禁。语义评测覆盖正向/负向路由与批准、只读、越界、默认单代理及受控委派决策，记录模型和 token；可用 `LX_CODEX_EVAL_MODEL` / `LX_CODEX_EVAL_EFFORT` 显式覆盖。分类成绩不代表真实任务行为，不能替代执行审查。GitHub CI 不调用模型、不读取或要求 `CODEX_API_KEY`。
+AGENTS、Skill description、路由样例或决策语义变化时，才在开发者已登录的本地 Codex CLI 环境运行一次 `npm run test:skill-routing`；普通 YAML、脚本、测试实现和文档改动只运行本地确定性 workflow 门禁。语义评测覆盖正向/负向路由与批准、只读、越界、默认单代理及受控委派决策，记录模型和 token；可用 `LX_CODEX_EVAL_MODEL` / `LX_CODEX_EVAL_EFFORT` 显式覆盖。分类成绩不代表真实任务行为，不能替代执行审查。GitHub Actions 不调用模型、不读取或要求 `CODEX_API_KEY`。
 
 真实商店、小游戏容器或 Native 签名等无法由 Headless 证明的行为应列为未验证项，不自动切换到 GUI。
 

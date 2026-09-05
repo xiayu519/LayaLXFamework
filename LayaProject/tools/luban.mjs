@@ -16,6 +16,7 @@ import { fileURLToPath } from "node:url";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repositoryRoot = resolve(projectRoot, "..");
+const environmentGuide = "../Books/LXFamework-Environment.md";
 const designRoot = join(repositoryRoot, "Design");
 const toolRoot = join(designRoot, "tools");
 const lubanDll = join(toolRoot, "Luban", "Luban.dll");
@@ -90,7 +91,7 @@ function verifyVersion() {
         windowsHide: true,
     });
     if (result.error) {
-        throw result.error;
+        throw new Error(`.NET 8 runtime was not found. See ${environmentGuide}. (${result.error.message})`);
     }
     const actual = `${result.stdout ?? ""}${result.stderr ?? ""}`.trim().replace(/^Luban\s+/, "");
     if (actual !== pinnedVersion) {
@@ -121,7 +122,7 @@ function runLuban(codeOutput, dataOutput) {
         process.stderr.write(result.stderr);
     }
     if (result.error) {
-        throw result.error;
+        throw new Error(`.NET 8 runtime was not found. See ${environmentGuide}. (${result.error.message})`);
     }
     if (result.status !== 0) {
         throw new Error(`Luban exited with code ${result.status ?? 1}.`);

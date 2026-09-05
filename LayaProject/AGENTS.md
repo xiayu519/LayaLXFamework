@@ -8,7 +8,7 @@
 
 根目录存在 `.framework-lock.json` 即为下游消费模式：禁止手改 manifest 管理文件和 lock；缺口反馈上游，只同步已确认 Tag 或已提交的 channel snapshot。
 
-Windows/macOS 共用框架与工作流；环境自备，仓库只检测。工具优先跨平台 Node API，差异由双平台 CI 验证。
+Windows/macOS 共用；环境自备，本地只检测并引导。优先 Node 跨平台 API；差异本地验收，GitHub 只校验同步契约。
 
 优先使用 LayaAir 3.4.1 的 Event、`Laya.timer`、Tween、Pool、Loader、LocalStorage、Scene、SoundManager 与 ui2，不建同义层。`LX.Res`/`LX.Scene` 即原生对象。固定 UI 来自 `.ls/.lh`；异步回写用失效令牌。资源先停副作用并销毁 owner，稳定后 `Laya.Scene.gc()`；禁用私有引用 API。
 

@@ -21,6 +21,7 @@
     "typecheck": "node tools/typecheck.mjs",
     "test": "vitest run",
     "test:unit": "vitest run tests/framework tests/game --exclude tests/framework/HttpTransportEngine.test.ts",
+    "test:framework-sync": "vitest run tests/workflow/FrameworkDistribution.test.ts",
     "test:workflow": "vitest run tests/workflow",
     "check:architecture": "node tools/check-architecture.mjs",
     "check:engine-source": "node tools/check-engine-source.mjs",

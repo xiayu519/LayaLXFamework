@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
 export const LAYA_VERSION = "3.4.1";
+const environmentGuide = "../Books/LXFamework-Environment.md";
 
 export function resolveLayaInstallRoot() {
     return process.env.LAYAAIR_INSTALL_DIR
@@ -16,17 +17,17 @@ export function resolveLayaRuntime() {
     const installRoot = resolveLayaInstallRoot();
     const versionsFile = join(installRoot, "versions.json");
     if (!existsSync(versionsFile)) {
-        throw new Error(`LayaAir CLI is not installed: ${versionsFile}`);
+        throw new Error(`LayaAir CLI is not installed: ${versionsFile}. See ${environmentGuide}.`);
     }
     const registry = JSON.parse(readFileSync(versionsFile, "utf8"));
     const entry = registry.versions?.find((item) => item.version === LAYA_VERSION);
     if (!entry) {
-        throw new Error(`LayaAir CLI ${LAYA_VERSION} is not installed. No fallback is allowed.`);
+        throw new Error(`LayaAir CLI ${LAYA_VERSION} is not installed. No fallback is allowed. See ${environmentGuide}.`);
     }
     const runtimeRoot = resolve(installRoot, entry.path);
     const cliMain = join(runtimeRoot, "Resources", "cli-main.js");
     if (!existsSync(cliMain)) {
-        throw new Error(`LayaAir CLI ${LAYA_VERSION} is incomplete: ${cliMain}`);
+        throw new Error(`LayaAir CLI ${LAYA_VERSION} is incomplete: ${cliMain}. See ${environmentGuide}.`);
     }
     return { installRoot, runtimeRoot, cliMain };
 }

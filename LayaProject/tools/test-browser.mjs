@@ -16,6 +16,7 @@ import { runFrameworkProbes } from "./browser-framework-probes.mjs";
 import { handleNetworkProbe, runNetworkProbes } from "./browser-network-probes.mjs";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const environmentGuide = "../Books/LXFamework-Environment.md";
 const releaseRoot = join(projectRoot, "release", "web");
 const performanceSettings = JSON.parse(readFileSync(join(projectRoot, "settings", "PerformanceBudgets.json"), "utf8"));
 const headlessValidation = JSON.parse(readFileSync(join(projectRoot, "settings", "HeadlessValidation.json"), "utf8"));
@@ -480,7 +481,7 @@ function findBrowser() {
     ].filter(Boolean);
     const path = candidates.find((candidate) => existsSync(candidate));
     if (!path) {
-        throw new Error("Edge/Chrome/Chromium was not found. Set BROWSER_PATH to a Chromium browser executable.");
+        throw new Error(`Edge/Chrome/Chromium was not found. Set BROWSER_PATH to a Chromium browser executable. See ${environmentGuide}.`);
     }
     return path;
 }

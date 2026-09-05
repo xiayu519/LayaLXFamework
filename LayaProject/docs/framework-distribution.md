@@ -53,4 +53,4 @@ npm run verify
 
 第一次建立下游仓库时仍建议从一个已发布 Tag 创建完整项目并设置自己的 `origin`，再对同一 Tag 执行一次 `framework:sync` 生成初始 lock。之后可以同步更高的已发布版本，也可以按需显式更新 `main` snapshot；下游不会在上游 push 时自动漂移。
 
-本地文件仍可被编辑，但受管文件与 lock 不一致会被离线完整性检查拒绝；CI 还通过 `npm run check:framework-upstream` 对照 lock 指向的真实 Tag 或 channel 历史中的固定 commit，因此同时伪造文件与 lock 也会失败。用于 snapshot 的 channel 必须禁止 force-push，仓库必须启用分支保护并要求 `CODEOWNERS` 审查；框架缺口回到上游修复，不能修改哈希绕过。
+本地文件仍可被编辑，但受管文件与 lock 不一致会被离线完整性检查拒绝；唯一的 GitHub Workflow 只运行同步契约检查，通过 `npm run check:framework-upstream` 对照 lock 指向的真实 Tag 或 channel 历史中的固定 commit，因此同时伪造文件与 lock 也会失败。它不安装或检测 LayaAir、.NET、Python、浏览器与 Codex CLI；这些环境及游戏回归由使用者在本地按需验证。用于 snapshot 的 channel 必须禁止 force-push，仓库必须启用分支保护并要求 `CODEOWNERS` 审查；框架缺口回到上游修复，不能修改哈希绕过。

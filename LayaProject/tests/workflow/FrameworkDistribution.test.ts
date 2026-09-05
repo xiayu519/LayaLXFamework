@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -133,6 +133,55 @@ describe("framework distribution", () => {
             .toBe("export const value = 2;\n");
         expect(run("check", "--destination", destination)).toContain("main snapshot");
         expect(gitOutput(source, "tag")).toBe("");
+    }, distributionTestTimeoutMs);
+
+    it("removes GitHub workflows retired by a newer framework manifest", () => {
+        const source = fixture("lx-framework-workflow-source-");
+        const destination = fixture("lx-framework-workflow-consumer-");
+        const manifestPath = join(source, "framework.manifest.json");
+        const legacyWorkflow = join(source, ".github", "workflows", "release-validation.yml");
+        const syncWorkflow = join(source, ".github", "workflows", "framework-sync.yml");
+        writeJson(manifestPath, {
+            schemaVersion: 1,
+            name: "LayaLXFamework",
+            version: "1.0.0",
+            repository: "https://example.invalid/LayaLXFamework.git",
+            managedPaths: [
+                ".github/workflows/release-validation.yml",
+                "framework.manifest.json",
+            ],
+        });
+        write(legacyWorkflow, "name: Legacy release validation\n");
+        git(source, "init");
+        git(source, "config", "user.name", "Framework Test");
+        git(source, "config", "user.email", "framework-test@example.invalid");
+        git(source, "add", ".");
+        git(source, "commit", "-m", "test: publish legacy workflow");
+        git(source, "tag", "v1.0.0");
+
+        run("sync", "--source", source, "--destination", destination, "--ref", "v1.0.0");
+        expect(existsSync(join(destination, ".github", "workflows", "release-validation.yml"))).toBe(true);
+
+        writeJson(manifestPath, {
+            schemaVersion: 1,
+            name: "LayaLXFamework",
+            version: "1.1.0",
+            repository: "https://example.invalid/LayaLXFamework.git",
+            managedPaths: [
+                ".github/workflows/framework-sync.yml",
+                "framework.manifest.json",
+            ],
+        });
+        rmSync(legacyWorkflow);
+        write(syncWorkflow, "name: Framework sync contract\n");
+        git(source, "add", ".");
+        git(source, "commit", "-m", "test: replace validation workflows");
+        git(source, "tag", "v1.1.0");
+
+        run("sync", "--source", source, "--destination", destination, "--ref", "v1.1.0");
+        expect(existsSync(join(destination, ".github", "workflows", "release-validation.yml"))).toBe(false);
+        expect(readFileSync(join(destination, ".github", "workflows", "framework-sync.yml"), "utf8"))
+            .toContain("Framework sync contract");
     }, distributionTestTimeoutMs);
 });
 

@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 
 const MINIMUM_PYTHON = Object.freeze([3, 9]);
+const environmentGuide = "../Books/LXFamework-Environment.md";
 
 export function resolvePythonRuntime() {
     const configured = process.env.PYTHON_PATH?.trim();
@@ -33,7 +34,7 @@ export function resolvePythonRuntime() {
     }
 
     throw new Error(
-        `Python ${MINIMUM_PYTHON.join(".")}+ was not found. Prepare the local environment or set PYTHON_PATH.`,
+        `Python ${MINIMUM_PYTHON.join(".")}+ was not found. Prepare the local environment or set PYTHON_PATH. See ${environmentGuide}.`,
     );
 }
 

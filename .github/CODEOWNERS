@@ -1,7 +1,7 @@
 /framework.manifest.json @xiayu519
 /.gitattributes @xiayu519
 /.github/CODEOWNERS @xiayu519
-/.github/workflows/static-validation.yml @xiayu519
+/.github/workflows/framework-sync.yml @xiayu519
 /Books/ @xiayu519
 /Design/genBin.bat @xiayu519
 /Design/genBin.command @xiayu519

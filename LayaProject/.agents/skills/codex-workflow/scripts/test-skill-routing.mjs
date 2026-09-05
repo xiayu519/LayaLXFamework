@@ -12,6 +12,7 @@ const OUTPUT_TOKEN_LIMIT = 2_500;
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const skillRoot = resolve(scriptDirectory, "..");
 const projectRoot = resolve(skillRoot, "..", "..", "..");
+const environmentGuide = "../Books/LXFamework-Environment.md";
 const schemaPath = join(skillRoot, "evals", "routing-output.schema.json");
 const { definition, policy, prompt } = loadRoutingEvaluation(projectRoot, process.env);
 const temporaryRoot = resolve(tmpdir());
@@ -56,11 +57,14 @@ try {
         timeout: 240_000,
     });
     if (execution.error) {
-        throw execution.error;
+        throw new Error(`Local Codex CLI could not run. See ${environmentGuide}. (${execution.error.message})`);
     }
     if (execution.status !== 0) {
         const evidence = [execution.stdout, execution.stderr].filter(Boolean).join("\n");
-        throw new Error(`Codex routing evaluation exited with code ${execution.status ?? 1}.\n${evidence}`);
+        throw new Error(
+            `Codex routing evaluation exited with code ${execution.status ?? 1}. `
+            + `Use the locally authenticated Codex CLI; CODEX_API_KEY is not required. See ${environmentGuide}.\n${evidence}`,
+        );
     }
 
     const events = execution.stdout.split(/\r?\n/).filter(Boolean).flatMap((line) => {

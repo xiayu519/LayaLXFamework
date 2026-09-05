@@ -1,4 +1,4 @@
-name: Fast validation
+name: Framework sync contract
 
 on:
   workflow_dispatch:
@@ -28,4 +28,5 @@ jobs:
           cache-dependency-path: LayaProject/package-lock.json
       - run: npm ci
       - run: npm run check:framework-upstream
-      - run: npm run verify
+      - run: npm run check:framework-integrity
+      - run: npm run test:framework-sync
