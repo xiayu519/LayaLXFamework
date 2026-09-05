@@ -4,12 +4,14 @@ import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { LAYA_VERSION, resolveLayaRuntime } from "./layaair.mjs";
+import { resolvePythonRuntime } from "./python-runtime.mjs";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const errors = [];
 const ideRoot = resolveIdeRoot();
 let verifiedIdeRoot;
 let verifiedCliRoot;
+let verifiedPython;
 
 function readJson(path) {
     try {
@@ -23,6 +25,12 @@ function readJson(path) {
 const nodeMajor = Number(process.versions.node.split(".")[0]);
 if (nodeMajor < 20) {
     errors.push(`Node.js 20+ is required; found ${process.versions.node}.`);
+}
+
+try {
+    verifiedPython = resolvePythonRuntime();
+} catch (error) {
+    errors.push(error.message);
 }
 
 const dotnetVersion = spawnSync("dotnet", ["--version"], { encoding: "utf8", windowsHide: true });
@@ -148,6 +156,8 @@ const requiredPaths = [
     "src/framework/bootstrap/AppBootstrap.ts",
     "src/game/bootstrap/createApplication.ts",
     "tools/test-headless.mjs",
+    "tools/python-runtime.mjs",
+    "tools/run-python.mjs",
     "tools/check-engine-source.mjs",
     "tools/luban.mjs",
     "tools/validate-resource-layout.mjs",
@@ -179,12 +189,14 @@ for (const path of requiredPaths) {
 
 if (errors.length > 0) {
     console.error("Doctor found configuration errors:");
+    console.error("Prepare local prerequisites using ../Books/LXFamework-Environment.md; this command never installs software.");
     for (const error of errors) {
         console.error(`- ${error}`);
     }
     process.exitCode = 1;
 } else {
     console.log(`Doctor OK: Node ${process.versions.node}, LayaAir ${LAYA_VERSION}, ui2, TypeScript 5.9.3.`);
+    console.log(`Python runtime: ${verifiedPython.command} ${verifiedPython.version}`);
     console.log(`CLI runtime: ${verifiedCliRoot}`);
     if (verifiedIdeRoot) {
         console.log(`IDE runtime: ${verifiedIdeRoot}`);
@@ -197,7 +209,6 @@ function resolveIdeRoot() {
     }
     const candidates = process.platform === "win32"
         ? [
-            "D:\\Soft\\Laya\\LayaAirIDE",
             process.env.ProgramFiles ? join(process.env.ProgramFiles, "LayaAirIDE") : undefined,
             process.env.LOCALAPPDATA ? join(process.env.LOCALAPPDATA, "Programs", "LayaAirIDE") : undefined,
         ]

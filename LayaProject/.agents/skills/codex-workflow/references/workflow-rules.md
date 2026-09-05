@@ -15,7 +15,7 @@
 - 不使用关键词表或硬编码路由；以代表性语义 eval 验证 description。
 - 主线和质量门禁为 `gpt-5.6-sol/high`。明确、低风险小任务可用 `sol/medium` 或 `terra/medium`，公共契约与最终验收不降级。
 - 静态检查可并行；一次完整发布验证足够，不重复无相关变化的通过项。
-- 工具默认使用 Node 跨平台 API 和 `node:path`；系统路径、可执行文件及安装命令必须按平台显式发现，不能让业务或 Skill 使用方式分叉。
+- 本机工具只检测环境，不执行系统软件安装；默认使用 Node 跨平台 API 和 `node:path`。系统路径与可执行文件按平台发现，CI runner 的隔离准备不得让业务或 Skill 用法分叉。
 
 ## Collaboration
 

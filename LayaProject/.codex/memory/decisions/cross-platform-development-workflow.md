@@ -16,11 +16,11 @@ source: user-confirmed
 
 ## Decision
 
-业务和框架代码不按桌面系统分叉；两端使用相同 npm 命令。工具以 Node 跨平台 API 为默认实现，确有系统差异时显式发现可执行文件。仓库文本固定 LF，批处理保留 CRLF；Windows/macOS CI 分别原地执行完整 `npm run verify`。
+业务和框架代码不按桌面系统分叉；两端使用相同 npm 命令。开发人员按官方文档准备本机环境，仓库工具只检测、不安装系统软件；CI runner 仍隔离准备固定版本以保证可重复验收。工具以 Node 跨平台 API 为默认实现，确有系统差异时显式发现可执行文件。仓库文本固定 LF，批处理保留 CRLF；Windows/macOS CI 分别原地执行完整 `npm run verify`。
 
 ## Consequences
 
-新增工具不得依赖单一系统 shell、盘符或隐式 PATH。非标准位置使用 `LAYAAIR_INSTALL_DIR`、`LAYAAIR_IDE_HOME`、`BROWSER_PATH` 覆盖。未经双平台实际验证不能宣称完整兼容。
+新增本机工具不得安装系统依赖，也不得依赖单一系统 shell、盘符或隐式 PATH。非标准位置使用 `LAYAAIR_INSTALL_DIR`、`LAYAAIR_IDE_HOME`、`BROWSER_PATH`、`PYTHON_PATH` 覆盖。未经双平台实际验证不能宣称完整兼容。
 
 ## Re-evaluate when
 

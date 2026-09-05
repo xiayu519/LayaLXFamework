@@ -6,7 +6,7 @@
 
 共享框架在 `src/framework/`，业务在 `src/game/`；framework 不依赖 game，业务只经 `LX`。新游戏放在 `src/game/<game-id>/`；从该目录启动时叠加根与游戏规则，公共和游戏 Skills 同时可用。写前保留他人改动；同一区域并行冲突时停止报告。
 
-开发工具与工作流须兼容 Windows/macOS；使用跨平台路径和 Node API，不硬编码单一系统 shell。平台差异显式分支并由双平台 CI 验证。
+开发/工作流兼容 Windows/macOS；本机环境按文档自备，仓库只检测、不安装。工具用跨平台 Node API；差异由双平台 CI 验证。
 
 优先使用 LayaAir 3.4.1 的 Event、`Laya.timer`、Tween、Pool、Loader、LocalStorage、Scene、SoundManager 与 ui2，不建同义管理器或转发层。`LX.Res` 即 `Laya.loader`，`LX.Scene` 即 `Laya.Scene`。固定 UI 节点来自 `.ls/.lh`；异步 UI 回写使用失效令牌。资源先停副作用并销毁 owner，等待加载/渲染稳定后调用 `Laya.Scene.gc()`；禁止业务调用私有资源引用 API。
 

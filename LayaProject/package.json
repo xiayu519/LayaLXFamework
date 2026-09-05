@@ -23,7 +23,7 @@
     "validate:performance": "node tools/validate-performance-budgets.mjs",
     "validate:game-workflow": "node tools/create-game.mjs --id workflow-probe --dry-run",
     "analyze:packages": "node .agents/skills/laya-minigame-packaging/scripts/analyze-package-size.mjs",
-    "check:skills": "python tools/validate-skills.py",
+    "check:skills": "node tools/run-python.mjs tools/validate-skills.py",
     "check:memory": "node .agents/skills/project-memory/scripts/project-memory.mjs check",
     "test:skill-routing": "node .agents/skills/codex-workflow/scripts/test-skill-routing.mjs",
     "build:web": "node tools/layaair.mjs build web -p . --skip-package-install",

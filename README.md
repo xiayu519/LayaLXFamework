@@ -6,16 +6,11 @@ LayaLXFamework 是基于 **LayaAir 3.4.1** 的 2D 游戏客户端框架，面向
 
 ## 环境与打开方式
 
-- Windows 10/11 或 macOS
-- LayaAirIDE 3.4.1
-- LayaAir CLI 3.4.1
-- Node.js 20+
-- .NET 8 Runtime
-- Edge、Chrome 或 Chromium
+Windows 与 macOS 共用同一框架和工作流。开发人员先按 [开发环境说明](Books/LXFamework-Environment.md) 自行准备本机依赖；仓库和本地工具只检测环境，不安装系统软件。
 
 LayaAir 工程位于 `LayaProject/`。使用 LayaAirIDE 打开该目录或 `LayaProject/LayaProject.laya`。
 
-首次拉取后执行：
+环境准备完成后执行：
 
 ```shell
 cd LayaProject
@@ -23,7 +18,7 @@ npm ci
 npm run doctor
 ```
 
-Windows 与 macOS 使用相同命令。非标准安装位置可通过 `LAYAAIR_INSTALL_DIR`、`LAYAAIR_IDE_HOME` 或 `BROWSER_PATH` 指定；`LAYAAIR_IDE_HOME` 在 macOS 指向 `LayaAirIDE.app`。
+两端使用相同命令；`doctor` 不执行安装。
 
 ## 目录
 
