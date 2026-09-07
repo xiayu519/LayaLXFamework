@@ -2,7 +2,7 @@
   "resolution": {
     "designWidth": 750,
     "designHeight": 1334,
-    "scaleMode": "fixedauto",
+    "scaleMode": "fixedwidth",
     "screenMode": "vertical",
     "backgroundColor": "#0b1220"
   },

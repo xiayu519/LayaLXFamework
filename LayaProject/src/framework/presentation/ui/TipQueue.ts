@@ -1,4 +1,5 @@
 import { UILayer } from "./UILayer";
+import type { UILayoutService } from "./UILayoutService";
 
 export interface TipQueueOptions {
     readonly intervalMs?: number;
@@ -51,6 +52,7 @@ export class TipQueue {
         private readonly pool: TipPool,
         prefabUrl: string,
         options: TipQueueOptions = {},
+        private readonly layout?: Pick<UILayoutService, "snapshot">,
     ) {
         this.options = Object.freeze({ ...DEFAULT_OPTIONS, ...options });
         validateOptions(this.options);
@@ -150,8 +152,12 @@ export class TipQueue {
         messageText.text = message;
         root.addChild(view);
         view.zOrder = UILayer.Toast * 1000;
-        view.x = Math.round((root.width - view.width) / 2);
-        view.y = Math.round(root.height * 0.62);
+        const safeArea = this.layout?.snapshot().topSafeArea;
+        const area = safeArea && safeArea.width > 0 && safeArea.height > 0
+            ? safeArea
+            : { x: 0, y: 0, width: root.width, height: root.height };
+        view.x = Math.round(area.x + (area.width - view.width) / 2);
+        view.y = Math.round(area.y + area.height * 0.62);
         const finalY = view.y - this.options.riseDistance;
         this.active.add(view);
         this.shown += 1;

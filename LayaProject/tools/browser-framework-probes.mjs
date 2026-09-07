@@ -58,6 +58,22 @@ export async function runFrameworkProbes(validation) {
     };
 
     try {
+        const layout = ui.layout.snapshot();
+        const fullBleed = base.window.contentPane.getChildByName("fullBleed");
+        const safeContent = base.window.contentPane.getChildByName("safeContent");
+        const middle = safeContent?.getChildByName("middle");
+        assert(layout.viewport.width === root.width && layout.viewport.height === root.height,
+            `layout viewport ${JSON.stringify(layout.viewport)} differs from GRoot ${root.width}x${root.height}`);
+        assert(fullBleed?.width === root.width && fullBleed?.height === root.height,
+            "full-bleed content did not fill the live GRoot");
+        assert(safeContent?.x === layout.safeArea.x && safeContent?.y === layout.safeArea.y
+            && safeContent?.width === layout.safeArea.width && safeContent?.height === layout.safeArea.height,
+            "safe content differs from the current platform safe area");
+        assert(middle, "full-screen content is missing its middle slot");
+        assert(Math.abs(middle.x - (layout.safeArea.width - middle.width) / 2) <= 1
+            && Math.abs(middle.y - (layout.safeArea.height - middle.height) / 2) <= 1,
+            "middle content is not centered in the current safe area");
+
         for (const order of ["old-first", "new-first", "old-reject"]) {
             const route = register(ui, `binding_${order}`, { retention: "hide" });
             const window = await ui.show(route, {});
@@ -184,7 +200,7 @@ export async function runFrameworkProbes(validation) {
             "repeat cycle left pending UI work");
         assert(before.managed === after.managed && before.children === after.children, "final UI/root counts drifted");
         return {
-            bindingIsolation: true, bindingCancellation: true, modalOrdering: true,
+            responsiveLayout: true, bindingIsolation: true, bindingCancellation: true, modalOrdering: true,
             repeatCycles: 100, stableCounts: true, before, after, counts,
         };
     } finally {

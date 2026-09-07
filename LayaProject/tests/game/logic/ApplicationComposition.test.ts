@@ -103,7 +103,7 @@ describe("createApplication", () => {
         const platform: PlatformService = {
             name: "platform:test",
             kind: "native",
-            safeArea: { top: 0, right: 0, bottom: 0, left: 0 },
+            viewport: { width: 750, height: 1334, safeArea: { x: 0, y: 0, width: 750, height: 1334 } },
             start: vi.fn(),
             stop: vi.fn(),
             nowMs: () => 0,
@@ -153,7 +153,7 @@ describe("createApplication", () => {
         const platform: PlatformService = {
             name: "platform:broken",
             kind: "native",
-            safeArea: { top: 0, right: 0, bottom: 0, left: 0 },
+            viewport: { width: 750, height: 1334, safeArea: { x: 0, y: 0, width: 750, height: 1334 } },
             start: vi.fn(() => { throw new Error("platform unavailable"); }),
             stop: vi.fn(),
             nowMs: () => 0,

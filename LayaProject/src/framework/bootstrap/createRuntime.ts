@@ -11,11 +11,12 @@ import {
     type SaveSchema,
 } from "../infrastructure/storage/SaveStore";
 import type { PlatformService } from "../platform/PlatformService";
-import { WebPlatformService } from "../platform/WebPlatformService";
+import { createDefaultPlatformService } from "../platform/createDefaultPlatformService";
 import type { PurchasePlatform } from "../platform/purchase/PurchasePlatform";
 import { UnsupportedPurchasePlatform } from "../platform/purchase/UnsupportedPurchasePlatform";
 import { UIRouter } from "../presentation/ui/UIRouter";
 import { TipQueue } from "../presentation/ui/TipQueue";
+import { UILayoutService } from "../presentation/ui/UILayoutService";
 import { DefaultSceneLoadingPresenter } from "../presentation/scene/DefaultSceneLoadingPresenter";
 import {
     SceneFlow,
@@ -112,11 +113,12 @@ export function createRuntime(
     const pool = new PrefabPoolService();
     const performance = new RenderPerformance();
     const settings = new SaveStore(new LayaLocalStorageDriver(), SETTINGS_SCHEMA);
-    const platform = adapters.platform ?? new WebPlatformService();
+    const platform = adapters.platform ?? createDefaultPlatformService();
     const purchase = adapters.purchase ?? new UnsupportedPurchasePlatform();
     const http = adapters.http ?? new LayaHttpTransport();
-    const tips = new TipQueue(pool, "bootstrap/framework/ui/Tip.lh");
-    const ui = new UIRouter(tips);
+    const uiLayout = new UILayoutService(platform);
+    const tips = new TipQueue(pool, "bootstrap/framework/ui/Tip.lh", {}, uiLayout);
+    const ui = new UIRouter(tips, uiLayout);
     const sceneLoadingPresenter = definition.createSceneLoadingPresenter?.(ui, content)
         ?? new DefaultSceneLoadingPresenter(ui);
     const sceneFlow = new SceneFlow({ loadingPresenter: sceneLoadingPresenter });
@@ -187,7 +189,10 @@ export function createRuntime(
         },
     };
     const gameServices = definition.createServices?.(context) ?? [];
-    const bootstrap = new AppBootstrap([platform, cleanupService, preferencesService, ...gameServices], definition.lifecycle);
+    const bootstrap = new AppBootstrap(
+        [platform, uiLayout, cleanupService, preferencesService, ...gameServices],
+        definition.lifecycle,
+    );
 
     let runtime: ApplicationRuntime;
     runtime = {

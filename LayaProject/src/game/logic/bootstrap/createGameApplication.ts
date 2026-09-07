@@ -40,6 +40,7 @@ export function createGameApplication(adapters: ApplicationAdapters = {}): Appli
             const statusRoute: UIRoute<FrameworkStatusArgs> = {
                 id: statusContent.id,
                 url: statusContent.url,
+                layout: "fullscreen",
                 multiplicity: "singleton",
                 retention: "destroy",
                 create: (pane) => new FrameworkStatusWindow(pane),

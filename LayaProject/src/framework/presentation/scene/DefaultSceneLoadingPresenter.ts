@@ -27,6 +27,7 @@ export class DefaultSceneLoadingPresenter implements SceneLoadingPresenter {
             url: DEFAULT_SCENE_LOADING_URL,
             layer: UILayer.System,
             modal: true,
+            layout: "fullscreen",
             multiplicity: "singleton",
             retention: "hide",
             create: (pane) => new SceneLoadingWindow(pane),

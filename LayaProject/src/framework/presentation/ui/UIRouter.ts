@@ -9,6 +9,7 @@ import { UIRequestTracker, type UIRequest, type UIRequestInfo } from "./UIReques
 import { syncModalOrder } from "./UIModalOrder";
 import { destroyManagedWindow, getWindowCleanupDiagnostic,
     type CleanupWindowRecord, type UIWindowCleanupDiagnostic } from "./UIWindowCleanup";
+import { UILayoutService, type UIWindowLayout } from "./UILayoutService";
 
 export type UIWindowMultiplicity = "singleton" | "multiple";
 export type UIWindowRetention = "hide" | "destroy";
@@ -19,6 +20,8 @@ export interface UIRoute<TArgs> {
     readonly url: string;
     readonly layer?: UILayer;
     readonly modal?: boolean;
+    /** Defaults to center-popup for Popup routes and fullscreen for every other layer. */
+    readonly layout?: UIWindowLayout;
     readonly multiplicity: UIWindowMultiplicity;
     readonly retention: UIWindowRetention;
     create(contentPane: Laya.GWidget): BaseGameWindow<TArgs>;
@@ -73,9 +76,20 @@ export class UIRouter implements WindowLifecycleObserver {
     private readonly presentationVersions = new WeakMap<UnknownWindow, number>();
     private readonly pendingLoads = new Set<Promise<unknown>>();
     private readonly nativeLoads = new Set<Promise<unknown>>();
+    private readonly unsubscribeLayout: (() => void) | undefined;
     private disposed = false;
 
-    constructor(private readonly tips?: TipQueue) {}
+    constructor(
+        private readonly tips?: TipQueue,
+        private readonly layoutService?: UILayoutService,
+    ) {
+        this.unsubscribeLayout = layoutService?.subscribe(() => this.layoutManagedWindows());
+    }
+
+    get layout(): UILayoutService {
+        if (!this.layoutService) throw new Error("UI layout is not configured.");
+        return this.layoutService;
+    }
 
     register<TArgs>(route: UIRoute<TArgs>): UIRoute<TArgs> {
         this.requireActive();
@@ -215,6 +229,7 @@ export class UIRouter implements WindowLifecycleObserver {
         const errors: unknown[] = [];
         if (!this.disposed) {
             this.disposed = true;
+            this.unsubscribeLayout?.();
             try {
                 this.tips?.dispose();
             } catch (error) {
@@ -331,6 +346,7 @@ export class UIRouter implements WindowLifecycleObserver {
         request.window = window;
         window.modal = route.modal ?? resolveLayer(route) === UILayer.Popup;
         window.zOrder = resolveLayer(route) * 1000;
+        this.layoutService?.apply(window, resolveWindowLayout(route));
         try {
             const shown = await window.present(args, request.controller.signal);
             if (!shown || window.destroyed || this.disposed
@@ -428,10 +444,23 @@ export class UIRouter implements WindowLifecycleObserver {
         }
         syncModalOrder(root);
     }
+
+    private layoutManagedWindows(): void {
+        if (this.disposed || !this.layoutService) return;
+        for (const record of this.records.values()) {
+            if (!record.window.destroyed) {
+                this.layoutService.apply(record.window, resolveWindowLayout(record.route));
+            }
+        }
+    }
 }
 
 function resolveLayer(route: UnknownRoute): UILayer {
     return route.layer ?? UILayer.Screen;
+}
+
+function resolveWindowLayout(route: UnknownRoute): UIWindowLayout {
+    return route.layout ?? (resolveLayer(route) === UILayer.Popup ? "center-popup" : "fullscreen");
 }
 
 function toWindowInfo(record: WindowRecord): UIWindowInfo {
