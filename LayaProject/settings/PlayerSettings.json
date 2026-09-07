@@ -1,7 +1,7 @@
 {
   "resolution": {
-    "designWidth": 750,
-    "designHeight": 1334,
+    "designWidth": 720,
+    "designHeight": 1280,
     "scaleMode": "fixedwidth",
     "screenMode": "vertical",
     "backgroundColor": "#0b1220"

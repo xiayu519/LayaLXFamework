@@ -3,15 +3,15 @@
   "_$id": "fwstatus",
   "_$type": "GWidget",
   "name": "FrameworkStatus",
-  "width": 750,
-  "height": 1334,
+  "width": 720,
+  "height": 1280,
   "_$child": [
     {
       "_$id": "statusbleed",
       "_$type": "GWidget",
       "name": "fullBleed",
-      "width": 750,
-      "height": 1334,
+      "width": 720,
+      "height": 1280,
       "background": {
         "_$type": "DrawRectCmd",
         "fillColor": "#0b1220"
@@ -21,13 +21,15 @@
       "_$id": "statussafe",
       "_$type": "GWidget",
       "name": "safeContent",
-      "width": 750,
-      "height": 1334,
+      "width": 720,
+      "height": 1280,
       "_$child": [
         {
           "_$id": "statusmiddle",
           "_$type": "GWidget",
           "name": "middle",
+          "x": 49,
+          "y": 430,
           "width": 622,
           "height": 420,
           "_$child": [

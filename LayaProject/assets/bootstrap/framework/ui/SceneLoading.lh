@@ -3,15 +3,15 @@
   "_$id": "lxsceneloadingroot",
   "_$type": "GWidget",
   "name": "SceneLoading",
-  "width": 750,
-  "height": 1334,
+  "width": 720,
+  "height": 1280,
   "_$child": [
     {
       "_$id": "lxsceneloadingbleed",
       "_$type": "GWidget",
       "name": "fullBleed",
-      "width": 750,
-      "height": 1334,
+      "width": 720,
+      "height": 1280,
       "background": {
         "_$type": "DrawRectCmd",
         "fillColor": "#08101e"
@@ -21,13 +21,15 @@
       "_$id": "lxsceneloadingsafe",
       "_$type": "GWidget",
       "name": "safeContent",
-      "width": 750,
-      "height": 1334,
+      "width": 720,
+      "height": 1280,
       "_$child": [
         {
           "_$id": "lxsceneloadingmiddle",
           "_$type": "GWidget",
           "name": "middle",
+          "x": 58,
+          "y": 455,
           "width": 604,
           "height": 370,
           "_$child": [

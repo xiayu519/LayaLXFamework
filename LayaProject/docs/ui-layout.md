@@ -1,6 +1,6 @@
 # UI 屏幕与安全区适配
 
-框架不规定项目设计分辨率。每个下游项目在自己的 `settings/PlayerSettings.json` 中维护 `resolution.designWidth`、`resolution.designHeight` 和方向；`720×1280`、`750×1334` 或其他尺寸都可以作为该项目的设计画布。竖屏商业小游戏默认使用 LayaAir 推荐的 `fixedwidth`：项目设计宽度用于等比缩放，运行时 Stage 高度由当前窗口比例决定。若某个项目明确需要不同的可视区域策略，再由该项目调整 `scaleMode`，不写入框架公共契约。
+当前模板项目默认使用 `720×1280`。框架不规定下游项目设计分辨率；每个项目在自己的 `settings/PlayerSettings.json` 中维护 `resolution.designWidth`、`resolution.designHeight` 和方向，`720×1280`、`750×1334` 或其他尺寸都可以作为该项目的设计画布。竖屏商业小游戏默认使用 LayaAir 推荐的 `fixedwidth`：项目设计宽度用于等比缩放，运行时 Stage 高度由当前窗口比例决定。若某个项目明确需要不同的可视区域策略，再由该项目调整 `scaleMode`，不写入框架公共契约。
 
 所有 UI 的最终布局边界取运行时 `GRoot.inst.width/height`，也就是 Laya 适配完成后的 Stage 逻辑尺寸，而不是某一套预制体设计坐标或设备物理像素。平台安全区和微信胶囊坐标也会换算到这套运行时逻辑坐标中。
 
