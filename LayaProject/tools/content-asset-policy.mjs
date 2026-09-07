@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { basename, extname, join, relative, sep } from "node:path";
+import { basename, dirname, extname, join, relative, sep } from "node:path";
 
 const SOURCE_MASTER_EXTENSIONS = new Set([
     ".aep", ".aif", ".aiff", ".ase", ".aseprite", ".bmp", ".flac", ".gif", ".psb", ".psd", ".spine", ".tga", ".tif", ".tiff",
@@ -13,7 +13,6 @@ const EXCEPTION_NAMES = [
     "readableTextures",
     "straightAlphaSpriteTextures",
     "compressedSpriteTextures",
-    "jsonSpine",
 ];
 
 export function validateContentAssetProject(projectRoot) {
@@ -99,15 +98,15 @@ export function validateContentAssetProject(projectRoot) {
     }
 
     for (const group of spineGroups.values()) {
-        validateSpineGroup(group, policy, exceptionSets, failures);
+        validateSpineGroup(group, policy, failures, projectRoot);
         counts.spineGroups += 1;
     }
     return { failures, counts };
 }
 
 function validatePolicy(policy, failures) {
-    if (policy.version !== 1) {
-        failures.push("settings/AssetImportPolicy.json: version must be 1.");
+    if (policy.version !== 2) {
+        failures.push("settings/AssetImportPolicy.json: version must be 2.");
     }
     if (policy.spineRuntime !== REVIEWED_SPINE_RUNTIME) {
         failures.push(`settings/AssetImportPolicy.json: spineRuntime must equal the reviewed ${REVIEWED_SPINE_RUNTIME} runtime line.`);
@@ -243,35 +242,79 @@ function validateAudio(path, local, relativeSegments, policy, failures) {
     }
 }
 
-function validateSpineGroup(group, policy, exceptions, failures) {
+function validateSpineGroup(group, policy, failures, projectRoot) {
     const mainFiles = group.filter((file) => file.extension === ".skel" || file.extension === ".json");
     const atlasFiles = group.filter((file) => file.extension === ".atlas");
-    const pageFiles = new Set(group.filter((file) => IMAGE_EXTENSIONS.has(file.extension)).map((file) => basename(file.path)));
+    const pageFiles = new Set(group.filter((file) => IMAGE_EXTENSIONS.has(file.extension)).map((file) => file.path));
     const label = `assets/${group[0].local.split("/").slice(0, -1).join("/")}`;
     if (mainFiles.length !== 1) {
         failures.push(`${label}: Spine package requires exactly one .skel or .json main file.`);
-    } else if (mainFiles[0].extension === ".json" && !exceptions.jsonSpine.has(mainFiles[0].local)) {
-        failures.push(`assets/${mainFiles[0].local}: production Spine JSON requires an explicit exception; prefer .skel.`);
+    } else {
+        const mainFile = mainFiles[0];
+        if (mainFile.extension === ".json") {
+            validateSpineJson(mainFile, policy.spineRuntime, failures, projectRoot);
+        }
+        const mainName = basename(mainFile.path);
+        const expectedAtlas = join(
+            dirname(mainFile.path),
+            `${mainName.slice(0, -mainFile.extension.length)}.atlas`,
+        );
+        if (atlasFiles.length !== 1 || atlasFiles[0].path !== expectedAtlas) {
+            failures.push(`${label}: Spine package requires exactly one atlas named '${basename(expectedAtlas)}' beside the main file.`);
+        }
     }
     for (const file of [...mainFiles, ...atlasFiles]) {
         requireMeta(file.path, file.local, failures);
     }
-    if (atlasFiles.length < 1) {
-        failures.push(`${label}: Spine package requires an .atlas file.`);
-    }
     if (pageFiles.size < 1) {
         failures.push(`${label}: Spine package requires at least one atlas page image.`);
     }
+    let referencedPageCount = 0;
     for (const atlas of atlasFiles) {
-        for (const page of readAtlasPages(atlas.path)) {
-            if (!pageFiles.has(page)) {
+        const pages = readAtlasPages(atlas.path);
+        referencedPageCount += pages.length;
+        for (const page of pages) {
+            const pagePath = join(dirname(atlas.path), atlasPageBasename(page));
+            if (!pageFiles.has(pagePath)) {
                 failures.push(`assets/${atlas.local}: referenced atlas page '${page}' is missing from the Spine package.`);
             }
         }
     }
+    if (atlasFiles.length > 0 && referencedPageCount === 0) {
+        failures.push(`${label}: Spine atlas must reference at least one page image.`);
+    }
     if (policy.spineRuntime !== REVIEWED_SPINE_RUNTIME) {
         failures.push(`${label}: unsupported Spine runtime policy '${policy.spineRuntime}'.`);
     }
+}
+
+function validateSpineJson(mainFile, runtime, failures, projectRoot) {
+    const data = readJson(mainFile.path, failures, projectRoot);
+    if (!data) {
+        return;
+    }
+    const exportedVersion = data?.skeleton?.spine;
+    const exportedLine = majorMinor(exportedVersion);
+    if (!exportedLine) {
+        failures.push(`assets/${mainFile.local}: Spine JSON must declare a valid skeleton.spine version.`);
+    } else if (exportedLine !== runtime) {
+        failures.push(`assets/${mainFile.local}: Spine JSON exports ${exportedVersion}, but the project runtime is ${runtime}.`);
+    }
+    if (!Array.isArray(data.bones) || data.bones.length === 0) {
+        failures.push(`assets/${mainFile.local}: Spine JSON must contain a non-empty bones array.`);
+    }
+}
+
+function majorMinor(value) {
+    if (typeof value !== "string") {
+        return undefined;
+    }
+    const match = /^(\d+)\.(\d+)(?:\.|$)/.exec(value);
+    return match ? `${Number(match[1])}.${Number(match[2])}` : undefined;
+}
+
+function atlasPageBasename(value) {
+    return value.split(/[\\/]/).pop();
 }
 
 function locateAsset(local, roots, bootstrapScopes) {

@@ -68,22 +68,71 @@ describe("content asset policy", () => {
     it("accepts a co-located binary Spine 3.8 package with straight-alpha page textures", () => {
         const root = createProjectFixture();
         const spineRoot = join(root, "assets", "bootstrap", "game", "spine", "hero");
-        mkdirSync(spineRoot, { recursive: true });
-        writeFileSync(join(spineRoot, "hero.skel"), Buffer.from([0]));
-        writeJson(join(spineRoot, "hero.skel.meta"), { uuid: "spine-main-uuid" });
-        writeFileSync(join(spineRoot, "hero.atlas"), "hero.png\nsize: 64,64\nformat: RGBA8888\n");
-        writeJson(join(spineRoot, "hero.atlas.meta"), { uuid: "spine-atlas-uuid" });
-        const image = join(spineRoot, "hero.png");
-        writePngHeader(image, 64, 64);
-        writeJson(`${image}.meta`, {
-            uuid: "spine-page-uuid",
-            importer: { textureType: 0, sRGB: true, premultiplyAlpha: false },
-        });
+        writeSpinePackage(spineRoot, { format: "skel" });
 
         const result = validateContentAssetProject(root);
 
         expect(result.failures).toEqual([]);
         expect(result.counts.spineGroups).toBe(1);
+    });
+
+    it.each([
+        ["bootstrap game", ["bootstrap", "game"]],
+        ["feature package", ["packages", "battle"]],
+        ["shared package", ["shared", "characters"]],
+    ])("accepts matching Spine JSON from a valid %s spine directory", (_label, segments) => {
+        const root = createProjectFixture();
+        const spineRoot = join(root, "assets", ...segments, "spine", "hero");
+        writeSpinePackage(spineRoot, { format: "json", version: "3.8.87" });
+
+        const result = validateContentAssetProject(root);
+
+        expect(result.failures).toEqual([]);
+        expect(result.counts.spineGroups).toBe(1);
+    });
+
+    it("rejects incompatible or unidentifiable Spine JSON", () => {
+        const root = createProjectFixture();
+        const incompatibleRoot = join(root, "assets", "packages", "battle", "spine", "enemy");
+        const invalidRoot = join(root, "assets", "packages", "battle", "spine", "effect");
+        writeSpinePackage(incompatibleRoot, { format: "json", version: "4.2.0" });
+        writeSpinePackage(invalidRoot, { format: "json", version: undefined, bones: [] });
+
+        const messages = validateContentAssetProject(root).failures.join("\n");
+
+        expect(messages).toContain("Spine JSON exports 4.2.0, but the project runtime is 3.8");
+        expect(messages).toContain("Spine JSON must declare a valid skeleton.spine version");
+        expect(messages).toContain("Spine JSON must contain a non-empty bones array");
+    });
+
+    it("requires the atlas name that Laya derives from the Spine main file", () => {
+        const root = createProjectFixture();
+        const spineRoot = join(root, "assets", "packages", "battle", "spine", "hero");
+        writeSpinePackage(spineRoot, { format: "json", version: "3.8.87", atlasName: "other" });
+
+        const messages = validateContentAssetProject(root).failures.join("\n");
+
+        expect(messages).toContain("exactly one atlas named 'hero.atlas' beside the main file");
+    });
+
+    it("rejects a Spine atlas that does not reference a page image", () => {
+        const root = createProjectFixture();
+        const spineRoot = join(root, "assets", "packages", "battle", "spine", "hero");
+        writeSpinePackage(spineRoot, { format: "json", version: "3.8.87" });
+        writeFileSync(join(spineRoot, "hero.atlas"), "size: 64,64\nformat: RGBA8888\n");
+
+        const messages = validateContentAssetProject(root).failures.join("\n");
+
+        expect(messages).toContain("Spine atlas must reference at least one page image");
+    });
+
+    it("keeps JSON outside spine directories on the ordinary JSON path", () => {
+        const root = createProjectFixture();
+        writeJson(join(root, "assets", "packages", "battle", "config", "enemy.json"), {
+            skeleton: { spine: "4.2.0" },
+        });
+
+        expect(validateContentAssetProject(root).failures).toEqual([]);
     });
 
     it("rejects a Spine runtime outside the reviewed 3.8 line", () => {
@@ -135,7 +184,7 @@ function createProjectFixture(): string {
     writeJson(join(root, "settings", "PlayerSettings.json"), { spineVersion: "3.8" });
     writeJson(join(root, "settings", "EditorSettings.json"), { textureType: 2 });
     writeJson(join(root, "settings", "AssetImportPolicy.json"), {
-        version: 1,
+        version: 2,
         spineRuntime: "3.8",
         texture: {
             sourceExtensions: [".png", ".jpg", ".jpeg", ".webp"],
@@ -157,10 +206,40 @@ function createProjectFixture(): string {
             readableTextures: [],
             straightAlphaSpriteTextures: [],
             compressedSpriteTextures: [],
-            jsonSpine: [],
         },
     });
     return root;
+}
+
+function writeSpinePackage(
+    spineRoot: string,
+    options: {
+        format: "skel" | "json";
+        version?: string;
+        bones?: unknown[];
+        atlasName?: string;
+    },
+): void {
+    mkdirSync(spineRoot, { recursive: true });
+    const main = join(spineRoot, `hero.${options.format}`);
+    if (options.format === "json") {
+        writeJson(main, {
+            skeleton: options.version === undefined ? {} : { spine: options.version },
+            bones: options.bones ?? [{ name: "root" }],
+        });
+    } else {
+        writeFileSync(main, Buffer.from([0]));
+    }
+    writeJson(`${main}.meta`, { uuid: "spine-main-uuid" });
+    const atlas = join(spineRoot, `${options.atlasName ?? "hero"}.atlas`);
+    writeFileSync(atlas, "hero.png\nsize: 64,64\nformat: RGBA8888\n");
+    writeJson(`${atlas}.meta`, { uuid: "spine-atlas-uuid" });
+    const image = join(spineRoot, "hero.png");
+    writePngHeader(image, 64, 64);
+    writeJson(`${image}.meta`, {
+        uuid: "spine-page-uuid",
+        importer: { textureType: 0, sRGB: true, premultiplyAlpha: false },
+    });
 }
 
 function writeJson(path: string, value: unknown): void {

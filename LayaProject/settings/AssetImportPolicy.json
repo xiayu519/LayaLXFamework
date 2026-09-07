@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "spineRuntime": "3.8",
   "texture": {
     "sourceExtensions": [".png", ".jpg", ".jpeg", ".webp"],
@@ -20,7 +20,6 @@
     "mipmappedTextures": [],
     "readableTextures": [],
     "straightAlphaSpriteTextures": [],
-    "compressedSpriteTextures": [],
-    "jsonSpine": []
+    "compressedSpriteTextures": []
   }
 }
