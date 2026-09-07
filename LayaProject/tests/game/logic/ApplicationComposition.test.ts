@@ -31,6 +31,9 @@ class FakeTextResource {
 
 const storage = new Map<string, string>();
 const sceneGc = vi.fn();
+class FakeScene {
+    static gc(): void { sceneGc(); }
+}
 const clearRes = vi.fn();
 const tableBytes = readFileSync(resolve("assets/bootstrap/game/tables/tbtableappconfig.bin"));
 const runtimeConfig = JSON.parse(readFileSync(resolve("assets/bootstrap/game/config/runtime.json"), "utf8"));
@@ -64,7 +67,7 @@ vi.stubGlobal("Laya", {
         recover: vi.fn(),
         clearBySign: vi.fn(),
     },
-    Scene: { gc: sceneGc },
+    Scene: FakeScene,
     timer: { clearAll: vi.fn() },
     LocalStorage: {
         getItem: (key: string) => storage.get(key) ?? null,

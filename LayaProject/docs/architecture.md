@@ -12,7 +12,7 @@
 | --- | --- | --- |
 | 事件/时间/动画 | Event、`Laya.timer`、Tween | `LifetimeScope` 仅聚合异构清理；不建立新 Timer |
 | 资源 | `Laya.loader`、Resource 引用计数、`Scene.gc()` | `ContentCatalog` 映射 ID/URL；`LX.Config` 增加 JSON 校验和显式释放 |
-| 场景 | `Laya.Scene.open/close/destroy/gc` | 真实业务有竞态时在 game 层增加请求版本，不设公共 SceneRouter |
+| 场景 | `Laya.Scene.open/close/destroy/gc` | `SceneFlow` 编排低峰值切换、失败保护与场景级回收；`BaseGameScene` 声明动态附加资源和切换钩子 |
 | UI | ui2 `GRoot/GWindow/GWidget/GLoader` | 路由、分层查询、窗口参数与生命周期约束 |
 | 对象池 | `Laya.Pool` | Prefab 异步创建、容量、所有权和 reset 钩子 |
 | 音频 | `SoundManager` / `AudioDataCache` | BGM/SFX、handle、owner 与用户设置 |
@@ -20,7 +20,17 @@
 | 存储/网络 | LocalStorage、HttpRequest | schema 迁移与稳定错误契约 |
 | 配表 | `Loader.BUFFER` | Luban 生成的业务 Tables 安装到 `LX.Tables` |
 
-`LX.Res` 返回准确的 `Laya.loader`，`LX.Scene` 返回准确的 `Laya.Scene`。`LX` 不暴露整个 runtime，也不提供 `LX.Spine` 之类的平行入口。
+`LX.Res` 返回准确的 `Laya.loader`，`LX.Scene` 返回准确的 `Laya.Scene`；需要完整切换事务时使用 `LX.SceneFlow`。`LX` 不暴露整个 runtime，也不提供 `LX.Spine` 之类的平行入口。
+
+## 场景切换
+
+业务场景根节点继承 `BaseGameScene<TArgs>`，在应用组合的 `configureSceneFlow` 中注册 typed route，经 `LX.SceneFlow.open(route, args, options)` 打开，完整示例见 [scene-flow.md](scene-flow.md)。`showLoading` 与 `autoCloseLoading` 均默认 `true`；默认 Loading 是 `UILayer.System` 上 `retention: "hide"` 的单例 ui2 `.lh`，因此复用 `GRoot` 且不随业务 `Scene` 销毁。2D 战斗摄像机应放在业务场景的 `Area2D` 内，UI 留在 `GRoot`，不建立 Unity 风格的 `UICamera`。
+
+切换顺序固定为：显示 Loading、暂停并最终清理旧场景、等待一帧并执行 `Laya.Scene.gc()`、加载 `.ls` 层级及其依赖、加载 `describeResources(args)` 返回的运行时附加资源、执行 `onPrepare`、打开新场景、等待 `onWaitUntilReady`、提交新场景、报告 `ready: 100%`，再等待一帧按策略隐藏 Loading。这样加载新场景时旧场景节点和无引用资源已退出，避免两套业务场景同时占用峰值内存。框架以 `cleanup/scene/resources/prepare/switch/ready` 六阶段输出单调总进度；`scene` 和 `resources` 也保留独立进度。
+
+`describeResources` 不是卸载清单：`.ls/.lh` 已声明的依赖不应重复列出，只声明由参数、配置或关卡数据动态选择且必须在显示前就绪的资源；这些资源应从 `onPrepare` 起消费，不在构造或反序列化期间假设其已加载。离场副作用通过 `onTransitionPause/onTransitionResume/onTransitionLeaving` 管理，同步 owner 清理通过 `own()` 登记。旧场景进入最终释放后不再承诺回滚；此后新场景失败会销毁半成品并让 Loading 保持失败状态，下一次 `open()` 可直接重试或进入兜底场景。连续切换或外部 `AbortSignal` 会使旧请求失效，晚到结果不得覆盖新请求或隐藏新请求的 Loading。
+
+`SceneFlow` 使用 `open(false)`，只替换自身记录的业务场景，不调用 `closeAll()`，从而保留挂载 `Main` 的 `Startup.ls` 生命周期外壳。`autoCloseLoading: false` 时，当前场景只能通过请求绑定的 `completeTransitionLoading()` 请求关闭；框架至少等到 `ready: 100%` 后才执行，旧场景或旧异步任务的调用自动失效。常驻 UI 使用 `retention: "hide"`，普通页面使用 `retention: "destroy"`；二者都由 UI route 明确声明，不通过场景节点存活碰运气。
 
 ## UI 生命周期
 

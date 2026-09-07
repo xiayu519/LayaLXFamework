@@ -14,6 +14,10 @@ class LXFacade {
         return requireLXRuntime().ui;
     }
 
+    get SceneFlow(): ApplicationRuntime["sceneFlow"] {
+        return requireLXRuntime().sceneFlow;
+    }
+
     get Res(): typeof Laya.loader {
         requireLXRuntime();
         return Laya.loader;

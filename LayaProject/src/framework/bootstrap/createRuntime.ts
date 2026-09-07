@@ -16,6 +16,11 @@ import type { PurchasePlatform } from "../platform/purchase/PurchasePlatform";
 import { UnsupportedPurchasePlatform } from "../platform/purchase/UnsupportedPurchasePlatform";
 import { UIRouter } from "../presentation/ui/UIRouter";
 import { TipQueue } from "../presentation/ui/TipQueue";
+import { DefaultSceneLoadingPresenter } from "../presentation/scene/DefaultSceneLoadingPresenter";
+import {
+    SceneFlow,
+    type SceneLoadingPresenter,
+} from "../presentation/scene/SceneFlow";
 import { AppBootstrap, type AppService, type BootstrapOptions } from "./AppBootstrap";
 import { bindLXRuntime, unbindLXRuntime } from "./LXRuntimeHost";
 
@@ -32,6 +37,7 @@ export interface RuntimeContext {
     readonly pool: PrefabPoolService;
     readonly performance: RenderPerformance;
     readonly ui: UIRouter;
+    readonly sceneFlow: SceneFlow;
     readonly platform: PlatformService;
     readonly purchase: PurchasePlatform;
     readonly http: HttpTransport;
@@ -47,6 +53,7 @@ export interface ApplicationRuntime extends RuntimeContext {
 export interface RuntimeSnapshot {
     readonly bootstrap: ReturnType<AppBootstrap["snapshot"]>;
     readonly ui: ReturnType<UIRouter["snapshot"]>;
+    readonly scenes: ReturnType<SceneFlow["snapshot"]>;
     readonly pools: ReturnType<PrefabPoolService["snapshot"]>;
     readonly config: ReturnType<JsonConfigService["snapshot"]>;
     readonly pendingCleanup: readonly string[];
@@ -63,6 +70,8 @@ export interface ApplicationDefinition {
     readonly lifecycle?: BootstrapOptions & { readonly pendingLoadTimeoutMs?: number };
     readonly content?: readonly ContentEntry[];
     configureUI?(ui: UIRouter, content: ContentCatalog): void;
+    createSceneLoadingPresenter?(ui: UIRouter, content: ContentCatalog): SceneLoadingPresenter;
+    configureSceneFlow?(sceneFlow: SceneFlow, content: ContentCatalog): void;
     createServices?(context: RuntimeContext): readonly AppService[];
 }
 
@@ -108,8 +117,12 @@ export function createRuntime(
     const http = adapters.http ?? new LayaHttpTransport();
     const tips = new TipQueue(pool, "bootstrap/framework/ui/Tip.lh");
     const ui = new UIRouter(tips);
+    const sceneLoadingPresenter = definition.createSceneLoadingPresenter?.(ui, content)
+        ?? new DefaultSceneLoadingPresenter(ui);
+    const sceneFlow = new SceneFlow({ loadingPresenter: sceneLoadingPresenter });
 
     definition.configureUI?.(ui, content);
+    definition.configureSceneFlow?.(sceneFlow, content);
 
     const context: RuntimeContext = {
         tables,
@@ -120,6 +133,7 @@ export function createRuntime(
         pool,
         performance,
         ui,
+        sceneFlow,
         platform,
         purchase,
         http,
@@ -139,11 +153,13 @@ export function createRuntime(
         async stop(): Promise<void> {
             const errors: unknown[] = [];
             let safeToCollect = true;
+            if (!await collectCleanup(errors, () => sceneFlow.dispose())) safeToCollect = false;
             await collectCleanup(errors, () => ui.dispose());
             await collectCleanup(errors, () => pool.dispose());
             if (!await collectCleanup(errors, () => audio.dispose())) safeToCollect = false;
             if (!await collectCleanup(errors, () => config.dispose())) safeToCollect = false;
             const waits = [
+                ["scene-flow", () => sceneFlow.waitForPendingLoads()],
                 ["ui", () => ui.waitForPendingLoads()],
                 ["pool", () => pool.waitForPendingLoads()],
                 ["config", () => config.waitForPendingLoads()],
@@ -179,7 +195,8 @@ export function createRuntime(
         bootstrap,
         snapshot(): RuntimeSnapshot {
             return Object.freeze({ bootstrap: bootstrap.snapshot(), ui: ui.snapshot(),
-                pools: pool.snapshot(), config: config.snapshot(), pendingCleanup: [...pendingCleanup], gc });
+                scenes: sceneFlow.snapshot(), pools: pool.snapshot(), config: config.snapshot(),
+                pendingCleanup: [...pendingCleanup], gc });
         },
         async start(): Promise<void> {
             bindLXRuntime(runtime);

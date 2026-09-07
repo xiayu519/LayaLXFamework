@@ -23,6 +23,7 @@ afterEach(() => {
 function createRuntime(bootstrap = new AppBootstrap([]), pendingCleanup: string[] = []): ApplicationRuntime {
     const runtime = {
         ui: { id: "ui" },
+        sceneFlow: { id: "scene-flow" },
         content: { id: "content" },
         config: { id: "config" },
         tables: { id: "tables" },
@@ -37,6 +38,9 @@ function createRuntime(bootstrap = new AppBootstrap([]), pendingCleanup: string[
         snapshot: (): RuntimeSnapshot => ({
             bootstrap: bootstrap.snapshot(), pendingCleanup, gc: "not-requested",
             pools: [], config: [],
+            scenes: {
+                state: "idle", registeredRoutes: [], requestVersion: 0, pendingTransitions: 0,
+            },
             ui: { loading: {}, pendingRequests: [], nativeLoads: 0, managed: [], visible: [], cleanupFailures: 0,
                 tips: { queued: 0, active: 0, shown: 0, dropped: 0 } },
         }),
@@ -54,6 +58,7 @@ describe("LX", () => {
             expect(globalThis.LX).toBe(LX);
             expect(LX.Ready).toBe(true);
             expect(LX.UI).toBe(runtime.ui);
+            expect(LX.SceneFlow).toBe(runtime.sceneFlow);
             expect(LX.Res).toBe(loader);
             expect(LX.Scene).toBe(FakeScene);
             expect(LX.Audio).toBe(runtime.audio);
