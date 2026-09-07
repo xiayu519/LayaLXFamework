@@ -184,6 +184,28 @@ describe("TipQueue", () => {
         await vi.advanceTimersByTimeAsync(1);
         expect(tips.snapshot()).toMatchObject({ queued: 0, active: 2, shown: 2 });
     });
+
+    it("fits a tip inside a narrow safe area and resets its pooled transform", async () => {
+        const pool = createPool();
+        const layout = {
+            snapshot: () => ({
+                topSafeArea: { x: 110, y: 50, width: 500, height: 1000 },
+            }),
+        };
+        const tips = new TipQueue(pool as never, "bootstrap/framework/ui/Tip.lh", {}, layout as never);
+
+        tips.show("safe-area tip");
+        await vi.advanceTimersByTimeAsync(0);
+
+        const view = root.views[0];
+        expect(view.x).toBe(110);
+        expect(view.y).toBe(670);
+        expect(view.scaleX).toBeCloseTo(500 / 620);
+        expect(view.scaleY).toBeCloseTo(500 / 620);
+
+        await vi.advanceTimersByTimeAsync(1300);
+        expect(pool.idle[0]).toMatchObject({ scaleX: 1, scaleY: 1 });
+    });
 });
 
 function createPool(firstAcquireDelayMs = 0) {

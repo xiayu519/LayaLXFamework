@@ -6,6 +6,8 @@ class FakeWidget {
     height = 0;
     x = 0;
     y = 0;
+    scaleX = 1;
+    scaleY = 1;
     private readonly children = new Map<string, FakeWidget>();
 
     addNamedChild(name: string, child: FakeWidget): FakeWidget {
@@ -111,6 +113,37 @@ describe("UILayoutService", () => {
         expect(middle).toMatchObject({ x: 73, y: 549, width: 604, height: 370 });
         expect(bottom).toMatchObject({ x: 0, y: 1348, width: 750, height: 120 });
         expect(layout.snapshot().topSafeArea.y).toBe(168);
+    });
+
+    it("uniformly scales middle content to fit a narrow safe area", async () => {
+        root.width = stage.width = 540;
+        root.height = stage.height = 960;
+        vi.stubGlobal("Laya", {
+            GWidget: FakeWidget,
+            GRoot: { inst: root },
+            stage,
+            Event: { RESIZE: "resize" },
+        });
+        const platform = createPlatform({ width: 540, height: 960 });
+        const { UILayoutService } = await import("../../src/framework/presentation/ui/UILayoutService");
+        const layout = new UILayoutService(platform);
+        const pane = sized(new FakeWidget(), 720, 1280);
+        const safeContent = pane.addNamedChild("safeContent", sized(new FakeWidget(), 720, 1280));
+        const middle = safeContent.addNamedChild("middle", sized(new FakeWidget(), 604, 370));
+        const window = new FakeWindow(pane);
+
+        layout.apply(window as unknown as Laya.GWindow, "fullscreen");
+
+        const expectedScale = 540 / 604;
+        expect(middle).toMatchObject({ width: 604, height: 370, x: 0 });
+        expect(middle.scaleX).toBeCloseTo(expectedScale);
+        expect(middle.scaleY).toBeCloseTo(expectedScale);
+        expect(middle.y).toBeCloseTo((960 - 370 * expectedScale) / 2);
+
+        root.width = stage.width = 720;
+        root.height = stage.height = 1280;
+        layout.apply(window as unknown as Laya.GWindow, "fullscreen");
+        expect(middle).toMatchObject({ width: 604, height: 370, x: 58, y: 455, scaleX: 1, scaleY: 1 });
     });
 
     it("reflows from a stage resize and centers popups inside the safe area", async () => {

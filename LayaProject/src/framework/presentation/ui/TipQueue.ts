@@ -156,9 +156,17 @@ export class TipQueue {
         const area = safeArea && safeArea.width > 0 && safeArea.height > 0
             ? safeArea
             : { x: 0, y: 0, width: root.width, height: root.height };
-        view.x = Math.round(area.x + (area.width - view.width) / 2);
-        view.y = Math.round(area.y + area.height * 0.62);
-        const finalY = view.y - this.options.riseDistance;
+        const scale = fitScale(view.width, view.height, area.width, area.height);
+        view.scaleX = scale;
+        view.scaleY = scale;
+        const displayWidth = view.width * scale;
+        const displayHeight = view.height * scale;
+        view.x = Math.round(area.x + (area.width - displayWidth) / 2);
+        view.y = Math.round(Math.min(
+            area.y + area.height * 0.62,
+            area.y + area.height - displayHeight,
+        ));
+        const finalY = Math.max(area.y, view.y - this.options.riseDistance * scale);
         this.active.add(view);
         this.shown += 1;
 
@@ -211,4 +219,10 @@ function validateOptions(options: Readonly<Required<TipQueueOptions>>): void {
     if (!Number.isInteger(options.maxQueue)) {
         throw new Error("Tip option 'maxQueue' must be an integer.");
     }
+}
+
+function fitScale(width: number, height: number, availableWidth: number, availableHeight: number): number {
+    const widthScale = width > 0 ? availableWidth / width : 1;
+    const heightScale = height > 0 ? availableHeight / height : 1;
+    return Math.max(0, Math.min(1, widthScale, heightScale));
 }

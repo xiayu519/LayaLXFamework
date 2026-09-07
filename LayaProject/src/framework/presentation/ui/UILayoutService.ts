@@ -144,11 +144,13 @@ export class UILayoutService {
         const middle = childWidget(safeContent, UI_LAYOUT_NODE_NAMES.middle);
         if (middle) {
             const size = this.captureSize(middle);
-            setRect(middle, centeredRect(
-                freezeRect(0, 0, layout.safeArea.width, layout.safeArea.height),
-                Math.min(size.width, layout.safeArea.width),
-                Math.min(size.height, layout.safeArea.height),
-            ));
+            const scale = fitScale(size.width, size.height, layout.safeArea.width, layout.safeArea.height);
+            middle.width = size.width;
+            middle.height = size.height;
+            middle.scaleX = scale;
+            middle.scaleY = scale;
+            middle.x = (layout.safeArea.width - size.width * scale) / 2;
+            middle.y = (layout.safeArea.height - size.height * scale) / 2;
         }
 
         const bottom = childWidget(safeContent, UI_LAYOUT_NODE_NAMES.bottom);
@@ -217,6 +219,12 @@ function centeredRect(area: UILayoutRect, width: number, height: number): UILayo
         width,
         height,
     );
+}
+
+function fitScale(width: number, height: number, availableWidth: number, availableHeight: number): number {
+    const widthScale = width > 0 ? availableWidth / width : 1;
+    const heightScale = height > 0 ? availableHeight / height : 1;
+    return Math.max(0, Math.min(1, widthScale, heightScale));
 }
 
 function childWidget(parent: Laya.GWidget, name: string): Laya.GWidget | undefined {

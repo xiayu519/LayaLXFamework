@@ -26,7 +26,7 @@ Root
 - `fullBleed`：铺满当前 GRoot，适合背景、遮罩和边缘特效。
 - `safeContent`：铺满平台安全区，交互内容放在这里。
 - `top`：保持自身设计高度、横向铺满，并移动到刘海和微信胶囊下方。
-- `middle`：保持自身设计尺寸，在安全区内居中；超过安全区时会收缩到安全区边界。
+- `middle`：保持自身设计尺寸，在安全区内居中；超过安全区时会整体等比缩小，避免内部内容因只改容器尺寸而溢出。
 - `bottom`：保持自身设计高度、横向铺满，并贴安全区底部。
 
 不需要的槽位可以省略。槽位内部的按钮、文本和列表继续使用 ui2 的 Relation 系统相对槽位布局，不需要读取平台 API，也不需要逐控件计算刘海偏移。
@@ -65,6 +65,8 @@ const resultRoute: UIRoute<ResultArgs> = {
 - `center-popup`：保留预制体设计尺寸并在避开平台顶部占用后的安全区居中；Popup 层未声明时默认使用该策略。框架自动为该布局播放 `0.3 -> 1` 的 200ms 弹出动画和对应收起动画，`fullscreen`、`safe-screen` 不播放窗口动画。
 
 特殊界面可以读取 `LX.UI.layout.snapshot()` 获得 `viewport`、`safeArea` 和 `topSafeArea`，但一般业务 UI 只需遵循 `.lh` 槽位约定。弹窗动画由 `BaseGameWindow` 通过原生 `GWindow.doShowAnimation()` / `doHideAnimation()` 扩展点统一处理，目标是弹窗 `contentPane`，不会缩放全屏 modal 遮罩。动画期间窗口输入会被禁用；关闭、销毁、重复关闭以及关闭尚未完成时再次显示，都会使旧 Tween 和晚到回调失效。`retention: "destroy"` 在收起动画完成后直接安全销毁，`retention: "hide"` 则恢复原始变换并保留实例。
+
+公共 `Tip` 使用 `topSafeArea` 定位；当安全区比 Tip 设计尺寸更窄时会整体等比缩小，并按缩放后的显示宽度居中，回池时恢复原始变换。
 
 ## 当前公共界面
 
