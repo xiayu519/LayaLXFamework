@@ -47,7 +47,7 @@ export async function runFrameworkProbes(validation) {
     }
     const register = (router, id, options = {}) => router.register({
         id: `${prefix}_${id}`, url: validation.uiProbe.prefabUrl,
-        layer: 3, modal: false, multiplicity: "singleton", retention: "destroy",
+        layer: 3, modal: false, layout: "fullscreen", multiplicity: "singleton", retention: "destroy",
         create: (pane) => new ProbeWindow(pane), ...options,
     });
     const modalOrder = (expected) => {

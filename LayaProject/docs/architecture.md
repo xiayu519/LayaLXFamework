@@ -36,7 +36,7 @@
 
 UI route 声明 `UILayer`、modal、multiplicity 与 retention。`snapshot/listVisible/listManaged/getTop/getBottom/closeTop` 查询全部已管理或可见窗口；最终显示顺序取自 `GRoot` 子节点顺序。modal 同步 `zOrder` 与公开 child-order API，保证遮罩始终紧邻最高可见 modal 下方，含跨层打开和原生 `bringToFront()`。
 
-UI route 还声明 `layout`：非 Popup 层默认 `fullscreen`，Popup 层默认 `center-popup`，也可显式使用 `safe-screen`。`UILayoutService` 只以运行时 `GRoot` 的实际逻辑宽高为布局边界，并把平台窗口坐标转换为 Stage 坐标；`.lh` 中的 `750×1334` 仅是编辑器设计基准，不是运行时固定边界。完整约定见 [ui-layout.md](ui-layout.md)。
+UI route 还声明 `layout`：非 Popup 层默认 `fullscreen`，Popup 层默认 `center-popup`，也可显式使用 `safe-screen`。`center-popup` 由框架自动播放内容缩放开合动画，全屏布局不播放；关闭/销毁会取消旧 Tween，并以版本令牌隔离晚到回调。`UILayoutService` 只以运行时 `GRoot` 的实际逻辑宽高为布局边界，并把平台窗口坐标转换为 Stage 坐标；`.lh` 中的 `750×1334` 仅是编辑器设计基准，不是运行时固定边界。完整约定见 [ui-layout.md](ui-layout.md)。
 
 `register(route)` 返回保留参数类型的 route，可用 `show(route, args, { signal })` 获得编译期错参检查；旧字符串入口兼容但不具有同等类型保证。每次 `present` 独占 scope/token，旧代完成不能清理新代。关闭、销毁或外部 signal 取消会结束框架等待并通知 `BindingToken.signal`，`pendingRequests` 区分 loading/binding；不可取消的原生 Loader 单独记录为 `nativeLoads`。取消不会强行终止用户 Promise，异步回写仍必须经 token.commit 或检查失效。
 

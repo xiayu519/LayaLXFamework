@@ -100,6 +100,12 @@ vi.stubGlobal("Laya", {
     GRoot: { inst: root },
     Loader: { HIERARCHY: "HIERARCHY" },
     loader: { load: loaderLoad },
+    timer: {
+        callLater(caller: unknown, method: (window: unknown) => void, args: [unknown]): void {
+            method.apply(caller, args);
+        },
+        clearAll() {},
+    },
 });
 const { UIRouter } = await import("../../src/framework/presentation/ui/UIRouter") as { UIRouter: typeof UIRouterType };
 const { BaseGameWindow } = await import("../../src/framework/presentation/ui/BaseGameWindow") as {
@@ -278,9 +284,26 @@ describe("UIRouter", () => {
         });
 
         const window = await router.show("popup", "args");
+        expect(window.hasPopupTransition).toBe(true);
         expect(root.modalLayer.zOrder).toBe(window.zOrder);
+        const hideForReuse = vi.spyOn(window, "hideForReuse");
         router.close("popup");
+        expect(hideForReuse).toHaveBeenCalledOnce();
         expect(root.modalLayer.zOrder).toBe(0);
+    });
+
+    it("does not animate fullscreen destruction", async () => {
+        loaderLoad.mockResolvedValue(prefab());
+        const router = new UIRouter();
+        router.register(route("screen", (content) => new TestWindow(content)));
+
+        const window = await router.show("screen", "args");
+        const hideForReuse = vi.spyOn(window, "hideForReuse");
+        expect(window.hasPopupTransition).toBe(false);
+        router.close("screen");
+
+        expect(hideForReuse).not.toHaveBeenCalled();
+        expect(window.destroyed).toBe(true);
     });
 
     it("reports in-flight route loads", async () => {

@@ -10,6 +10,12 @@ import { syncModalOrder } from "./UIModalOrder";
 import { destroyManagedWindow, getWindowCleanupDiagnostic,
     type CleanupWindowRecord, type UIWindowCleanupDiagnostic } from "./UIWindowCleanup";
 import { UILayoutService, type UIWindowLayout } from "./UILayoutService";
+import {
+    compareVisibleWindows,
+    resolveLayer,
+    resolveWindowLayout,
+    toWindowInfo,
+} from "./UIWindowRoutePolicy";
 
 export type UIWindowMultiplicity = "singleton" | "multiple";
 export type UIWindowRetention = "hide" | "destroy";
@@ -76,6 +82,7 @@ export class UIRouter implements WindowLifecycleObserver {
     private readonly presentationVersions = new WeakMap<UnknownWindow, number>();
     private readonly pendingLoads = new Set<Promise<unknown>>();
     private readonly nativeLoads = new Set<Promise<unknown>>();
+    private readonly pendingHiddenDestructions = new Set<UnknownWindow>();
     private readonly unsubscribeLayout: (() => void) | undefined;
     private disposed = false;
 
@@ -230,6 +237,8 @@ export class UIRouter implements WindowLifecycleObserver {
         if (!this.disposed) {
             this.disposed = true;
             this.unsubscribeLayout?.();
+            Laya.timer.clearAll(this);
+            this.pendingHiddenDestructions.clear();
             try {
                 this.tips?.dispose();
             } catch (error) {
@@ -261,12 +270,14 @@ export class UIRouter implements WindowLifecycleObserver {
     onHidden(window: UnknownWindow): void {
         const record = this.records.get(window);
         if (record?.route.retention === "destroy") {
-            this.destroyWindow(record);
+            this.pendingHiddenDestructions.add(window);
+            Laya.timer.callLater(this, this.destroyHiddenWindow, [window]);
         }
         this.syncModalLayer();
     }
 
     onDestroyed(window: UnknownWindow): void {
+        this.pendingHiddenDestructions.delete(window);
         const record = this.records.get(window);
         if (record) {
             if (!window.destructionComplete) throw window.destructionFailure
@@ -284,10 +295,22 @@ export class UIRouter implements WindowLifecycleObserver {
         if (request.controller.signal.aborted) throw new BindingCancelledError();
         if (route.multiplicity === "singleton") {
             const cached = this.singletonWindows.get(routeId) as BaseGameWindow<TArgs> | undefined;
+            if (cached && this.pendingHiddenDestructions.delete(cached as unknown as UnknownWindow)) {
+                const record = this.records.get(cached as unknown as UnknownWindow);
+                if (record) this.destroyWindow(record);
+            }
+            if (cached?.isPopupHiding) {
+                const record = this.records.get(cached as unknown as UnknownWindow);
+                if (route.retention === "destroy") {
+                    if (record) this.destroyWindow(record);
+                } else {
+                    cached.finishPopupHideImmediately();
+                }
+            }
             if (cached?.destroyed) {
                 const record = this.records.get(cached as unknown as UnknownWindow);
                 if (record) this.destroyWindow(record);
-            } else if (cached) {
+            } else if (cached && this.records.has(cached as unknown as UnknownWindow)) {
                 return this.presentWindow(route, cached, args, request);
             }
         }
@@ -346,7 +369,10 @@ export class UIRouter implements WindowLifecycleObserver {
         request.window = window;
         window.modal = route.modal ?? resolveLayer(route) === UILayer.Popup;
         window.zOrder = resolveLayer(route) * 1000;
-        this.layoutService?.apply(window, resolveWindowLayout(route));
+        const layout = resolveWindowLayout(route);
+        window.configurePopupTransition(layout === "center-popup");
+        window.configureDestroyWhenHidden(route.retention === "destroy");
+        this.layoutService?.apply(window, layout);
         try {
             const shown = await window.present(args, request.controller.signal);
             if (!shown || window.destroyed || this.disposed
@@ -390,7 +416,7 @@ export class UIRouter implements WindowLifecycleObserver {
     }
 
     private closeWindow(route: UnknownRoute, window: UnknownWindow): void {
-        if (route.retention === "hide") {
+        if (route.retention === "hide" || window.isShowing && window.hasPopupTransition) {
             window.hideForReuse();
             return;
         }
@@ -401,6 +427,7 @@ export class UIRouter implements WindowLifecycleObserver {
     }
 
     private destroyWindow(record: WindowRecord): void {
+        this.pendingHiddenDestructions.delete(record.window);
         destroyManagedWindow(record);
         if (this.records.has(record.window)) {
             this.untrackWindow(record);
@@ -431,6 +458,14 @@ export class UIRouter implements WindowLifecycleObserver {
         return route;
     }
 
+    private destroyHiddenWindow(window: UnknownWindow): void {
+        if (!this.pendingHiddenDestructions.delete(window)) return;
+        const record = this.records.get(window);
+        if (record?.route.retention === "destroy" && !window.isShowing) {
+            this.destroyWindow(record);
+        }
+    }
+
     private requireActive(): void {
         if (this.disposed) {
             throw new Error("UIRouter has been disposed.");
@@ -453,36 +488,4 @@ export class UIRouter implements WindowLifecycleObserver {
             }
         }
     }
-}
-
-function resolveLayer(route: UnknownRoute): UILayer {
-    return route.layer ?? UILayer.Screen;
-}
-
-function resolveWindowLayout(route: UnknownRoute): UIWindowLayout {
-    return route.layout ?? (resolveLayer(route) === UILayer.Popup ? "center-popup" : "fullscreen");
-}
-
-function toWindowInfo(record: WindowRecord): UIWindowInfo {
-    return Object.freeze({
-        routeId: record.route.id,
-        layer: resolveLayer(record.route),
-        modal: record.window.modal,
-        state: getWindowCleanupDiagnostic(record) ? "cleanup-failed"
-            : record.window.isShowing ? "visible" : "hidden-retained",
-        window: record.window,
-    });
-}
-
-function compareVisibleWindows(left: UIWindowInfo, right: UIWindowInfo): number {
-    if (left.layer !== right.layer) {
-        return left.layer - right.layer;
-    }
-    const leftIndex = displayIndex(left.window);
-    const rightIndex = displayIndex(right.window);
-    return leftIndex - rightIndex;
-}
-
-function displayIndex(window: UnknownWindow): number {
-    return window.parent?.getChildIndex(window) ?? -1;
 }

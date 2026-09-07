@@ -405,8 +405,16 @@ async function runEngineLifecycleProbes(cdp) {
                 && modalIndex > statusIndex
                 && modalLayer.zOrder === popup.zOrder
                 && globalThis.LX.UI.getTop()?.window === popup;
+            const popupAnimating = popup.hasPopupTransition === true
+                && popup.mouseEnabled === false
+                && popup.contentPane.scaleX !== 1;
             globalThis.LX.UI.close(routeId, popup);
-            await delay(40);
+            await waitUntil(
+                () => popup.destroyed
+                    && !globalThis.LX.UI.snapshot().managed.some((entry) => entry.routeId === routeId),
+                1000,
+                "the interrupted popup transition to finish destruction",
+            );
             const uiDestroyed = popup.destroyed
                 && !globalThis.LX.UI.snapshot().managed.some((entry) => entry.routeId === routeId);
 
@@ -430,6 +438,7 @@ async function runEngineLifecycleProbes(cdp) {
                 tipsReleased,
                 tipReused,
                 modalOrdered,
+                popupAnimating,
                 uiDestroyed,
             };
         })()`,
@@ -451,6 +460,7 @@ async function runEngineLifecycleProbes(cdp) {
         || result?.tipsReleased !== true
         || result?.tipReused !== true
         || result?.modalOrdered !== true
+        || result?.popupAnimating !== true
         || result?.uiDestroyed !== true) {
         throw new Error(`engine lifecycle probes failed: ${JSON.stringify(result)}`);
     }
