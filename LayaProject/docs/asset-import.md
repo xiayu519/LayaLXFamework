@@ -28,11 +28,12 @@ GPU 压缩由 Laya 发布转换生成，不提交 `.ktx/.dds/.pvr` 源文件。�
 
 ## Spine
 
-- 项目固定 `PlayerSettings.spineVersion=4.2`，导出器必须匹配 `major.minor`。
+- 项目固定 `PlayerSettings.spineVersion=3.8`；Spine Editor `3.8.x`（包括 `3.8.87`）导出资源使用该运行时，导出器必须匹配 `major.minor`。
 - 生产优先 `.skel`；JSON 只能按具体路径加入 `jsonSpine` 例外。
 - 一个 `spine/<name>/` 共置一个主文件、`.atlas`、全部页图和 `.lh` Prefab；运行时只加载主文件。
 - 页图固定 `textureType=0`、`sRGB=true`、`premultiplyAlpha=false`，Spine 导出关闭 PMA；这与普通 UI 图片不同。
 - 默认使用 `useFastRender`，网格单顶点最多 4 个骨骼影响。真实动画、皮肤组合、池化、内存和 DrawCall 必须在业务提供资产后专项验证。
+- Spine 3.8 不支持 4.2 的物理更新和平移能力；即使 LayaAir 3.4.1 类型中存在相应 API，业务也不得依赖。
 
 例外必须精确到 `assets/` 相对路径，不能用目录通配掩盖新资产。修改资产至少运行：
 

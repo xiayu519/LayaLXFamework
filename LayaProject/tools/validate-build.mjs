@@ -21,6 +21,7 @@ function readJson(path) {
 const buildSettings = readJson(join(projectRoot, "settings", "BuildSettings.json"));
 const resourceLayout = readJson(join(projectRoot, "settings", "ResourceLayout.json"));
 const headlessValidation = readJson(join(projectRoot, "settings", "HeadlessValidation.json"));
+const playerSettings = readJson(join(projectRoot, "settings", "PlayerSettings.json"));
 const bootstrapRoot = resourceLayout?.roots?.bootstrap;
 if (typeof bootstrapRoot !== "string" || !buildSettings?.alwaysIncluded?.includes(bootstrapRoot)) {
     failures.push("settings/BuildSettings.json must always include the bootstrap resource root.");
@@ -117,7 +118,21 @@ try { assertBuildTitle(htmlSource, buildSettings?.name); }
 catch (error) { failures.push(`release/web/index.html: ${error.message}`); }
 
 const scriptSources = Array.from(htmlSource.matchAll(/<script[^>]+src=["']([^"']+)["']/gi), (match) => match[1]);
-for (const requiredScript of ["libs/laya.core.js", "libs/laya.webgl_2D.js", "libs/laya.ui2.js", "libs/laya.spine.js"]) {
+const spineRuntime = /^\d+\.\d+$/.test(playerSettings?.spineVersion ?? "")
+    ? playerSettings.spineVersion
+    : undefined;
+if (!spineRuntime) {
+    failures.push("settings/PlayerSettings.json must select a major.minor Spine runtime.");
+}
+const spineCoreScript = spineRuntime ? `libs/spine-core-${spineRuntime}.js` : undefined;
+const requiredScripts = [
+    "libs/laya.core.js",
+    "libs/laya.webgl_2D.js",
+    "libs/laya.ui2.js",
+    "libs/laya.spine.js",
+    ...(spineCoreScript ? [spineCoreScript] : []),
+];
+for (const requiredScript of requiredScripts) {
     if (!scriptSources.includes(requiredScript)) {
         failures.push(`release/web/index.html is missing required 2D engine script '${requiredScript}'.`);
     }
@@ -129,9 +144,15 @@ if (forbiddenScripts.length > 0) {
 if (!existsSync(releaseLibRoot)) {
     failures.push("release/web/libs is missing.");
 } else {
-    const forbiddenLibraries = readdirSync(releaseLibRoot).filter(is3DEngineFile);
+    const releaseLibraries = readdirSync(releaseLibRoot);
+    const forbiddenLibraries = releaseLibraries.filter(is3DEngineFile);
     if (forbiddenLibraries.length > 0) {
         failures.push(`release/web/libs contains forbidden 3D engine file(s): ${forbiddenLibraries.join(", ")}.`);
+    }
+    const spineCoreLibraries = releaseLibraries.filter((name) => /^spine-core-.*\.js$/i.test(name));
+    const expectedSpineCore = spineCoreScript?.split("/").at(-1);
+    if (expectedSpineCore && (spineCoreLibraries.length !== 1 || spineCoreLibraries[0] !== expectedSpineCore)) {
+        failures.push(`release/web/libs must contain only '${expectedSpineCore}' as its Spine runtime; found ${spineCoreLibraries.join(", ") || "none"}.`);
     }
 }
 
@@ -142,7 +163,7 @@ if (failures.length > 0) {
     }
     process.exitCode = 1;
 } else {
-    console.log("Web build OK: bootstrap JSON, 2D modules, startup/tip UI and generated table binaries are present; library assets are excluded.");
+    console.log(`Web build OK: bootstrap JSON, 2D modules, Spine ${spineRuntime}, startup/tip UI and generated table binaries are present; library assets are excluded.`);
 }
 
 function hierarchyFiles(path) {

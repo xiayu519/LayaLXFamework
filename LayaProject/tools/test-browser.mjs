@@ -20,6 +20,7 @@ const environmentGuide = "../Books/LXFamework-Environment.md";
 const releaseRoot = join(projectRoot, "release", "web");
 const performanceSettings = JSON.parse(readFileSync(join(projectRoot, "settings", "PerformanceBudgets.json"), "utf8"));
 const headlessValidation = JSON.parse(readFileSync(join(projectRoot, "settings", "HeadlessValidation.json"), "utf8"));
+const playerSettings = JSON.parse(readFileSync(join(projectRoot, "settings", "PlayerSettings.json"), "utf8"));
 const headlessProfile = performanceSettings.profiles[performanceSettings.headless.profile];
 const startupRenderBudget = headlessProfile.scenes[performanceSettings.headless.scene];
 const temporaryRoot = resolve(tmpdir());
@@ -161,7 +162,7 @@ try {
         || (headlessValidation.tables
             && runtimeState.tableValue !== headlessValidation.tables.expected)
         || !runtimeState.spineReady
-        || runtimeState.spineVersion !== "4.2"
+        || runtimeState.spineVersion !== playerSettings.spineVersion
         || !runtimeState.performanceReady
         || !runtimeState.ownershipReady
         || (headlessValidation.status

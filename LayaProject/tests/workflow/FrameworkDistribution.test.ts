@@ -148,6 +148,7 @@ describe("framework distribution", () => {
                 "LayaProject/settings/PlayerSettings.json": {
                     modules: { "laya.ui": true },
                     addons: { "laya.ui": "ui2" },
+                    spineVersion: "3.8",
                 },
             },
         });
@@ -160,6 +161,7 @@ describe("framework distribution", () => {
                 screenMode: "vertical",
             },
             modules: { "laya.ui": false, "laya.d3": false },
+            spineVersion: "4.2",
         });
         git(source, "init");
         git(source, "config", "user.name", "Framework Test");
@@ -179,6 +181,7 @@ describe("framework distribution", () => {
         });
         expect(settings.modules).toEqual({ "laya.ui": true, "laya.d3": false });
         expect(settings.addons).toEqual({ "laya.ui": "ui2" });
+        expect(settings.spineVersion).toBe("3.8");
         expect(run("check", "--destination", destination)).toContain("Framework integrity OK");
     }, distributionTestTimeoutMs);
 

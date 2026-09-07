@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "spineRuntime": "4.2",
+  "spineRuntime": "3.8",
   "texture": {
     "sourceExtensions": [".png", ".jpg", ".jpeg", ".webp"],
     "maxDimension": 4096,

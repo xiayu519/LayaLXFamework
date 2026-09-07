@@ -171,7 +171,7 @@
     },
     {
       "id": "spine_export_profile",
-      "request": "检查 Spine 4.2 导出的 skel、atlas、页图直通 Alpha 和 Laya Spine2DRenderNode 导入规格。",
+      "request": "检查 Spine 3.8.87 导出的 skel、atlas、页图直通 Alpha 和 Laya Spine2DRenderNode 导入规格。",
       "expected": ["laya-spine"]
     }
   ]

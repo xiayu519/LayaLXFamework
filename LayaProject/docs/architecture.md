@@ -87,7 +87,7 @@ Laya.loader.load(.lh, HIERARCHY)
 
 ## 内容资产门禁
 
-`AssetImportPolicy.json` 固定 2D 纹理、图集、音频和 Spine 4.2 导入规格。`validate:content-assets` 校验真实 `.meta` 与文件头；它不替代目标设备的压缩纹理、音频解码、Spine 动画和性能验收。详细规则见 [asset-import.md](asset-import.md)。
+`AssetImportPolicy.json` 固定 2D 纹理、图集、音频和 Spine 3.8 导入规格。`validate:content-assets` 校验真实 `.meta` 与文件头；它不替代目标设备的压缩纹理、音频解码、Spine 动画和性能验收。详细规则见 [asset-import.md](asset-import.md)。
 
 ## 启动与停止
 

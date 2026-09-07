@@ -121,7 +121,7 @@
       "addons": {
         "laya.ui": "ui2"
       },
-      "spineVersion": "4.2"
+      "spineVersion": "3.8"
     },
     "LayaProject/tsconfig.json": {
       "compilerOptions": {

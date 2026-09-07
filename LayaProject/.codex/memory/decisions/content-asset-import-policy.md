@@ -3,12 +3,14 @@ type: decision
 scope: content-assets
 description: LayaAir 3.4.1 图片、图集、音频与 Spine 4.2 使用版本化导入策略、文件头门禁和精确路径例外。
 trigger: 新增或修改运行时图片、图集、音频、Spine 导出文件或纹理 .meta 时
-status: active
+status: superseded
 last_verified: 2026-09-04
 source: external-verified
 ---
 
 # Content asset import policy
+
+Superseded by [Content asset import policy v2](content-asset-import-policy-v2.md), which changes the shared Spine runtime baseline from 4.2 to 3.8.
 
 ## Decision
 

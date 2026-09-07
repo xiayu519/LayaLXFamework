@@ -6,6 +6,7 @@ const SOURCE_MASTER_EXTENSIONS = new Set([
 ]);
 const IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".webp"]);
 const PACKAGED_TEXTURE_EXTENSIONS = new Set([".dds", ".ktx", ".ktx2", ".pvr"]);
+const REVIEWED_SPINE_RUNTIME = "3.8";
 const EXCEPTION_NAMES = [
     "linearTextures",
     "mipmappedTextures",
@@ -108,8 +109,8 @@ function validatePolicy(policy, failures) {
     if (policy.version !== 1) {
         failures.push("settings/AssetImportPolicy.json: version must be 1.");
     }
-    if (!/^4\.2(?:\.|$)/.test(policy.spineRuntime ?? "")) {
-        failures.push("settings/AssetImportPolicy.json: spineRuntime must pin the reviewed 4.2 runtime line.");
+    if (policy.spineRuntime !== REVIEWED_SPINE_RUNTIME) {
+        failures.push(`settings/AssetImportPolicy.json: spineRuntime must equal the reviewed ${REVIEWED_SPINE_RUNTIME} runtime line.`);
     }
     for (const field of ["maxDimension", "atlasMaxDimension", "atlasMaxEntryDimension"]) {
         if (!Number.isInteger(policy.texture?.[field]) || policy.texture[field] < 1) {
@@ -268,7 +269,7 @@ function validateSpineGroup(group, policy, exceptions, failures) {
             }
         }
     }
-    if (!/^4\.2(?:\.|$)/.test(policy.spineRuntime)) {
+    if (policy.spineRuntime !== REVIEWED_SPINE_RUNTIME) {
         failures.push(`${label}: unsupported Spine runtime policy '${policy.spineRuntime}'.`);
     }
 }

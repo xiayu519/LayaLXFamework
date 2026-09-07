@@ -42,7 +42,8 @@
 - [Laya resource package layout v2](decisions/resource-package-layout-v2.md)：bootstrap 拆分框架与游戏所有权，功能包仍按依赖边界组织。
 - [Framework distribution ownership](decisions/framework-distribution-ownership.md)：旧 Tag-only 同步决定，已由双轨发行模式替代。
 - [Framework distribution channels](decisions/framework-distribution-channels.md)：release 使用 Tag，开发 snapshot 显式跟随 channel，并统一锁定不可变 commit。
-- [Content asset import policy](decisions/content-asset-import-policy.md)：图片、音频和 Spine 使用固定可执行导入规格与精确例外。
+- [Content asset import policy](decisions/content-asset-import-policy.md)：旧 Spine 4.2 导入基线，已由 v2 替代。
+- [Content asset import policy v2](decisions/content-asset-import-policy-v2.md)：图片、音频和 Spine 3.8 使用固定可执行导入规格与精确例外。
 - [HTTP retry idempotency](decisions/http-retry-idempotency.md)：默认不重试；只有幂等请求可进行有限瞬时失败重试。
 
 ## Feedback

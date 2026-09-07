@@ -65,7 +65,7 @@ describe("content asset policy", () => {
         expect(messages).toContain("mipmaps require");
     });
 
-    it("accepts a co-located binary Spine 4.2 package with straight-alpha page textures", () => {
+    it("accepts a co-located binary Spine 3.8 package with straight-alpha page textures", () => {
         const root = createProjectFixture();
         const spineRoot = join(root, "assets", "bootstrap", "game", "spine", "hero");
         mkdirSync(spineRoot, { recursive: true });
@@ -84,6 +84,18 @@ describe("content asset policy", () => {
 
         expect(result.failures).toEqual([]);
         expect(result.counts.spineGroups).toBe(1);
+    });
+
+    it("rejects a Spine runtime outside the reviewed 3.8 line", () => {
+        const root = createProjectFixture();
+        const policyPath = join(root, "settings", "AssetImportPolicy.json");
+        const policy = JSON.parse(readFileSync(policyPath, "utf8"));
+        policy.spineRuntime = "4.2";
+        writeJson(policyPath, policy);
+        writeJson(join(root, "settings", "PlayerSettings.json"), { spineVersion: "4.2" });
+
+        expect(validateContentAssetProject(root).failures.join("\n"))
+            .toContain("spineRuntime must equal the reviewed 3.8 runtime line");
     });
 
     it("decodes the enforced WAV and MP3 header fields", () => {
@@ -120,11 +132,11 @@ function createProjectFixture(): string {
         roots: { bootstrap: "bootstrap", packages: "packages", shared: "shared", library: "library" },
         bootstrapScopes: { framework: "framework", game: "game" },
     });
-    writeJson(join(root, "settings", "PlayerSettings.json"), { spineVersion: "4.2" });
+    writeJson(join(root, "settings", "PlayerSettings.json"), { spineVersion: "3.8" });
     writeJson(join(root, "settings", "EditorSettings.json"), { textureType: 2 });
     writeJson(join(root, "settings", "AssetImportPolicy.json"), {
         version: 1,
-        spineRuntime: "4.2",
+        spineRuntime: "3.8",
         texture: {
             sourceExtensions: [".png", ".jpg", ".jpeg", ".webp"],
             maxDimension: 4096,
