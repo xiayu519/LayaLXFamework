@@ -135,6 +135,53 @@ describe("framework distribution", () => {
         expect(gitOutput(source, "tag")).toBe("");
     }, distributionTestTimeoutMs);
 
+    it("preserves the downstream project resolution while applying PlayerSettings contracts", () => {
+        const source = fixture("lx-framework-settings-source-");
+        const destination = fixture("lx-framework-settings-consumer-");
+        writeJson(join(source, "framework.manifest.json"), {
+            schemaVersion: 1,
+            name: "LayaLXFamework",
+            version: "1.0.0",
+            repository: "https://example.invalid/LayaLXFamework.git",
+            managedPaths: ["framework.manifest.json"],
+            jsonContracts: {
+                "LayaProject/settings/PlayerSettings.json": {
+                    modules: { "laya.ui": true },
+                    addons: { "laya.ui": "ui2" },
+                },
+            },
+        });
+        const settingsPath = join(destination, "LayaProject", "settings", "PlayerSettings.json");
+        writeJson(settingsPath, {
+            resolution: {
+                designWidth: 720,
+                designHeight: 1280,
+                scaleMode: "fixedwidth",
+                screenMode: "vertical",
+            },
+            modules: { "laya.ui": false, "laya.d3": false },
+        });
+        git(source, "init");
+        git(source, "config", "user.name", "Framework Test");
+        git(source, "config", "user.email", "framework-test@example.invalid");
+        git(source, "add", ".");
+        git(source, "commit", "-m", "test: publish settings contract");
+        git(source, "tag", "v1.0.0");
+
+        run("sync", "--source", source, "--destination", destination, "--ref", "v1.0.0");
+
+        const settings = JSON.parse(readFileSync(settingsPath, "utf8"));
+        expect(settings.resolution).toEqual({
+            designWidth: 720,
+            designHeight: 1280,
+            scaleMode: "fixedwidth",
+            screenMode: "vertical",
+        });
+        expect(settings.modules).toEqual({ "laya.ui": true, "laya.d3": false });
+        expect(settings.addons).toEqual({ "laya.ui": "ui2" });
+        expect(run("check", "--destination", destination)).toContain("Framework integrity OK");
+    }, distributionTestTimeoutMs);
+
     it("removes GitHub workflows retired by a newer framework manifest", () => {
         const source = fixture("lx-framework-workflow-source-");
         const destination = fixture("lx-framework-workflow-consumer-");

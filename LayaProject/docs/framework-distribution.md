@@ -12,7 +12,7 @@
 | `tools/**`、`tests/framework/**`、`tests/workflow/**` | `tests/game/**`、游戏专属工具 |
 | `Design/tools/**`、`Design/genBin.*` | `Design/Tables/**` |
 
-`package.json`、`LayaProject.laya`、`PlayerSettings.json`、`ResourceLayout.json` 和 `tsconfig.json` 归下游维护，但 manifest 会校验框架依赖的最小 JSON 字段；下游可添加游戏字段，不能删除或改写公共契约。
+`package.json`、`LayaProject.laya`、`PlayerSettings.json`、`ResourceLayout.json` 和 `tsconfig.json` 归下游维护，但 manifest 会校验框架依赖的最小 JSON 字段；下游可添加游戏字段，不能删除或改写公共契约。`PlayerSettings.json` 的公共契约只约束框架所需模块、ui2 插件和 Spine 版本，不包含 `resolution`；同步会保留每个项目自己选择的 `designWidth`、`designHeight`、`scaleMode` 和 `screenMode`。
 
 ## 启动扩展点
 

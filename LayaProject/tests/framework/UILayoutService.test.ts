@@ -50,6 +50,31 @@ const stage = new FakeStage();
 afterEach(() => vi.unstubAllGlobals());
 
 describe("UILayoutService", () => {
+    it("fits a full-screen prefab to a project-selected 720 by 1280 stage", async () => {
+        root.width = stage.width = 720;
+        root.height = stage.height = 1280;
+        vi.stubGlobal("Laya", {
+            GWidget: FakeWidget,
+            GRoot: { inst: root },
+            stage,
+            Event: { RESIZE: "resize" },
+        });
+        const platform = createPlatform({ width: 720, height: 1280 });
+        const { UILayoutService } = await import("../../src/framework/presentation/ui/UILayoutService");
+        const layout = new UILayoutService(platform);
+        const pane = sized(new FakeWidget(), 750, 1334);
+        const fullBleed = pane.addNamedChild("fullBleed", sized(new FakeWidget(), 750, 1334));
+        const safeContent = pane.addNamedChild("safeContent", sized(new FakeWidget(), 750, 1334));
+        const window = new FakeWindow(pane);
+
+        layout.apply(window as unknown as Laya.GWindow, "fullscreen");
+
+        expect(window).toMatchObject({ x: 0, y: 0, width: 720, height: 1280 });
+        expect(pane).toMatchObject({ x: 0, y: 0, width: 720, height: 1280 });
+        expect(fullBleed).toMatchObject({ x: 0, y: 0, width: 720, height: 1280 });
+        expect(safeContent).toMatchObject({ x: 0, y: 0, width: 720, height: 1280 });
+    });
+
     it("uses the live GRoot size and applies safe top, middle, and bottom slots", async () => {
         root.width = stage.width = 750;
         root.height = stage.height = 1624;

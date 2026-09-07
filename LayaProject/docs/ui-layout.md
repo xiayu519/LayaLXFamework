@@ -1,6 +1,8 @@
 # UI 屏幕与安全区适配
 
-项目竖屏基线使用 LayaAir 官方推荐的 `fixedwidth`：设计宽度用于等比缩放，运行时 Stage 高度由当前窗口比例决定。所有 UI 的最终边界取 `GRoot.inst.width/height`，禁止把 `750×1334` 当作运行时坐标边界。
+框架不规定项目设计分辨率。每个下游项目在自己的 `settings/PlayerSettings.json` 中维护 `resolution.designWidth`、`resolution.designHeight` 和方向；`720×1280`、`750×1334` 或其他尺寸都可以作为该项目的设计画布。竖屏商业小游戏默认使用 LayaAir 推荐的 `fixedwidth`：项目设计宽度用于等比缩放，运行时 Stage 高度由当前窗口比例决定。若某个项目明确需要不同的可视区域策略，再由该项目调整 `scaleMode`，不写入框架公共契约。
+
+所有 UI 的最终布局边界取运行时 `GRoot.inst.width/height`，也就是 Laya 适配完成后的 Stage 逻辑尺寸，而不是某一套预制体设计坐标或设备物理像素。平台安全区和微信胶囊坐标也会换算到这套运行时逻辑坐标中。
 
 ## 常驻根与平台边界
 
@@ -30,6 +32,8 @@ Root
 不需要的槽位可以省略。槽位内部的按钮、文本和列表继续使用 ui2 的 Relation 系统相对槽位布局，不需要读取平台 API，也不需要逐控件计算刘海偏移。
 
 全屏背景和安全内容必须分开：背景可以延伸到异形屏边缘，文字和可点击控件进入安全区。微信胶囊只改变 `top` 的起点，不会把 `middle` 和 `bottom` 一起下移。
+
+`.lh` 必须拥有一个用于编辑器排版的设计宽高，但这个数值只属于该资源的创作画布。`fullscreen` 和 `safe-screen` 在显示时会由 `UILayoutService` 按当前项目的运行时 Stage 重新设置 Window、根 Pane 和约定槽位，因此框架内置界面的创作尺寸不会限制下游项目选择自己的设计分辨率。
 
 ## Route 布局策略
 
@@ -64,4 +68,4 @@ const resultRoute: UIRoute<ResultArgs> = {
 
 ## 当前公共界面
 
-`SceneLoading.lh` 和 `FrameworkStatus.lh` 已使用 `fullBleed + safeContent + middle`：背景始终覆盖当前 GRoot，中间卡片始终在当前安全区居中，不再使用设计分辨率中的固定 `x/y` 定位。
+`SceneLoading.lh` 和 `FrameworkStatus.lh` 已使用 `fullBleed + safeContent + middle`：背景始终覆盖当前 GRoot，中间卡片始终在当前安全区居中，不把资源创作画布中的固定 `x/y` 当作运行时布局。
