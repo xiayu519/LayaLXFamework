@@ -1,0 +1,14 @@
+{
+  "codexCliVersion": "0.153.2",
+  "textBudgets": {
+    "projectAgentsBytes": 3072,
+    "gameAgentsBytes": 2048,
+    "publicDescriptionCharacters": 2500,
+    "gameDescriptionCharacters": 1000
+  },
+  "routing": {
+    "inputTokens": 25000,
+    "outputTokens": 2500,
+    "timeoutMs": 240000
+  }
+}

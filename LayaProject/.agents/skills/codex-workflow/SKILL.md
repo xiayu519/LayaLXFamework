@@ -6,8 +6,6 @@ description: 创建、拆分、审查或验证本项目的 AGENTS.md、.codex �
 # Codex Workflow
 
 1. 先读 [references/workflow-rules.md](references/workflow-rules.md)，再检查 `AGENTS.md`、`.codex/config.toml` 和相关 Skill。
-2. `AGENTS.md` 只放跨任务稳定约束，不写 Skill 名称到任务的映射。领域知识放入语义最窄的 Skill。
-3. Skill `description` 先写正向触发，再写最易混淆的排除边界；一个 Skill 只处理一个独立风险边界。
-4. 主文件保持短小；按需知识放 `references/`，确定性工具放 `scripts/`。删除过期规则，不保留“当前没有什么”的说明。
-5. 收到开发者纠正时重判语义边界；涉及共享工作流先暂停写入并重新对齐，验证后再写项目记忆。
-6. 工作流改动先运行 `npm run check:skills`、`npm run check:memory`、`npm run validate:game-workflow` 和 `npm run test:workflow`。仅 AGENTS、Skill description、路由样例或决策语义变化时，追加一次原地、ephemeral、read-only 的 `npm run test:skill-routing`；普通 YAML、脚本或文档改动不调用模型。分类通过不等于真实任务执行通过，复杂变更补独立执行审查。
+2. 从实际任务判断每条指令是否改变决策；保留领域不变量，删除重复通用步骤。按需知识放 `references/`，重复且确定的操作放 `scripts/`。
+3. 同步修改规则的真实消费者：游戏模板、检索、评测与开发文档。历史记录按状态保留，不把旧基线改写成新结论。
+4. 按 reference 的验证条件检查；涉及模型或执行语义时读 [evaluation.md](references/evaluation.md)。交付实际行为证据，分类成绩不能代替执行结果。

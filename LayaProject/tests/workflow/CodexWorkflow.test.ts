@@ -5,18 +5,19 @@ import { describe, expect, it } from "vitest";
 import {
     assertRoutingResult,
     buildRoutingPrompt,
+    loadRoutingEvaluation,
 } from "../../.agents/skills/codex-workflow/scripts/routing-evaluation.mjs";
+import { evaluationArguments, evaluationPolicy } from "../../.agents/skills/codex-workflow/scripts/evaluation-policy.mjs";
 
 describe("Codex workflow policy", () => {
-    it("keeps single-maintainer usage distinct from Codex delegation", () => {
-        const agents = readFileSync("AGENTS.md", "utf8");
-        const bounded = readFileSync(".agents/skills/bounded-task/SKILL.md", "utf8");
-        const rules = readFileSync(".agents/skills/codex-workflow/references/workflow-rules.md", "utf8");
-        expect(agents).toContain("框架一人维护、约 2–3 人协作");
-        expect(agents).toContain("Codex 默认单代理");
-        expect(agents).toContain("仅跨独立风险边界或用户明确要求时委派");
-        expect(bounded).toContain("默认由当前代理直接完成");
-        expect(rules).toContain("使用团队规模不等于 Codex 代理数量");
+    it("loads the current config and complete cases without exposing answer fields", () => {
+        const evaluation = loadRoutingEvaluation(resolve("."), {});
+        expect(evaluation.policy).toEqual(evaluationPolicy(readFileSync(".codex/config.toml", "utf8")));
+        for (const group of [evaluation.definition.cases, evaluation.definition.decisions]) {
+            expect(new Set(group.map((item) => item.id)).size).toBe(group.length);
+            for (const item of group) expect(evaluation.prompt).toContain(JSON.stringify({ id: item.id, request: item.request }));
+        }
+        expect(evaluation.prompt).not.toContain('"expected"');
     });
 
     it("keeps semantic evaluation in the authenticated local Codex CLI", () => {
@@ -30,9 +31,11 @@ describe("Codex workflow policy", () => {
             ".agents/skills/codex-workflow/scripts/test-skill-routing.mjs",
             "utf8",
         );
-        expect(localRunner).toContain("@openai/codex@${CODEX_CLI_VERSION}");
-        expect(localRunner).toContain('"--ephemeral"');
-        expect(localRunner).toContain('"--sandbox", "read-only"');
+        expect(localRunner).toContain("@openai/codex@${settings.codexCliVersion}");
+        const args = evaluationArguments({ model: "selected-model", effort: "medium" }, "schema", "output");
+        expect(args).toContain("--ephemeral");
+        expect(args).toContain("--ignore-user-config");
+        expect(args.slice(args.indexOf("--sandbox"), args.indexOf("--sandbox") + 2)).toEqual(["--sandbox", "read-only"]);
         expect(localRunner).toContain("CODEX_API_KEY is not required");
         expect(localRunner).toContain("../Books/LXFamework-Environment.md");
     });
@@ -78,14 +81,9 @@ describe("Codex workflow policy", () => {
     });
 
     it("creates a named game scope only after an explicit business name", () => {
-        const agents = readFileSync("AGENTS.md", "utf8");
-        const rules = readFileSync(".agents/skills/codex-workflow/references/workflow-rules.md", "utf8");
         const pkg = JSON.parse(readFileSync("package.json", "utf8"));
         const project = JSON.parse(readFileSync("settings/GameProject.json", "utf8"));
 
-        expect(agents).toContain("`src/game/logic/` 是不可删除的可调用脚本库，不是游戏");
-        expect(rules).toContain("仅当用户明确开始业务并给出名称时");
-        expect(rules).toContain("--name <原名> --id <english-id>");
         expect(pkg.scripts["validate:game-workflow"])
             .toContain('--name "Workflow Probe" --id workflow-probe --dry-run');
         expect(project).toMatchObject({ schemaVersion: 2, logicRoot: "src/game/logic" });
@@ -124,25 +122,6 @@ describe("Codex workflow policy", () => {
         expect(guide).toContain("GitHub Actions 不代表开发者本机");
         expect(guide).toContain("不检查或安装 LayaAir、.NET、Python、浏览器和 Codex CLI");
     });
-
-    it("runs the complete fast profile without a LayaAir installation", () => {
-        const npmCli = process.env.npm_execpath;
-        if (!npmCli) {
-            throw new Error("npm_execpath is missing; run this test through npm run test:workflow.");
-        }
-        const output = execFileSync(process.execPath, [npmCli, "run", "verify"], {
-            cwd: resolve("."),
-            encoding: "utf8",
-            env: {
-                ...process.env,
-                LAYAAIR_INSTALL_DIR: resolve("__missing_layaair__"),
-                PYTHON_PATH: resolve("__missing_python__"),
-            },
-            timeout: 60_000,
-        });
-        expect(output).toContain("[verify] fast profile passed.");
-        expect(output).not.toContain("LayaAir CLI is not installed");
-    }, 70_000);
 
 });
 

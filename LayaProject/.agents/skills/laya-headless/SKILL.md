@@ -1,6 +1,6 @@
 ---
 name: laya-headless
-description: 构建、验证或诊断 LayaAir 3.4.1 CLI、引擎源码基线、Headless Chromium/CDP、发布包、2D 边界和 CI 验收时使用；普通 TypeScript 单测不触发。
+description: 专项构建、验证或诊断 LayaAir 3.4.1 CLI、源码基线、Headless Chromium/CDP、发布包与 CI 时使用；领域任务仅调用已有验收命令及普通 TypeScript 单测不触发。
 ---
 
 # Laya Headless Validation

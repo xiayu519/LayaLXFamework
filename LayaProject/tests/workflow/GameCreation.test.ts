@@ -31,7 +31,7 @@ describe("named game creation", () => {
         expect(output).toContain("'梦境江湖' -> src/game/dream-rivers");
         expect(agents).toContain("# 梦境江湖");
         expect(agents).toContain("Game ID: `dream-rivers`");
-        expect(agents).toContain("可调用 `src/game/logic/` 的公共业务逻辑");
+        expect(agents).toContain("`src/game/logic/`");
         expect(existsSync(join(gameRoot, "AGENTS.md.meta"))).toBe(true);
         expect(existsSync(join(gameRoot, ".agents", "skills", "README.md"))).toBe(true);
         expect(existsSync(join(gameRoot, ".codex", "memory", "INDEX.md"))).toBe(true);
@@ -57,5 +57,8 @@ function createFixture(): { project: string; script: string } {
     const script = join(project, "tools", "create-game.mjs");
     mkdirSync(dirname(script), { recursive: true });
     copyFileSync(resolve("tools/create-game.mjs"), script);
+    const policyPath = ".agents/skills/codex-workflow/evals/policy.json";
+    mkdirSync(dirname(join(project, policyPath)), { recursive: true });
+    copyFileSync(resolve(policyPath), join(project, policyPath));
     return { project, script };
 }

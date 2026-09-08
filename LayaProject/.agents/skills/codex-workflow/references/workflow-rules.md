@@ -1,37 +1,34 @@
 # Workflow Rules
 
-## Source order
+## Instruction design
 
-1. 当前用户目标与明确约束。
-2. 当前目录生效的 `AGENTS.md`。
-3. 语义命中的最窄 Skill；只读任务所需 reference。
-4. 当前代码、测试、本地固定版本源码与官方文档。
-5. 外部参考只提供候选模式，不覆盖已验证的 LayaAir 3.4.1 本地行为。
+- `AGENTS.md` 维护跨任务约束；Skill 只补领域决策、失败边界和专项验收。不要把同一句规则复制到各 Skill，也不要复制官方通用提示全文。
+- description 描述独立能力；排除最易混淆的邻域。不用关键词路由、固定步骤数量或模型档位决定是否需要 Skill。
+- 规则解决已证明的问题；删除陈旧路径与模糊的暂停条件。普通纠正是任务输入，只有超出授权语义才重新对齐。查阅与核验能解决的不确定性由代理消除。
+- 先用当前代码、测试与固定版本源码核验事实。官方文档用于核对模型/客户端能力；外部案例仅供参考，不覆盖本地已验证的 Laya 行为。
 
-## Precision and token budget
+## Cost and model compatibility
 
-- 规则只写一次，放在最近作用域。
-- `AGENTS.md` 不超过 2048 bytes；Skill description 总计不超过 2500 字符。
-- 不使用关键词表或硬编码路由；以代表性语义 eval 验证 description。
-- 模型默认值仅在 `.codex/config.toml` 维护；用户当前显式选择优先，Skill 不重置模型。子代理默认继承主线程，仅在用户授权降成本时改用较低档执行模型，验收标准不降低。
-- 语义评测包含无需 Skill 的负例、邻域误触发和工作流决策；拒绝工具调用防止读取预期答案，分类评测不能冒充端到端代理执行证明。token 是执行后失败阈值，不是硬花费上限。只有语义输入变化才由开发者已登录的本地 Codex CLI 执行一次；普通 YAML、脚本、测试实现和文档改动只跑本地确定性门禁。GitHub Actions 只校验框架同步契约，不调用模型或要求 API key。
-- 静态检查最多 3 路并行；日常门禁不得调用 Laya CLI 或模型，一次完整发布验证足够，不重复无相关变化的通过项。
-- 本机工具只检测环境，不执行系统软件安装；缺少依赖时指向 `Books/LXFamework-Environment.md`。默认使用 Node 跨平台 API 和 `node:path`，系统路径与可执行文件按平台发现。
+- `.codex/config.toml` 是模型与强度默认值的唯一入口；修改配置不等于切换已运行的会话。低强度仍遵守相同边界与验收，不自动升降档。
+- Light 对应 `low`。标准 effort 为 `low/medium/high/xhigh/max`；Ultra 包含自动委派，不作为单代理评测 effort。客户端支持以实际运行核验。
+- 文本预算在 [policy.json](../evals/policy.json) 单点维护，按 bytes/字符检查冗余，不能冒充 token 计量或逼迫省略关键条件。公共与游戏 description 分开预算；按需读取内容。
+- 优先并行独立读取与检查；依赖步骤顺序执行。委派需有独立输入、输出和可核查结果，收益应覆盖交接成本；不按文件数或团队人数凑代理。
 
-## Collaboration
+## Verification
 
-- 框架由一人维护，投入使用后约 2–3 人可能并行工作；使用团队规模不等于 Codex 代理数量。
-- Codex 默认单代理执行；仅任务确实跨独立风险边界或用户明确要求时委派。子代理默认继承主线程，验收不降级。
-- 写前重读目标，保留其他成员改动；检测到同一区域并发变化就停止报告。
-- 公共候选先证明跨业务复用、稳定语义、Laya 无等价能力、失败边界与验证；否则留在 game。
-- `src/game/logic/` 只放可被游戏调用的业务逻辑脚本，不是游戏或 Codex 游戏层。仅当用户明确开始业务并给出名称时，Codex 将名称整理为英文 kebab-case，再用 `game:create -- --name <原名> --id <english-id>` 创建 `src/game/<english-id>/AGENTS.md`、`.agents/skills/` 和游戏记忆；从该游戏目录启动时才叠加游戏层。
-- 游戏层不复制公共规则且 Skill 不与公共层重名；生成与发现规则由 `npm run validate:game-workflow` 检查。
-- Windows/macOS 兼容结论必须来自相关平台上的本地原地构建与同一 Headless 验收；GitHub 同步契约不能替代运行时验证。
-- Git 操作仅在开发者明确要求时执行。
+- 工作流修改运行 `check:skills`、`check:memory`、`validate:game-workflow`、`test:workflow`。检查器行为由确定性测试保证，避免用句子匹配锁死自然语言措辞。
+- AGENTS、Skill 决策/description、路由案例、模型或 CLI 变化时读取 [evaluation.md](evaluation.md)，运行相关模型验收；普通排版、YAML 展示信息和无语义脚本改动只跑确定性检查。
+- 日常不调用模型；迁移时允许按需比较档位，记录耗时、token、行为结果与失败原因。通过后不重复无相关变化的检查。
+- 已批准任务的验收发现规则问题时直接修正并复验受影响项，不放宽 expected 或删掉失败案例来制造通过。
 
-## References
+## Game layer
 
-- Codex configuration precedence: https://learn.chatgpt.com/docs/config-file/config-basic
-- Codex AGENTS.md: https://developers.openai.com/codex/guides/agents-md#layer-project-instructions
-- Tyou workflow: `D:\gitframework\Tyou\Books\AI-Development-Workflow.md`
-- Domain references: `D:\layapro\esengine`, `D:\layapro\GameFrameX.LayaBox`
+从命名游戏目录启动时叠加公共与游戏 Skills/AGENTS；根目录启动不隐式加载子游戏规则。游戏 Skill 使用独立名称，只维护当前游戏约束；生成与发现由 `validate:game-workflow` 检查。`src/game/logic/` 不创建游戏 Codex 层。
+
+## Official references
+
+- [GPT-6 prompting and migration](https://developers.openai.com/api/docs/guides/latest-model?model=gpt-6-astra#prompting-best-practices)
+- [GPT-6 capabilities](https://developers.openai.com/api/docs/models/gpt-6-astra)
+- [Codex models and reasoning](https://learn.chatgpt.com/docs/models)
+- [Configuration precedence](https://learn.chatgpt.com/docs/config-file/config-basic)
+- [AGENTS discovery](https://learn.chatgpt.com/docs/agent-configuration/agents-md)

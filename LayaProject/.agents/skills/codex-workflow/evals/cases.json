@@ -9,7 +9,14 @@
     { "id": "already_verified", "request": "完整构建和 Headless 已通过，之后只有评估文字变化，没有相关代码或验证配置变化。是否再跑相同构建？", "expected": "reuse_evidence" },
     { "id": "explicit_model", "request": "项目配置有默认模型，但用户本轮明确选择另一个可用模型。遵循哪一个？", "expected": "respect_user_model" },
     { "id": "default_single_agent", "request": "框架由一人维护。当前是单一边界的局部任务，用户没有要求委派；应该怎样执行？", "expected": "execute_single_agent" },
-    { "id": "explicit_independent_delegation", "request": "用户明确要求并行检查两个互不重叠的风险边界，文件区域也已隔离；应该怎样执行？", "expected": "delegate_independent" }
+    { "id": "explicit_independent_delegation", "request": "用户明确要求并行检查两个互不重叠的风险边界，文件区域也已隔离；应该怎样执行？", "expected": "delegate_independent" },
+    { "id": "infer_existing_platform", "request": "用户要求修复当前游戏的分数格式，平台未重复说明，但当前游戏配置和已有测试已明确行为，接口不变。下一步？", "expected": "implement" },
+    { "id": "ordinary_correction", "request": "实施已批准的局部修复时，用户纠正函数名为 formatScore，行为和边界不变。下一步？", "expected": "implement" },
+    { "id": "status_preserves_task", "request": "实现尚未完成时用户问进度，没有取消或更改目标；已简短回答进度，必要验证尚未执行。下一步？", "expected": "implement" },
+    { "id": "explicit_medium", "request": "用户明确选择 Medium 完成日常任务，Skill 建议更深入分析；尚无实际失败，是否重设模型强度？", "expected": "respect_user_model" },
+    { "id": "explicit_shared_authorization", "request": "用户明确要求给 LX 的公共结果类型增加字段 requestId，兼容旧调用并验证消费者；语义、范围与验收已授权，仅文件拆分尚未决定。下一步？", "expected": "implement" },
+    { "id": "uncertain_product_choice", "request": "用户要求实现结算奖励，但设计文档和代码没有说明失败关卡是否发奖，两个选择影响玩家收益。下一步？", "expected": "realign" },
+    { "id": "independent_work_continues", "request": "公共存档格式变更尚待批准；当前游戏一个已授权且独立的分数显示修复不依赖它。对这个局部修复下一步？", "expected": "implement" }
   ],
   "cases": [
     { "id": "unchanged_workflow_review", "request": "只读审查 AGENTS.md 是否准确区分单人维护、约 2–3 人使用和 Codex 默认单代理，不修改或重新设计任何工作流。", "expected": ["codex-workflow"] },
@@ -106,7 +113,7 @@
     },
     {
       "id": "bounded_small_change",
-      "request": "给 src/game/ScoreLabel.ts 现有 formatScore 补千位分隔符，接口不变并运行现有单测。",
+      "request": "给 src/game/dream-rivers/presentation/ScoreLabel.ts 现有 formatScore 补千位分隔符，接口不变并运行现有单测。",
       "expected": ["bounded-task"]
     },
     {
@@ -169,6 +176,8 @@
       "request": "为 BGM、短音效和语音确定 Laya 运行时的 MP3/WAV、采样率、码率和目录规范，并验证导入资产。",
       "expected": ["laya-audio"]
     },
+    { "id": "approved_workflow_upgrade", "request": "按上一轮已批准且边界未变的方案优化 Codex 工作流与模型评测，然后验证。", "expected": ["codex-workflow"] },
+    { "id": "ordinary_naming_correction", "request": "用户把本次局部分数格式函数名纠正为 formatScore，继续修改当前命名游戏的显示脚本；不改变 API 或工作流。", "expected": ["bounded-task"] },
     {
       "id": "spine_export_profile",
       "request": "检查 Spine 3.8.87 导出的 skel、atlas、页图直通 Alpha 和 Laya Spine2DRenderNode 导入规格。",

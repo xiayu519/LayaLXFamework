@@ -4,11 +4,12 @@
 
 ```text
 src/framework/  多人共享、稳定且已验证的框架能力
-src/game/       当前产品的玩法、界面、配置与组合根
+src/game/<id>/  命名游戏的玩法、界面、配置与组合根
+src/game/logic/ 可调用逻辑脚本库，不是具体游戏
 src/Main.ts     Laya 启动 Scene 挂载入口
 ```
 
-framework 不依赖 game。game 的 domain/application 保持纯净；`src/game/bootstrap/` 显式组合具体实现。业务运行时只访问 `LX`，不读取 runtime host。
+framework 不依赖 game。game 的 domain/application 保持纯净；`src/game/<id>/bootstrap/` 显式组合具体实现。业务运行时只访问 `LX`，不读取 runtime host。
 
 ## Existing boundaries
 

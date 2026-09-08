@@ -15,6 +15,7 @@ RESERVED_GAME_DIRECTORIES = {
 VALIDATOR = Path.home() / ".codex" / "skills" / ".system" / "skill-creator" / "scripts" / "quick_validate.py"
 AGENTS = PROJECT_ROOT / "AGENTS.md"
 ROUTING_CASES = SKILLS_ROOT / "codex-workflow" / "evals" / "cases.json"
+BUDGETS = json.loads((ROUTING_CASES.parent / "policy.json").read_text(encoding="utf-8"))["textBudgets"]
 FRONTMATTER = re.compile(r"^---\s*\n(.*?)\n---", re.DOTALL)
 MARKDOWN_LINK = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 EXPLICIT_SKILL = re.compile(r"\$[a-z][a-z0-9-]*")
@@ -106,8 +107,8 @@ def main() -> int:
     if len(set(skill.name for skill in skills)) != len(skills):
         errors.append("Public and game skill names must be globally unique.")
     public_budget = sum(len(descriptions.get(skill, "")) for skill in public_skills)
-    if public_budget > 2500:
-        errors.append("Combined public skill descriptions exceed the 2500-character budget.")
+    if public_budget > BUDGETS["publicDescriptionCharacters"]:
+        errors.append("Combined public skill descriptions exceed the configured character budget.")
 
     for game_agents in sorted(GAME_ROOT.glob("*/AGENTS.md")):
         game_directory = game_agents.parent
@@ -115,18 +116,18 @@ def main() -> int:
             errors.append(f"{game_agents.relative_to(PROJECT_ROOT)} is inside a reserved non-game directory")
             continue
         active_game_skills = [skill for skill in game_skills if game_directory in skill.parents]
-        active_budget = public_budget + sum(len(descriptions.get(skill, "")) for skill in active_game_skills)
-        if active_budget > 2500:
-            errors.append(f"{game_directory.name}: active public + game skill descriptions exceed 2500 characters")
+        game_budget = sum(len(descriptions.get(skill, "")) for skill in active_game_skills)
+        if game_budget > BUDGETS["gameDescriptionCharacters"]:
+            errors.append(f"{game_directory.name}: game skill descriptions exceed the configured character budget")
         game_source = game_agents.read_text(encoding="utf-8")
-        if len(game_source.encode("utf-8")) > 2048:
-            errors.append(f"{game_agents.relative_to(PROJECT_ROOT)} exceeds the 2048-byte game budget.")
+        if len(game_source.encode("utf-8")) > BUDGETS["gameAgentsBytes"]:
+            errors.append(f"{game_agents.relative_to(PROJECT_ROOT)} exceeds the configured game byte budget.")
         if EXPLICIT_SKILL.search(game_source):
             errors.append(f"{game_agents.relative_to(PROJECT_ROOT)} must not hard-code explicit $skill routing.")
 
     agents_source = AGENTS.read_text(encoding="utf-8")
-    if len(agents_source.encode("utf-8")) > 2048:
-        errors.append("AGENTS.md exceeds the 2048-byte project budget.")
+    if len(agents_source.encode("utf-8")) > BUDGETS["projectAgentsBytes"]:
+        errors.append("AGENTS.md exceeds the configured project byte budget.")
     if EXPLICIT_SKILL.search(agents_source):
         errors.append("AGENTS.md must not hard-code explicit $skill routing.")
 
@@ -149,7 +150,8 @@ def main() -> int:
 
     print(
         f"Skills OK: {len(public_skills)} public + {len(game_skills)} game skill(s); "
-        f"public description budget {public_budget}/2500 characters; "
+        f"AGENTS {len(agents_source.encode('utf-8'))}/{BUDGETS['projectAgentsBytes']} bytes; "
+        f"public descriptions {public_budget}/{BUDGETS['publicDescriptionCharacters']} characters; "
         f"validator={'system+project' if uses_system_validator else 'project-portable'}."
     )
     return 0

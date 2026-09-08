@@ -176,33 +176,39 @@ function check() {
 function search(rawArguments) {
     let limit = 3;
     const argumentsCopy = [...rawArguments];
+    const historyIndex = argumentsCopy.indexOf("--include-history");
+    const includeHistory = historyIndex >= 0;
+    if (includeHistory) argumentsCopy.splice(historyIndex, 1);
     const limitIndex = argumentsCopy.indexOf("--limit");
     if (limitIndex >= 0) {
         limit = Number(argumentsCopy[limitIndex + 1]);
         argumentsCopy.splice(limitIndex, 2);
     }
     const terms = [...new Set(argumentsCopy.flatMap(tokenize))];
-    if (terms.length === 0 || !Number.isInteger(limit) || limit < 1 || limit > 10) {
-        console.error("Usage: project-memory.mjs search <keyword...> [--limit 1..10]");
+    if (terms.length === 0 || argumentsCopy.some((argument) => argument.startsWith("--"))
+        || !Number.isInteger(limit) || limit < 1 || limit > 10) {
+        console.error("Usage: project-memory.mjs search <keyword...> [--limit 1..10] [--include-history]");
         process.exitCode = 2;
         return;
     }
 
     const matches = activeMemories()
         .flatMap((memory) => entryFiles(memory).map((path) => parseEntry(memory, path)))
+        .filter((entry) => entry.metadata.status === "active" || includeHistory)
         .map((entry) => {
             const metadata = entry.metadata;
-            const fields = [metadata.scope, metadata.description, metadata.trigger, entry.title, entry.source]
+            const fields = [metadata.scope, metadata.description, metadata.trigger, entry.title,
+                portable(relative(projectRoot, entry.path))]
                 .filter(Boolean)
-                .map((item) => item.toLowerCase());
-            const body = entry.source.toLowerCase();
+                .map((item) => item.normalize("NFKC").toLowerCase());
+            const body = entry.source.normalize("NFKC").toLowerCase();
             const score = terms.reduce((total, term) => {
                 const fieldHits = fields.reduce((count, item) => count + (item.includes(term) ? 3 : 0), 0);
                 return total + fieldHits + (body.includes(term) ? 1 : 0);
-            }, 0) + (metadata.status === "active" ? 1 : 0);
+            }, 0);
             return { entry, score };
         })
-        .filter((item) => item.score > 1)
+        .filter((item) => item.score > 0)
         .sort((left, right) => right.score - left.score || left.entry.path.localeCompare(right.entry.path))
         .slice(0, limit);
 
@@ -213,14 +219,14 @@ function search(rawArguments) {
     for (const { entry } of matches) {
         const metadata = entry.metadata;
         console.log(
-            `${portable(relative(projectRoot, entry.path))} | ${metadata.type} | ${metadata.scope} | `
+            `${portable(relative(projectRoot, entry.path))} | ${metadata.status} | ${metadata.type} | ${metadata.scope} | `
             + `${metadata.description} | trigger: ${metadata.trigger}`,
         );
     }
 }
 
 function tokenize(value) {
-    return value.normalize("NFKC").toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+    return value.normalize("NFKC").toLowerCase().match(/[\p{L}\p{N}]+(?:[._-][\p{L}\p{N}]+)*/gu) ?? [];
 }
 
 const command = process.argv[2];

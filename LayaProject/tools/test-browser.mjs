@@ -10,7 +10,7 @@ import {
 import { createServer } from "node:http";
 import { homedir, tmpdir } from "node:os";
 import { dirname, extname, join, resolve, sep } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { WebSocket } from "ws";
 import { runFrameworkProbes } from "./browser-framework-probes.mjs";
 import { handleNetworkProbe, runNetworkProbes } from "./browser-network-probes.mjs";
@@ -20,6 +20,16 @@ const environmentGuide = "../Books/LXFamework-Environment.md";
 const releaseRoot = join(projectRoot, "release", "web");
 const performanceSettings = JSON.parse(readFileSync(join(projectRoot, "settings", "PerformanceBudgets.json"), "utf8"));
 const headlessValidation = JSON.parse(readFileSync(join(projectRoot, "settings", "HeadlessValidation.json"), "utf8"));
+const probeArguments = process.argv.slice(2);
+if (probeArguments.length !== 0 && (probeArguments.length !== 2 || probeArguments[0] !== "--probe")) {
+    throw new Error("Usage: node tools/test-browser.mjs [--probe <trusted-local-module.mjs>]");
+}
+const extraProbe = probeArguments.length
+    ? (await import(pathToFileURL(resolve(probeArguments[1])).href)).default
+    : undefined;
+if (probeArguments.length && typeof extraProbe !== "function") {
+    throw new Error("Probe module must default-export a function returning a browser expression string.");
+}
 const playerSettings = JSON.parse(readFileSync(join(projectRoot, "settings", "PlayerSettings.json"), "utf8"));
 const headlessProfile = performanceSettings.profiles[performanceSettings.headless.profile];
 const startupRenderBudget = headlessProfile.scenes[performanceSettings.headless.scene];
@@ -188,6 +198,25 @@ try {
             throw new Error(`${probe.name}: ${JSON.stringify(result.exceptionDetails)}`);
         }
         console.log(`${probe.name}: ${JSON.stringify(result.result?.value)}`);
+    }
+    if (extraProbe) {
+        const expression = extraProbe(headlessValidation);
+        if (typeof expression !== "string" || !expression.trim()) {
+            throw new Error("Probe module returned an empty or non-string browser expression.");
+        }
+        let timeout;
+        try {
+            const result = await Promise.race([
+                cdp.send("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true }),
+                new Promise((_resolve, reject) => {
+                    timeout = setTimeout(() => reject(new Error("Extra browser probe timed out after 30s.")), 30_000);
+                }),
+            ]);
+            if (result.exceptionDetails || result.result?.value?.passed !== true) {
+                throw new Error(`Extra browser probe failed: ${JSON.stringify(result)}`);
+            }
+            console.log(`Extra browser probe: ${JSON.stringify(result.result.value)}`);
+        } finally { clearTimeout(timeout); }
     }
     const shutdown = await cdp.send("Runtime.evaluate", {
         expression: `(async () => {

@@ -23,7 +23,8 @@
 
 - [Laya native runtime boundary](decisions/laya-native-runtime-boundary.md)：先采用已审计的 Laya 原生生命周期，只保留薄业务扩展。
 - [Codex model floor](decisions/codex-model-floor.md)：旧固定模型策略，已由单点配置与用户选择优先替代。
-- [Codex model policy](decisions/codex-model-policy.md)：默认值单点维护，用户显式选择优先，已批准方案不重复审批。
+- [Codex model policy](decisions/codex-model-policy.md)：旧默认保留决定，已由 GPT-6 工作流承接。
+- [GPT-6 workflow](decisions/gpt6-workflow.md)：初次迁移与验收历史；Medium 目标定位已更正。
 - [Framework/game ownership](decisions/framework-game-ownership.md)：共享 framework 与具体 game 物理分离，业务只经 `LX`。
 - [Repository boundary](decisions/repository-boundary.md)：Git 根目录在外层，完整 Codex 工作流保留在 `LayaProject`。
 - [Runtime resource ownership](decisions/runtime-resource-ownership.md)：旧 scope/lease 方案，已由 Laya native runtime boundary 替代。
@@ -49,6 +50,7 @@
 
 ## Feedback
 
+- [GPT-6 effort compatibility](feedback/gpt6-effort-compatibility.md)：各标准档位共用工作流，Medium 只是可覆盖的个人选择。
 - [Workflow push gates](feedback/workflow-push-gates.md)：旧的 GitHub 确定性门禁边界，已由 GitHub 同步专用契约替代。
 - [Source-first Laya design](feedback/source-first-laya-design.md)：公共模块必须先审查固定版本源码，禁止重复造引擎轮子。
 - [In-place Headless validation](feedback/in-place-headless-validation.md)：验证必须在当前项目原地纯 Headless 执行。

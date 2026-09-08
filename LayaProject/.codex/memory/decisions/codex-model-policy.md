@@ -3,12 +3,14 @@ type: decision
 scope: codex-workflow
 description: 模型默认值单点维护，尊重用户显式选择，不在 Skill 和评测脚本重复锁死模型。
 trigger: 调整模型、子代理策略、工作流评测或处理已批准的框架优化时。
-status: active
+status: superseded
 last_verified: 2026-09-05
 source: user-confirmed
 ---
 
 # Codex model policy
+
+已由 [GPT-6 workflow](gpt6-workflow.md) 承接并更新日常强度、授权和验证策略；下文保留历史。
 
 ## Context
 

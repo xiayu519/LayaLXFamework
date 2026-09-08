@@ -3,17 +3,15 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { assertUsage, assertToolFreeTranscript } from "./evaluation-policy.mjs";
+import { assertUsage, assertToolFreeTranscript, evaluationArguments, validateEvaluationSettings } from "./evaluation-policy.mjs";
 import { assertRoutingResult, loadRoutingEvaluation } from "./routing-evaluation.mjs";
 
-const CODEX_CLI_VERSION = "0.153.2";
-const INPUT_TOKEN_LIMIT = 25_000;
-const OUTPUT_TOKEN_LIMIT = 2_500;
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const skillRoot = resolve(scriptDirectory, "..");
 const projectRoot = resolve(skillRoot, "..", "..", "..");
 const environmentGuide = "../Books/LXFamework-Environment.md";
 const schemaPath = join(skillRoot, "evals", "routing-output.schema.json");
+const settings = validateEvaluationSettings(JSON.parse(readFileSync(join(skillRoot, "evals", "policy.json"), "utf8")));
 const { definition, policy, prompt } = loadRoutingEvaluation(projectRoot, process.env);
 const temporaryRoot = resolve(tmpdir());
 const evaluationRoot = mkdtempSync(join(temporaryRoot, "lx-skill-routing-"));
@@ -24,26 +22,13 @@ try {
     if (!npmCli) {
         throw new Error("npm_execpath is missing; run this evaluation through 'npm run test:skill-routing'.");
     }
-    const codexArguments = [
-        "exec",
-        "--ephemeral",
-        "--ignore-user-config",
-        "--skip-git-repo-check",
-        "--sandbox", "read-only",
-        "--disable", "plugins",
-        "--disable", "apps",
-        "--model", policy.model,
-        "-c", `model_reasoning_effort="${policy.effort}"`,
-        "--json",
-        "--output-schema", schemaPath,
-        "--output-last-message", resultPath,
-        "-",
-    ];
+    const codexArguments = evaluationArguments(policy, schemaPath, resultPath);
+    const started = performance.now();
     const execution = spawnSync(process.execPath, [
         npmCli,
         "exec",
         "--yes",
-        `--package=@openai/codex@${CODEX_CLI_VERSION}`,
+        `--package=@openai/codex@${settings.codexCliVersion}`,
         "--",
         "codex",
         ...codexArguments,
@@ -54,7 +39,7 @@ try {
         encoding: "utf8",
         windowsHide: true,
         maxBuffer: 20 * 1024 * 1024,
-        timeout: 240_000,
+        timeout: settings.routing.timeoutMs,
     });
     if (execution.error) {
         throw new Error(`Local Codex CLI could not run. See ${environmentGuide}. (${execution.error.message})`);
@@ -71,8 +56,9 @@ try {
         try { return [JSON.parse(line)]; } catch { return []; }
     });
     const usage = assertToolFreeTranscript(events);
-    assertUsage(usage, INPUT_TOKEN_LIMIT, OUTPUT_TOKEN_LIMIT);
-    console.log(`Evaluation usage (post-run threshold): ${JSON.stringify(usage)}; ${policy.model}/${policy.effort}.`);
+    console.log(`Evaluation: ${JSON.stringify({ ...policy, cli: settings.codexCliVersion,
+        elapsedMs: Math.round(performance.now() - started), usage })}`);
+    assertUsage(usage, settings.routing.inputTokens, settings.routing.outputTokens);
     const actual = JSON.parse(readFileSync(resultPath, "utf8"));
     const counts = assertRoutingResult(actual, definition);
 

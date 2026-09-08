@@ -1,4 +1,6 @@
-# LXFamework Codex 开发工作流
+# LXFamework GPT-6 开发工作流
+
+本工作流面向 GPT-6 的各标准推理档位，共用同一套 Skill、授权边界和验收标准。`medium` 只是当前可覆盖的默认选择，不是工作流要求或支持下限；项目模型与强度默认值只在 [config.toml](../LayaProject/.codex/config.toml) 维护。用户当前显式选择优先，工作流不自动升降档。项目不额外设置 Plan 专用强度覆盖；客户端 Plan 有自己的预设，切换模式后以实际选择器为准，不能仅凭项目配置声称继承当前档位。修改配置不能切换正在运行的模型。
 
 ## 仓库与工作目录
 
@@ -21,62 +23,65 @@ codex --cd src/game/english-game-name
 
 Codex 对两类文件采用不同的官方发现顺序：`AGENTS.md` 从 Git 根目录向当前目录合并，所以 `LayaProject/AGENTS.md` 先于游戏文件生效，冲突时更近的规则优先；Skills 从当前目录向仓库根扫描，所以公共与游戏 Skills 同时可用。从 `LayaProject` 根启动不会加载游戏层。游戏规则不得复制公共规则，游戏 Skill 使用独立名称。
 
-## 应纳入版本控制的内容
+## 提出与完成任务
 
-- `Books/`
-- `Design/`（Luban Tables、固定工具和生成配置）
-- `LayaProject/.agents/`、`.codex/`、`AGENTS.md`
-- `assets/`、`src/`、`tests/`、`tools/`、`docs/`
-- `engine/`、`settings/`、`.vscode/`
-- `LayaProject.laya`、TypeScript/Vitest 配置、`package.json` 与 `package-lock.json`
+说明想得到的游戏行为、目标平台、验收与硬约束；已在会话或配置中确定的信息无需重复。Codex 先查现有实现和相邻测试，按 description 选择最窄 Skill。根规则维护通用边界，Skill 只补领域知识，reference 按需读取；不要求每个任务加载全部工作流或记忆。
 
-外层 `.gitignore` 排除 LayaAir 缓存、本机布局、依赖、发布产物、编译 bundle、测试产物、日志与本地密钥。`bin` 不整体排除，仅排除由构建生成的 `bin/js/bundles/`。
+例如：“给星港游戏的背包弹窗补关闭后异步图标失效，保持现有 UI 路由；快速开关不再回写已销毁节点，并验证。”Codex 应定位当前游戏和窗口生命周期、实施、跑相关测试；涉及真实 ui2 行为时再做 Headless 验收。
 
-## 模型与语义路由
+实施请求授权范围内的可逆工作与必要验证。只有无法查明、会实质改变结果的产品选择需要追问；普通命名纠正、实现细节和文件数量变化直接处理。用户询问进度或中途补充时保留原任务目标。只读分析请求仍只读。
 
-- 模型与推理强度默认值只在 `LayaProject/.codex/config.toml` 维护；用户显式选择优先，Skill 不重置当前模型。
-- Codex 默认单代理执行；只有任务跨独立风险边界或用户明确要求时才委派。委派时子代理默认继承主线程模型；用户授权降成本后才显式选择较低档执行模型，最终验收标准不降低。
-- 框架目录不是高风险的充分条件：保契约内部修复走最窄领域 Skill；共享 API、生命周期、schema 或工作流语义变化才需要 Change Contract。已批准且边界未变直接实施，不重复索要批准。
+输出先说明结果、相关文件和验证证据；不要用长计划、固定格式或重复检查占据简单任务。无法完成时报告具体失败、尝试和未验证项，不自行切模型或扩大范围。
 
-请求只需说明业务目标、目标平台、可观察验收结果与硬约束，不需要指定 Skill 名称。Codex 依据各 Skill 的 `description` 选择范围最窄的工作流。
+## 模型与成本
+
+支持 `low`（Light）、`medium`、`high`、`xhigh`、`max`，可按个人偏好与任务选择，无需切换或重写工作流。较低档位可优先考虑速度，较高档位可用于深入分析；这不是任务与档位的强制映射，也不承诺相同的一次成功率。Ultra 包含自动委派，不属于本项目单代理评测范围。
+
+先减少无关读取、重复指令和重复验证，再考虑档位成本。文本长度只是冗余检查，不等于 token；阈值集中在 [policy.json](../LayaProject/.agents/skills/codex-workflow/evals/policy.json)，公共与游戏 Skill description 分开计量。只有真实比较任务质量、总 token 与耗时后才声称性价比改善。
 
 ## 公共变更与协作
 
-框架代码位于 `src/framework/`，业务代码位于 `src/game/`。业务实现发现公共能力不足时，先暂停公共边界写入：不能证明稳定复用就保留在 game；能够证明才提交 Change Contract，取得批准后修改 framework 或共享工作流。
+框架代码位于 `src/framework/`，命名游戏业务位于 `src/game/<id>/`。业务发现公共候选时，先证明稳定复用、真实消费者和失败边界；不能证明则留在当前游戏。
 
-框架由一人维护；投入使用后约 2–3 人可能协作，这不表示每个 Codex 任务需要多个代理。多人并行写入时先重新读取目标文件；同一语义区域已被他人修改时停止并报告，不猜测覆盖。`git init`、commit 与 push 只在开发者明确要求时执行。
+新共享语义或高回滚成本变更按 [Change Contract](../LayaProject/.agents/skills/sdd-explore/references/alignment-contract.md) 对齐。用户明确指定共享变更与结果，或批准已列明方案后，继续完成实施与验证；保契约内部修复不因在 framework 目录重复审批。新增内容超出授权时只暂停该边界，独立工作继续。因 Skill 停顿时提供具体文件、条款和尚缺的决定。
+
+框架由一人维护，使用团队约 2–3 人。Codex 默认单代理；独立风险边界的委派需有收益与隔离的文件区域，子代理继承当前模型/强度。多人写入前复读目标，无法避开的同区域冲突停止报告。Git 写操作按用户授权执行。
 
 下游仓库存在 `.framework-lock.json` 时，manifest 管理内容为只读；框架缺口反馈上游，稳定消费等待验证后的 Tag，开发联调可按需同步已提交的 channel snapshot。目录所有权、启动扩展点和同步命令只在 [框架发行与下游同步](../LayaProject/docs/framework-distribution.md) 维护。
 
 ## 验证
 
-验证按改动范围选择最小命令；不复制项目，不启动 LayaAirIDE 或可见浏览器。日常快速门禁执行：
+按改动选择覆盖风险的最小命令；已有通过证据只在相关变化、新失败或疑点出现时重跑。新增测试证明行为与失败边界，不复刻实现。
 
-```shell
-npm run verify
-```
-
-`verify` 不检测或调用 Laya CLI、.NET、Python 或浏览器。AGENTS、Skills、memory 与 workflow 由相关路径专用门禁检查；修改 Luban 表后先运行 `npm run tables:generate`，再运行 `npm run tables:check`。普通 JSON 与 Luban 无关，由 `LX.Config` 使用原生 `Loader.JSON` 加载并读取 `TextResource.data`；生成表只通过 `LX.Tables` 访问。
+| 改动 | 验证入口 |
+| --- | --- |
+| TS 行为 | `npm run typecheck` 与 `npm test -- <相关测试文件>` |
+| 依赖方向/模块边界 | 加 `npm run check:architecture` |
+| 源资产、Tables、导入、资源 | 对应 Skill 的领域检查 |
+| 完整快速回归 | `npm run verify`，无 Laya CLI、.NET、Python 或浏览器 |
+| 真实引擎行为 | 按需 `npm run test:headless` |
+| 工作流规则/工具 | `check:skills`、`check:memory`、`validate:game-workflow`、`test:workflow` |
+| 快速门禁链路本身 | `npm run test:verification`，独立于普通测试 |
 
 只有改动影响 Laya 发布链或准备正式发布时才执行 `npm run verify:release`。它先检查环境，以最多 3 路并发运行完整静态检查，全部通过后只构建一次，并由 Headless Chromium + SwiftShader 检查真实 LayaAir 3.4.1 2D 发布包。已通过且没有相关文件变化的检查不重复执行。
 
 Windows 与 macOS 共用同一套 AGENTS、Skills 和 npm 命令。GitHub Actions 只运行 framework manifest、lock、upstream 与同步工具的纯 Node 契约检查，不安装或检测 LayaAir、.NET、Python、浏览器和 Codex CLI。快速门禁、领域检查及 `npm run verify:release` 全部由开发者在相关本机按需执行；缺少环境时按 [开发环境说明](LXFamework-Environment.md) 准备。
 
-AGENTS、Skill description、路由样例或决策语义变化时，才在开发者已登录的本地 Codex CLI 环境运行一次 `npm run test:skill-routing`；普通 YAML、脚本、测试实现和文档改动只运行本地确定性 workflow 门禁。语义评测覆盖正向/负向路由与批准、只读、越界、默认单代理及受控委派决策，记录模型和 token；可用 `LX_CODEX_EVAL_MODEL` / `LX_CODEX_EVAL_EFFORT` 显式覆盖。分类成绩不代表真实任务行为，不能替代执行审查。GitHub Actions 不调用模型、不读取或要求 `CODEX_API_KEY`。
+模型调用只用于模型/CLI 迁移、AGENTS、Skill 决策/description 或路由变化的验收，详见 [工作流评测](../LayaProject/.agents/skills/codex-workflow/references/evaluation.md)。分类测试与实际执行分别报告；日常开发不反复跑模型评测。普通排版、展示 YAML 或无语义脚本变化只跑确定性检查。
 
 真实商店、小游戏容器或 Native 签名等无法由 Headless 证明的行为应列为未验证项，不自动切换到 GUI。
 
 ## 项目记忆
 
-公共框架经验存放在根 `.codex/memory/`，单个游戏经验存放在 `src/game/<game-id>/.codex/memory/`；从游戏目录启动时两者叠加查询。只记录经验证的长期内容，不记录临时进度、猜测、密钥或大段日志。
+公共框架经验存放在根 `.codex/memory/`，单个游戏经验存放在 `src/game/<id>/.codex/memory/`；游戏目录查询时叠加两者。`project-memory.mjs search` 默认只返回 active；查历史加 `--include-history`，输出状态，废弃决定不再作为当前指令。只记录经验证的长期内容，历史正文保留替代关系。
 
 ## 依据
 
+- [OpenAI：GPT-6 提示与迁移](https://developers.openai.com/api/docs/guides/latest-model?model=gpt-6-astra#prompting-best-practices)
+- [OpenAI：GPT-6 模型能力](https://developers.openai.com/api/docs/models/gpt-6-astra)
+- [OpenAI：Codex 模型与强度](https://learn.chatgpt.com/docs/models)
 - [OpenAI：Codex AGENTS.md 分层项目指令](https://learn.chatgpt.com/docs/agent-configuration/agents-md)
 - [OpenAI：Codex 项目配置层级](https://learn.chatgpt.com/docs/config-file/config-basic)
 - [OpenAI：Codex Subagents](https://learn.chatgpt.com/docs/agent-configuration/subagents)
-- [LayaAir：项目工程目录说明](https://layaair.com/3.x/doc/basics/IDE/projecFolders/)
-- [LayaAir：源码模板导出规则](https://layaair.com/3.x/doc/IDE/layapackage/exportToStore/readme.html)
-- [Luban v4.11.0](https://github.com/focus-creative-games/luban/tree/v4.11.0)
 
 人工使用方式和公共 API 见 [项目 README](../README.md)；内部所有权和生命周期边界见 [运行时架构](../LayaProject/docs/architecture.md)。

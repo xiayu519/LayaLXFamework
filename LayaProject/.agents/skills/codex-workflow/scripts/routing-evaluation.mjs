@@ -4,8 +4,9 @@ import { evaluationPolicy } from "./evaluation-policy.mjs";
 
 const WORKFLOW_RULE_PATHS = [
     "AGENTS.md",
+    ".agents/skills/sdd-explore/SKILL.md",
     ".agents/skills/sdd-explore/references/alignment-contract.md",
-    ".agents/skills/codex-workflow/references/workflow-rules.md",
+    ".agents/skills/bounded-task/SKILL.md",
 ];
 
 export function loadRoutingEvaluation(projectRoot, environment = process.env) {

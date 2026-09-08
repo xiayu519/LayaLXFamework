@@ -1,9 +1,12 @@
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const { textBudgets } = JSON.parse(readFileSync(
+    join(projectRoot, ".agents", "skills", "codex-workflow", "evals", "policy.json"), "utf8",
+));
 const gameRoot = join(projectRoot, "src", "game");
 const argumentsByName = parseArguments(process.argv.slice(2));
 const id = argumentsByName.get("id");
@@ -109,8 +112,11 @@ function metadataFor(identity) {
 }
 
 function validateAgents(source) {
-    if (Buffer.byteLength(source, "utf8") > 2048) {
-        throw new Error("Generated game AGENTS.md exceeds 2048 bytes.");
+    if (!Number.isSafeInteger(textBudgets.gameAgentsBytes) || textBudgets.gameAgentsBytes <= 0) {
+        throw new Error("Invalid game AGENTS byte budget.");
+    }
+    if (Buffer.byteLength(source, "utf8") > textBudgets.gameAgentsBytes) {
+        throw new Error("Generated game AGENTS.md exceeds the configured byte budget.");
     }
     if (/\$[a-z][a-z0-9-]*/.test(source)) {
         throw new Error("Generated game AGENTS.md must not hard-code Skill routing.");

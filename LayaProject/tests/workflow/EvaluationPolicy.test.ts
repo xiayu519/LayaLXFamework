@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { evaluationPolicy, assertUsage, assertToolFreeTranscript } from "../../.agents/skills/codex-workflow/scripts/evaluation-policy.mjs";
+import { evaluationPolicy, evaluationArguments, assertUsage, assertToolFreeTranscript, validateEvaluationSettings } from "../../.agents/skills/codex-workflow/scripts/evaluation-policy.mjs";
 
 describe("evaluation policy", () => {
     it("rejects tool use that could read expected answers or mutate state", () => {
@@ -24,5 +24,27 @@ describe("evaluation policy", () => {
             expect(() => assertUsage({ input_tokens: value, output_tokens: 1 }, 10, 10)).toThrow();
         }
         expect(() => assertUsage({ input_tokens: 10, output_tokens: 10 }, 10, 10)).not.toThrow();
+    });
+    it.each(["low", "medium", "high", "xhigh", "max"])("passes the explicitly chosen %s without changing the model", (effort) => {
+        const policy = evaluationPolicy(config, { LX_CODEX_EVAL_EFFORT: effort });
+        expect(policy).toEqual({ model: "configured-model", effort });
+        const args = evaluationArguments(policy, "schema path.json", "output path.json");
+        expect(args).toContain(`model_reasoning_effort="${effort}"`);
+        expect(args.slice(-5)).toEqual(["--output-schema", "schema path.json", "--output-last-message", "output path.json", "-"]);
+    });
+    it.each(["none", "minimal", "light", "exhigh", "ultra"])("rejects nonstandard single-agent effort %s before invoking the model", (effort) => {
+        expect(() => evaluationPolicy(config, { LX_CODEX_EVAL_EFFORT: effort })).toThrow(/Invalid evaluation effort/);
+    });
+    it("rejects incomplete or invalid budgets before invoking the CLI", () => {
+        const settings = { codexCliVersion: "0.153.2", routing: { inputTokens: 100, outputTokens: 100, timeoutMs: 1000 } };
+        expect(validateEvaluationSettings(settings)).toEqual(settings);
+        for (const invalid of [undefined, null, {}, { ...settings, codexCliVersion: "latest" }]) {
+            expect(() => validateEvaluationSettings(invalid)).toThrow();
+        }
+        for (const key of ["inputTokens", "outputTokens", "timeoutMs"]) {
+            for (const value of [undefined, null, "100", 0, -1, NaN, Infinity]) {
+                expect(() => validateEvaluationSettings({ ...settings, routing: { ...settings.routing, [key]: value } })).toThrow();
+            }
+        }
     });
 });
