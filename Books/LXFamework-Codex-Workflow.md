@@ -51,25 +51,33 @@ Codex 对两类文件采用不同的官方发现顺序：`AGENTS.md` 从 Git 根
 
 ## 验证
 
-按改动选择覆盖风险的最小命令；已有通过证据只在相关变化、新失败或疑点出现时重跑。新增测试证明行为与失败边界，不复刻实现。
+按影响与风险选择最小命令，不按改动行数；已有通过证据只在相关输入、依赖、配置变化或新失败时重跑。新增测试证明行为与失败边界，不复刻实现。组合命令已包含的检查不预跑一遍。
 
 | 改动 | 验证入口 |
 | --- | --- |
+| 普通文档/注释 | 差异与相关链接；不启动类型检查、模型评测或构建 |
 | TS 行为 | `npm run typecheck` 与 `npm test -- <相关测试文件>` |
 | 依赖方向/模块边界 | 加 `npm run check:architecture` |
 | 源资产、Tables、导入、资源 | 对应 Skill 的领域检查 |
-| 完整快速回归 | `npm run verify`，无 Laya CLI、.NET、Python 或浏览器 |
-| 真实引擎行为 | 按需 `npm run test:headless` |
-| 工作流规则/工具 | `check:skills`、`check:memory`、`validate:game-workflow`、`test:workflow` |
+| 跨模块影响或明确全量回归 | `npm run verify`，无 Laya CLI、.NET、Python 或浏览器；不是每次任务的收尾 |
+| 真实引擎行为 | 按 [探针范围](../LayaProject/.agents/skills/laya-headless/references/verification.md) 选择 `test:headless -- --suite <范围>` |
+| AGENTS/Skill/路由数据 | `check:skills`；语义变化再加受影响模型案例 |
+| 记忆记录/索引 | `check:memory`；检索器变化再跑对应测试 |
+| 游戏模板/发现规则 | `validate:game-workflow` 与对应测试 |
+| 工作流工具 | 相关 `tests/workflow/*.test.ts`；多边界重构才跑整组 `test:workflow` |
 | 快速门禁链路本身 | `npm run test:verification`，独立于普通测试 |
 
 只有改动影响 Laya 发布链或准备正式发布时才执行 `npm run verify:release`。它先检查环境，以最多 3 路并发运行完整静态检查，全部通过后只构建一次，并由 Headless Chromium + SwiftShader 检查真实 LayaAir 3.4.1 2D 发布包。已通过且没有相关文件变化的检查不重复执行。
 
+Headless 默认仍为全部探针。局部任务可选 `lifecycle`、`network`、`framework`，或 `targeted --probe <module.mjs>`；启动、错误监听和场景停机始终保留。已有本轮成功构建且发布输入未变时，改用 `test:browser` 搭配同样参数，不重复构建。专项通过只代表所选范围，不等于完整引擎回归。
+
 Windows 与 macOS 共用同一套 AGENTS、Skills 和 npm 命令。GitHub Actions 只运行 framework manifest、lock、upstream 与同步工具的纯 Node 契约检查，不安装或检测 LayaAir、.NET、Python、浏览器和 Codex CLI。快速门禁、领域检查及 `npm run verify:release` 全部由开发者在相关本机按需执行；缺少环境时按 [开发环境说明](LXFamework-Environment.md) 准备。
 
-模型调用只用于模型/CLI 迁移、AGENTS、Skill 决策/description 或路由变化的验收，详见 [工作流评测](../LayaProject/.agents/skills/codex-workflow/references/evaluation.md)。分类测试与实际执行分别报告；日常开发不反复跑模型评测。普通排版、展示 YAML 或无语义脚本变化只跑确定性检查。
+模型调用只用于模型/CLI 迁移、AGENTS、Skill 决策/description 或路由变化的验收，详见 [工作流评测](../LayaProject/.agents/skills/codex-workflow/references/evaluation.md)。`test:skill-routing -- --case <id>` 可重复选择受影响正负例，`--group verification` 专测过量/不足验证；无参数才跑全套。分类测试与实际执行分别报告；日常开发不反复跑模型评测。普通排版、展示 YAML 或无语义脚本变化只跑确定性检查。
 
 本次迁移的分类、真实 Laya 执行证据和成本计量限制统一记录在 [GPT-6 工作流迁移验收](../LayaProject/docs/gpt6-workflow-validation.md)，不在使用手册中重复维护成绩。
+
+后续按影响选择检查、探针分组和模型案例筛选的证据见 [验证粒度优化验收](../LayaProject/docs/verification-scope-validation.md)。
 
 真实商店、小游戏容器或 Native 签名等无法由 Headless 证明的行为应列为未验证项，不自动切换到 GUI。
 

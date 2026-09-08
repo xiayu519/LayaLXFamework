@@ -1,0 +1,12 @@
+[
+  { "id": "verify_docs_only", "request": "仅修正 README 和工程介绍中的导航链接与错别字，没有改变 AGENTS、Skill 或配置语义；本次专项验证选什么？", "expected": ["diff_links"] },
+  { "id": "verify_comment_only", "request": "只把 ScoreLabel.ts 的普通注释翻译成英文，没有改指令注释、类型、可执行代码或配置；本次专项验证选什么？", "expected": ["diff_links"] },
+  { "id": "verify_local_ts", "request": "已修复命名游戏 formatScore 的千位分隔，接口和依赖不变；有相关单测，不涉及 Laya 引擎行为。本次专项验证选什么？", "expected": ["typecheck", "related_tests"] },
+  { "id": "verify_skill_semantics", "request": "只调整一个 Skill 的授权判断语义，未改工具、记忆、游戏模板或 TS；有对应路由正负例。本次专项验证选什么？", "expected": ["skills", "model_subset"] },
+  { "id": "verify_memory_only", "request": "只新增一条已验证的项目记忆并更新索引，没有改变检索器、Skill 或代码。本次专项验证选什么？", "expected": ["memory"] },
+  { "id": "verify_engine_reuse", "request": "本轮已有成功构建，发布代码、资产、依赖与构建配置均未变；只新增临时 ui2 点击探针，需补测该行为。本次专项验证选什么？", "expected": ["engine_targeted_reuse"] },
+  { "id": "verify_engine_rebuild", "request": "本轮旧构建通过后又修改了局部窗口的真实 ui2 行为；类型检查和相关单测已针对新代码通过，现在验收专项引擎行为。选什么？", "expected": ["engine_targeted_build"] },
+  { "id": "verify_release_chain", "request": "只改一行发布构建工具的库收集规则，已授权并准备正式发布；相关工具单测已通过，现在做发布门禁。选什么？", "expected": ["release"] },
+  { "id": "verify_unchanged_evidence", "request": "相关测试和本轮完整 Headless 已通过，所有相关输入未变也没有新失败；用户只问是否验证过，需要重新运行什么？", "expected": [] },
+  { "id": "verify_boundary_ts", "request": "已授权调整两个纯 TS 模块的依赖方向，未改引擎与发布链；现在做类型、行为和依赖边界专项验收，不要求全项目回归。选什么？", "expected": ["typecheck", "related_tests", "architecture"] }
+]

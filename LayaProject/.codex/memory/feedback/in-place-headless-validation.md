@@ -3,12 +3,14 @@ type: feedback
 scope: validation
 description: 除非明确要求 GUI，自动验收必须在当前项目原地 Headless 执行，并在完整验收前提下并行独立检查、避免重复。
 trigger: 设计、修改或执行构建、NoRender、浏览器、工作流路由和交付验证时。
-status: active
+status: superseded
 last_verified: 2026-09-04
 source: user-confirmed
 ---
 
 # In-place Headless validation
+
+此记录保留原始反馈；验证范围与原地 Headless 要求现由 [Risk-scoped validation](risk-scoped-validation.md) 统一承接，避免把“完整验收”误读为所有任务都跑全量。
 
 ## Required behavior
 

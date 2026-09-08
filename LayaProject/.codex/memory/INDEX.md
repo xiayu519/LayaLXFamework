@@ -53,7 +53,8 @@
 - [GPT-6 effort compatibility](feedback/gpt6-effort-compatibility.md)：各标准档位共用工作流，Medium 只是可覆盖的个人选择。
 - [Workflow push gates](feedback/workflow-push-gates.md)：旧的 GitHub 确定性门禁边界，已由 GitHub 同步专用契约替代。
 - [Source-first Laya design](feedback/source-first-laya-design.md)：公共模块必须先审查固定版本源码，禁止重复造引擎轮子。
-- [In-place Headless validation](feedback/in-place-headless-validation.md)：验证必须在当前项目原地纯 Headless 执行。
+- [Risk-scoped validation](feedback/risk-scoped-validation.md)：按影响选最小充分验收，保留原地 Headless 与可追溯构建复用。
+- [In-place Headless validation](feedback/in-place-headless-validation.md)：原始反馈，已由精细验证范围规则承接。
 - [Semantic Skill routing](feedback/semantic-skill-routing.md)：业务请求按语义触发窄 Skill，不在 `AGENTS.md` 写死路由。
 - [Small-team collaboration](feedback/small-team-collaboration.md)：旧多人维护解释，已由单维护者协作策略替代。
 - [Single-maintainer collaboration](feedback/single-maintainer-collaboration.md)：框架单人维护；Codex 默认单代理，团队规模不决定委派数量。

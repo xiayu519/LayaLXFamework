@@ -12,7 +12,9 @@ const projectRoot = resolve(skillRoot, "..", "..", "..");
 const environmentGuide = "../Books/LXFamework-Environment.md";
 const schemaPath = join(skillRoot, "evals", "routing-output.schema.json");
 const settings = validateEvaluationSettings(JSON.parse(readFileSync(join(skillRoot, "evals", "policy.json"), "utf8")));
-const { definition, policy, prompt } = loadRoutingEvaluation(projectRoot, process.env);
+const { definition, policy, prompt } = loadRoutingEvaluation(projectRoot, process.env, process.argv.slice(2));
+const selection = Object.fromEntries(Object.entries(definition).map(([group, cases]) => [group, cases.map(({ id }) => id)]));
+console.log(`Evaluation selection: ${JSON.stringify(selection)}`);
 const temporaryRoot = resolve(tmpdir());
 const evaluationRoot = mkdtempSync(join(temporaryRoot, "lx-skill-routing-"));
 const resultPath = join(evaluationRoot, "last-message.json");
@@ -63,7 +65,7 @@ try {
     const counts = assertRoutingResult(actual, definition);
 
     console.log(
-        `Skill routing OK: ${counts.routing} routing + ${counts.decisions} decision cases, ${policy.model}/${policy.effort}, one ephemeral read-only Codex run. `
+        `Skill routing OK: ${counts.routing} routing + ${counts.decisions} decision + ${counts.verification} verification cases, ${policy.model}/${policy.effort}, one ephemeral read-only Codex run. `
         + `Usage: ${JSON.stringify(usage)}.`,
     );
 } finally {

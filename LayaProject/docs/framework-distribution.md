@@ -35,7 +35,6 @@ git switch -c sync/framework-0.2.0
 cd LayaProject
 npm run framework:sync -- --ref v0.2.0
 npm run check:framework-integrity
-npm run verify
 ```
 
 开发期不需要为每批提交创建 Tag。需要联调最新 `main` 时，下游执行：
@@ -45,10 +44,9 @@ git switch -c sync/framework-main-20260905
 cd LayaProject
 npm run framework:sync -- --channel main
 npm run check:framework-integrity
-npm run verify
 ```
 
-这里的 `verify` 是无 Laya CLI 的快速门禁。只有同步内容影响运行时、资源或发布构建时，才追加一次 `npm run test:headless`；上游正式发布使用 `npm run verify:release`。
+同步后必查完整性，再按同步差异选择验收：纯说明/工作流不附带游戏回归；代码变化跑类型检查与相关测试，跨模块或依赖更新再用 `verify`。真实引擎语义按 [Headless 范围](../.agents/skills/laya-headless/references/verification.md) 选探针；发布链变化或正式发布用 `verify:release`，不先重复跑它已包含的快速检查。
 
 同步工具从 manifest 复制发行文件，更新 `.framework-lock.json` 中的 repository、来源模式与 ref、commit、manifest 哈希及逐文件 SHA-256，并合并最小 JSON 契约。release 模式锁定 Tag；snapshot 模式在同步时解析 channel 最新提交并固定该 commit，channel 后续推进不会改变已有下游。若 npm 契约变化，下游在同步分支更新 `package-lock.json`。游戏回归通过后才合并主分支。
 

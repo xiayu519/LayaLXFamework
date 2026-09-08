@@ -7,5 +7,5 @@ description: 在下游游戏仓库锁定、同步或校验 LayaLXFamework 发布
 
 1. 先读 [distribution.md](references/distribution.md)，确认当前仓库是无 lock 的上游还是有 lock 的下游。
 2. 下游不得手改 managed files 或 `.framework-lock.json`；框架缺口反馈上游。稳定消费等待上游验证和发布 Tag，开发联调可同步已提交的 channel snapshot。
-3. 同步前确认业务工作区没有与 managed paths 重叠的未提交改动；同步后审查变更，更新 npm lock（如需要），再执行完整验证和游戏回归。
+3. 同步前确认业务工作区没有与 managed paths 重叠的未提交改动；同步后审查变更，更新 npm lock（如需要），按 reference 选择完整性检查与受影响游戏回归，不把“同步”直接等同发布验收。
 4. 完整性失败只通过批准的版本同步恢复，不用改哈希或缩小 manifest 绕过。

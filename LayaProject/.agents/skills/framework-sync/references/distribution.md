@@ -19,10 +19,9 @@ npm run framework:sync -- --ref v0.2.0
 npm run framework:sync -- --channel main
 
 npm run check:framework-integrity
-npm run verify
 ```
 
-`npm run verify` 是不调用 Laya CLI 的同步后快速门禁；只有同步内容影响真实 Laya 发布链或准备正式发布时，再运行 `npm run test:headless` 或 `npm run verify:release`。
+每次同步必跑 `check:framework-integrity`。仅说明/工作流变化按对应规则验证；运行时代码变化加类型检查和受影响游戏测试；跨模块或依赖更新用 `verify`。真实引擎语义变化按 [Headless 范围](../../laya-headless/references/verification.md) 验证，发布链变化或正式发布用 `verify:release`；完整发布验收已含完整性与快速检查时不先重复跑 `verify`。
 
 远程同步默认使用 manifest/lock 中的 repository，也可显式传 `--repository <url>`。`--ref` 只接受不可变 SemVer Tag；`--channel` 解析分支当前提交并作为 snapshot 锁定，分支后续推进不会改变已有 lock。受控本地联调可用 `--source <上游仓库>` 搭配其中任一来源参数；工具会验证本地 HEAD 与所选 ref 一致且工作区干净。
 

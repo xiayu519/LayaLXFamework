@@ -6,6 +6,7 @@ import {
     assertRoutingResult,
     buildRoutingPrompt,
     loadRoutingEvaluation,
+    selectEvaluationCases,
 } from "../../.agents/skills/codex-workflow/scripts/routing-evaluation.mjs";
 import { evaluationArguments, evaluationPolicy } from "../../.agents/skills/codex-workflow/scripts/evaluation-policy.mjs";
 
@@ -13,7 +14,7 @@ describe("Codex workflow policy", () => {
     it("loads the current config and complete cases without exposing answer fields", () => {
         const evaluation = loadRoutingEvaluation(resolve("."), {});
         expect(evaluation.policy).toEqual(evaluationPolicy(readFileSync(".codex/config.toml", "utf8")));
-        for (const group of [evaluation.definition.cases, evaluation.definition.decisions]) {
+        for (const group of [evaluation.definition.cases, evaluation.definition.decisions, evaluation.definition.verification ?? []]) {
             expect(new Set(group.map((item) => item.id)).size).toBe(group.length);
             for (const item of group) expect(evaluation.prompt).toContain(JSON.stringify({ id: item.id, request: item.request }));
         }
@@ -145,12 +146,63 @@ describe("structured routing evaluation", () => {
         const valid = {
             results: [{ id: "route", skills: ["a", "b"] }],
             decisions: [{ id: "decision", action: "execute_single_agent" }],
+            verification: [],
         };
-        expect(assertRoutingResult(valid, definition)).toEqual({ routing: 1, decisions: 1 });
+        expect(assertRoutingResult(valid, definition)).toEqual({ routing: 1, decisions: 1, verification: 0 });
         expect(() => assertRoutingResult({ ...valid, results: [] }, definition)).toThrow(/missing routing/);
         expect(() => assertRoutingResult({ ...valid, decisions: [...valid.decisions, ...valid.decisions] }, definition))
             .toThrow(/Duplicate decision/);
         expect(() => assertRoutingResult({ ...valid, results: [...valid.results, { id: "extra", skills: [] }] }, definition))
             .toThrow(/unexpected routing/);
+    });
+
+    it("selects only requested cases while retaining competing Skill descriptions", () => {
+        const evaluation = loadRoutingEvaluation(resolve("."), {}, ["--case", "approved_ui_fix"]);
+        expect(evaluation.definition.cases.map(({ id }) => id)).toEqual(["approved_ui_fix"]);
+        expect(evaluation.definition.decisions).toEqual([]);
+        expect(evaluation.prompt).toContain('"name":"laya-scene"');
+        expect(evaluation.prompt).not.toContain('"id":"negative_arithmetic"');
+        expect(evaluation.prompt).not.toContain('"expected"');
+    });
+
+    it("loads only verification inputs for a verification-only selection", () => {
+        const evaluation = loadRoutingEvaluation(resolve("."), {}, ["--group", "verification"]);
+        expect(evaluation.definition.cases).toEqual([]);
+        expect(evaluation.definition.decisions).toEqual([]);
+        expect(evaluation.definition.verification?.length).toBeGreaterThan(0);
+        expect(evaluation.prompt).not.toContain('"name":"laya-scene"');
+        expect(evaluation.prompt).not.toContain('"expected"');
+        expect(evaluation.prompt).toContain("## Verification");
+        expect(evaluation.prompt).not.toContain("## Official references");
+    });
+
+    it("unions selectors without running selected cases twice", () => {
+        const selected = selectEvaluationCases(definition, ["--group", "routing", "--case", "route", "--case", "decision"]);
+        expect(selected.cases).toEqual(definition.cases);
+        expect(selected.decisions).toEqual(definition.decisions);
+    });
+
+    it.each([
+        ["--case", "typo"], ["--group", "typo"], ["--group", "toString"], ["--case"],
+        ["--case", "route", "--case", "route"], ["--group", "verification"], ["--all"],
+    ])("rejects invalid or empty selections rather than running everything: %j", (...args) => {
+        expect(() => selectEvaluationCases(definition, args)).toThrow();
+    });
+
+    it("detects both excessive and insufficient verification", () => {
+        const selected = { cases: [], decisions: [], verification: [
+            { id: "local", request: "local task", expected: ["typecheck", "related_tests"] },
+        ] };
+        const result = (checks: string[]) => ({ results: [], decisions: [], verification: [{ id: "local", checks }] });
+        expect(assertRoutingResult(result(["related_tests", "typecheck"]), selected).verification).toBe(1);
+        for (const checks of [["typecheck"], ["typecheck", "related_tests", "verify"], ["typecheck", "related_tests", "typecheck"]]) {
+            expect(() => assertRoutingResult(result(checks), selected)).toThrow(/expected/);
+        }
+        const valid = result(["typecheck", "related_tests"]);
+        expect(() => assertRoutingResult({ ...valid, verification: [] }, selected)).toThrow(/missing verification/);
+        expect(() => assertRoutingResult({ ...valid, verification: [...valid.verification, ...valid.verification] }, selected))
+            .toThrow(/Duplicate verification/);
+        expect(() => assertRoutingResult({ ...valid, verification: [...valid.verification, { id: "extra", checks: [] }] }, selected))
+            .toThrow(/unexpected verification/);
     });
 });

@@ -2,8 +2,26 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
-  "required": ["results", "decisions"],
+  "required": ["results", "decisions", "verification"],
   "properties": {
+    "verification": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "checks"],
+        "properties": {
+          "id": { "type": "string" },
+          "checks": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["diff_links", "typecheck", "related_tests", "architecture", "skills", "memory", "game_template", "model_subset", "engine_targeted_build", "engine_targeted_reuse", "verify", "release"]
+            }
+          }
+        }
+      }
+    },
     "decisions": {
       "type": "array",
       "items": {

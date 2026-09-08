@@ -14,20 +14,18 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { WebSocket } from "ws";
 import { runFrameworkProbes } from "./browser-framework-probes.mjs";
 import { handleNetworkProbe, runNetworkProbes } from "./browser-network-probes.mjs";
+import { parseBrowserOptions, runSelectedBrowserProbes } from "./browser-probe-plan.mjs";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const environmentGuide = "../Books/LXFamework-Environment.md";
 const releaseRoot = join(projectRoot, "release", "web");
 const performanceSettings = JSON.parse(readFileSync(join(projectRoot, "settings", "PerformanceBudgets.json"), "utf8"));
 const headlessValidation = JSON.parse(readFileSync(join(projectRoot, "settings", "HeadlessValidation.json"), "utf8"));
-const probeArguments = process.argv.slice(2);
-if (probeArguments.length !== 0 && (probeArguments.length !== 2 || probeArguments[0] !== "--probe")) {
-    throw new Error("Usage: node tools/test-browser.mjs [--probe <trusted-local-module.mjs>]");
-}
-const extraProbe = probeArguments.length
-    ? (await import(pathToFileURL(resolve(probeArguments[1])).href)).default
+const probeOptions = parseBrowserOptions(process.argv.slice(2));
+const extraProbe = probeOptions.probe
+    ? (await import(pathToFileURL(resolve(probeOptions.probe)).href)).default
     : undefined;
-if (probeArguments.length && typeof extraProbe !== "function") {
+if (probeOptions.probe && typeof extraProbe !== "function") {
     throw new Error("Probe module must default-export a function returning a browser expression string.");
 }
 const playerSettings = JSON.parse(readFileSync(join(projectRoot, "settings", "PlayerSettings.json"), "utf8"));
@@ -188,8 +186,7 @@ try {
     if (consoleErrors.length > 0 || runtimeErrors.length > 0 || failedRequests.length > 0) {
         throw new Error(`browser errors: ${consoleErrors.concat(runtimeErrors, failedRequests).join(" | ")}`);
     }
-    await runEngineLifecycleProbes(cdp);
-    for (const probe of [runNetworkProbes, runFrameworkProbes]) {
+    const runBuiltin = async (probe) => {
         const result = await cdp.send("Runtime.evaluate", {
             expression: `(${probe.toString()})(${JSON.stringify(headlessValidation)})`,
             awaitPromise: true, returnByValue: true,
@@ -198,8 +195,8 @@ try {
             throw new Error(`${probe.name}: ${JSON.stringify(result.exceptionDetails)}`);
         }
         console.log(`${probe.name}: ${JSON.stringify(result.result?.value)}`);
-    }
-    if (extraProbe) {
+    };
+    const runExtra = async () => {
         const expression = extraProbe(headlessValidation);
         if (typeof expression !== "string" || !expression.trim()) {
             throw new Error("Probe module returned an empty or non-string browser expression.");
@@ -217,7 +214,13 @@ try {
             }
             console.log(`Extra browser probe: ${JSON.stringify(result.result.value)}`);
         } finally { clearTimeout(timeout); }
-    }
+    };
+    const completedProbes = await runSelectedBrowserProbes(probeOptions, {
+        lifecycle: () => runEngineLifecycleProbes(cdp),
+        network: () => runBuiltin(runNetworkProbes),
+        framework: () => runBuiltin(runFrameworkProbes),
+        targeted: runExtra,
+    });
     const shutdown = await cdp.send("Runtime.evaluate", {
         expression: `(async () => {
             const validation = ${JSON.stringify(headlessValidation)};
@@ -275,7 +278,7 @@ try {
     console.log(
         `Browser OK: ${runtimeState.title}, LayaAir ${runtimeState.engineVersion}, pure 2D, `
         + `config=${runtimeState.configValue}, tables=${runtimeState.tableValue}, UI/Spine ${runtimeState.spineVersion}/performance ready, `
-        + `status=${runtimeState.statusText}, Timer/GLoader/shared-texture/PrefabPool/Tip/UI-modal probes passed, clean scene shutdown, no errors.`,
+        + `status=${runtimeState.statusText}, suite=${probeOptions.suite}, probes=${completedProbes.join(",")} passed, clean scene shutdown, no errors.`,
     );
 } finally {
     socket?.close();

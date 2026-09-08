@@ -280,14 +280,31 @@ LX.Performance.assertBudget({
 
 ## 验证
 
-日常开发按改动范围执行定向测试；通用快速门禁运行：
+以下命令均在 `LayaProject/` 执行。按改动影响选择最小充分验证；已通过的检查仅在相关输入、依赖、配置变化或出现新失败时需要重跑。
+
+| 改动或目的 | 验证入口与选择 |
+| --- | --- |
+| 纯文档或注释 | 检查差异与相关链接 |
+| TypeScript 行为或类型 | `npm run typecheck` 和 `npm test -- <相关测试文件>`；依赖边界变化再加 `npm run check:architecture` |
+| 跨模块影响或明确要求全项目快速回归 | `npm run verify` |
+| 真实 Laya 引擎行为 | `npm run test:headless -- --suite <套件>`，原地构建、检查发布包并运行所选 Headless 探针 |
+| 复用本轮已验证且发布输入未变的构建 | `npm run test:browser -- --suite <套件>`，不重复构建 |
+| Laya 发布链改动或正式发布 | `npm run verify:release` |
+| 工作流规则或工具 | 按[工作流说明](Books/LXFamework-Codex-Workflow.md#验证)选择对应检查与测试文件；语义变化按[评测说明](LayaProject/.agents/skills/codex-workflow/references/evaluation.md)筛选模型案例，不默认整组运行 |
+| 快速验证链路本身 | `npm run test:verification`；它会实际运行一次 `verify`，独立于普通测试 |
+
+`verify` 是全项目快速回归，不是每次任务的收尾；它不调用 LayaAir CLI、.NET、Python 或浏览器。资源、配表和同步按对应 Skill 选择专项检查，命令列表见 [package.json](LayaProject/package.json)，同步步骤见[发行与下游同步](LayaProject/docs/framework-distribution.md)。
+
+`test:headless` 和 `test:browser` 共用 `--suite`：默认 `all` 保留完整探针，也可选 `lifecycle`、`network`、`framework` 或 `targeted --probe <可信本地探针.mjs>`。所有范围都保留启动、错误监听与场景停机检查。例如：
 
 ```shell
-cd LayaProject
-npm run verify
+npm run test:headless -- --suite network
+npm run test:browser -- --suite targeted --probe <可信本地探针.mjs>
 ```
 
-`verify` 不调用 LayaAir CLI、.NET、Python 或浏览器。只有改动影响 Laya 发布链或准备正式发布时才运行 `npm run verify:release`；该命令在当前工程原地构建，并使用纯 Headless Chromium 检查真实 LayaAir 2D 发布包。
+探针模块须提供实际行为断言；契约与构建复用条件见 [Headless 验证](LayaProject/.agents/skills/laya-headless/references/verification.md)。专项通过不代表完整回归。
+
+`verify:release` 完成环境、完整静态检查和默认完整 Headless；原地构建一次，不复制工程或启动 GUI。不预跑它已包含的检查。具体集合见 [verify.mjs](LayaProject/tools/verify.mjs)，本机依赖见[开发环境说明](Books/LXFamework-Environment.md)。
 
 ## 开始游戏开发
 

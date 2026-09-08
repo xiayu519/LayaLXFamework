@@ -16,9 +16,9 @@
 
 ## Verification
 
-- 工作流修改运行 `check:skills`、`check:memory`、`validate:game-workflow`、`test:workflow`。检查器行为由确定性测试保证，避免用句子匹配锁死自然语言措辞。
+- 按实际消费者选检查，不因属于工作流就全跑：普通说明/导航只查差异和相关链接；AGENTS/Skill/路由数据改动用 `check:skills`；记忆记录/索引用 `check:memory`；游戏模板/发现规则用 `validate:game-workflow`。工具行为变化只跑对应 `tests/workflow/*.test.ts`；多边界重构才用整组 `test:workflow`。未改动的记忆和模板不陪跑。
 - AGENTS、Skill 决策/description、路由案例、模型或 CLI 变化时读取 [evaluation.md](evaluation.md)，运行相关模型验收；普通排版、YAML 展示信息和无语义脚本改动只跑确定性检查。
-- 日常不调用模型；迁移时允许按需比较档位，记录耗时、token、行为结果与失败原因。通过后不重复无相关变化的检查。
+- 日常不调用模型；语义变化按 [evaluation.md](evaluation.md) 筛受影响案例和邻接反例，核心迁移才扩大覆盖。通过后不重复无相关变化的检查；验证范围扩大时说明新增风险，不以“保险”作为全量理由。
 - 已批准任务的验收发现规则问题时直接修正并复验受影响项，不放宽 expected 或删掉失败案例来制造通过。
 
 ## Game layer
