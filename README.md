@@ -4,6 +4,12 @@ LayaLXFamework 是基于 **LayaAir 3.4.1** 的 2D 游戏客户端框架，提供
 
 项目继续使用 LayaAir 原生 `.ls/.lh`、ui2、`Laya.loader`、`Laya.Scene`、`Laya.timer`、`Laya.Tween`、`Laya.Pool` 和 `Laya.SoundManager`。业务通过 `LX` 访问已组装的公共能力。
 
+## GPT-6 开发工作流
+
+项目配套面向 GPT-6 的 Codex 工作流，兼容 Light（`low`）、`medium`、`high`、`xhigh` 和 `max`，共用 Skill、授权边界与验收标准。用户显式选择优先，不自动升降档；模型与强度默认值只在 [项目配置](LayaProject/.codex/config.toml) 维护。
+
+任务按需加载领域知识、检索有效项目记忆，并按风险选择验证，减少无关上下文和重复检查。使用方式见 [开发工作流](Books/LXFamework-Codex-Workflow.md)，分类评测、实际 Laya 执行样例及未验证项见 [GPT-6 迁移验收](LayaProject/docs/gpt6-workflow-validation.md)。兼容不代表各档能力或一次成功率相同。
+
 ## 环境与打开方式
 
 Windows 与 macOS 共用同一框架和工作流。开发人员先按 [开发环境说明](Books/LXFamework-Environment.md) 自行准备本机依赖；仓库和本地工具只检测环境，不安装系统软件。

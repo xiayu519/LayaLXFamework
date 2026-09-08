@@ -69,6 +69,8 @@ Windows 与 macOS 共用同一套 AGENTS、Skills 和 npm 命令。GitHub Action
 
 模型调用只用于模型/CLI 迁移、AGENTS、Skill 决策/description 或路由变化的验收，详见 [工作流评测](../LayaProject/.agents/skills/codex-workflow/references/evaluation.md)。分类测试与实际执行分别报告；日常开发不反复跑模型评测。普通排版、展示 YAML 或无语义脚本变化只跑确定性检查。
 
+本次迁移的分类、真实 Laya 执行证据和成本计量限制统一记录在 [GPT-6 工作流迁移验收](../LayaProject/docs/gpt6-workflow-validation.md)，不在使用手册中重复维护成绩。
+
 真实商店、小游戏容器或 Native 签名等无法由 Headless 证明的行为应列为未验证项，不自动切换到 GUI。
 
 ## 项目记忆

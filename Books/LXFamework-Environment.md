@@ -19,4 +19,10 @@ LayaAirIDE 只在人工编辑 `.ls/.lh` 或明确要求 GUI 验证时需要；�
 
 `npm run doctor` 只读取并检查环境，不会安装软件；`npm ci` 只还原 `package-lock.json` 锁定的项目依赖。
 
-GitHub Actions 不代表开发者本机，也不检查或安装 LayaAir、.NET、Python、浏览器和 Codex CLI。仓库只保留 framework manifest、lock、upstream 与同步工具契约检查；快速验证、表生成、语义评测和发布验收均在本地按需执行。语义评测复用本地 Codex CLI 登录态，不需要 `CODEX_API_KEY`。缺少依赖时，本地命令应指向本文档，而不是要求修改 GitHub Secrets 或让远端 Runner 代替本机环境。
+## Codex 与工作流评测
+
+使用 GPT-6 工作流前，在本机准备可访问目标模型的 Codex 客户端与登录态；可用模型以当前账户和客户端为准。项目默认配置见 [config.toml](../LayaProject/.codex/config.toml)，档位选择、工作目录和任务入口见 [开发工作流](LXFamework-Codex-Workflow.md)。本机登录信息不写入仓库。
+
+仅在需要模型评测时运行 `npm run test:skill-routing`，复用本地 Codex CLI 登录态，不需要 `CODEX_API_KEY`。评测使用的固定 CLI 版本和预算统一见 [policy.json](../LayaProject/.agents/skills/codex-workflow/evals/policy.json)；运行条件、临时覆盖与失败处理见 [评测说明](../LayaProject/.agents/skills/codex-workflow/references/evaluation.md)。该版本约束针对评测复现，不是日常客户端的版本锁定；普通游戏开发不重复调用模型评测。
+
+GitHub Actions 不代表开发者本机，也不检查或安装 LayaAir、.NET、Python、浏览器和 Codex CLI。仓库只保留 framework manifest、lock、upstream 与同步工具契约检查；快速验证、表生成、语义评测和发布验收均在本地按需执行。缺少依赖时，本地命令应指向本文档，而不是要求修改 GitHub Secrets 或让远端 Runner 代替本机环境。
