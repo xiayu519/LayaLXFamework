@@ -141,23 +141,27 @@ export class UILayoutService {
             ));
         }
 
+        const bottom = childWidget(safeContent, UI_LAYOUT_NODE_NAMES.bottom);
+        if (bottom) {
+            const size = this.captureSize(bottom);
+            const height = Math.min(size.height, layout.safeArea.height);
+            setRect(bottom, freezeRect(0, layout.safeArea.height - height, layout.safeArea.width, height));
+        }
+
         const middle = childWidget(safeContent, UI_LAYOUT_NODE_NAMES.middle);
         if (middle) {
             const size = this.captureSize(middle);
-            const scale = fitScale(size.width, size.height, layout.safeArea.width, layout.safeArea.height);
+            // Preserve the safe-area center, including when the capsule moves only the top slot.
+            // Reserve equal space on both sides of that center so the slots cannot overlap.
+            const reservedHeight = Math.max(top ? top.y + top.height : 0, bottom?.height ?? 0);
+            const availableHeight = Math.max(0, layout.safeArea.height - 2 * reservedHeight);
+            const scale = fitScale(size.width, size.height, layout.safeArea.width, availableHeight);
             middle.width = size.width;
             middle.height = size.height;
             middle.scaleX = scale;
             middle.scaleY = scale;
             middle.x = (layout.safeArea.width - size.width * scale) / 2;
             middle.y = (layout.safeArea.height - size.height * scale) / 2;
-        }
-
-        const bottom = childWidget(safeContent, UI_LAYOUT_NODE_NAMES.bottom);
-        if (bottom) {
-            const size = this.captureSize(bottom);
-            const height = Math.min(size.height, layout.safeArea.height);
-            setRect(bottom, freezeRect(0, layout.safeArea.height - height, layout.safeArea.width, height));
         }
     }
 

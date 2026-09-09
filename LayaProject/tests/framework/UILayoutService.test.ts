@@ -146,6 +146,48 @@ describe("UILayoutService", () => {
         expect(middle).toMatchObject({ width: 604, height: 370, x: 58, y: 455, scaleX: 1, scaleY: 1 });
     });
 
+    it("keeps a centered middle clear of top and bottom slots across short screens and capsule changes", async () => {
+        root.width = stage.width = 720;
+        root.height = stage.height = 960;
+        vi.stubGlobal("Laya", {
+            GWidget: FakeWidget, GRoot: { inst: root }, stage, Event: { RESIZE: "resize" },
+        });
+        const viewport = {
+            width: 720, height: 960,
+            safeArea: { x: 0, y: 40, width: 720, height: 880 },
+            topRightAvoidance: { x: 540, y: 48, width: 160, height: 64 },
+        };
+        const { UILayoutService } = await import("../../src/framework/presentation/ui/UILayoutService");
+        const layout = new UILayoutService(createPlatform(viewport));
+        const pane = sized(new FakeWidget(), 720, 1280);
+        const safe = pane.addNamedChild("safeContent", sized(new FakeWidget(), 720, 1280));
+        const top = safe.addNamedChild("top", sized(new FakeWidget(), 720, 184));
+        const middle = safe.addNamedChild("middle", sized(new FakeWidget(), 640, 680));
+        const bottom = safe.addNamedChild("bottom", sized(new FakeWidget(), 720, 208));
+        const window = new FakeWindow(pane);
+        const check = (): void => {
+            layout.apply(window as unknown as Laya.GWindow, "fullscreen");
+            expect(middle.y).toBeGreaterThanOrEqual(top.y + top.height - 0.001);
+            expect(middle.y + middle.height * middle.scaleY).toBeLessThanOrEqual(bottom.y + 0.001);
+            expect(middle.y + middle.height * middle.scaleY / 2).toBeCloseTo(safe.height / 2);
+            expect(middle.x + middle.width * middle.scaleX / 2).toBeCloseTo(safe.width / 2);
+            expect(middle.scaleX).toBe(middle.scaleY);
+            expect(middle.scaleX).toBeGreaterThan(0);
+            expect(top.height).toBe(184);
+            expect(bottom.y + bottom.height).toBe(safe.height);
+        };
+
+        check();
+        expect(middle.scaleY).toBeLessThan(1);
+        viewport.topRightAvoidance.y = 88;
+        check();
+        root.height = stage.height = viewport.height = 1600;
+        viewport.safeArea.height = 1520;
+        check();
+        expect(middle.scaleY).toBe(1);
+        expect(middle).toMatchObject({ width: 640, height: 680 });
+    });
+
     it("reflows from a stage resize and centers popups inside the safe area", async () => {
         root.width = stage.width = 1000;
         root.height = stage.height = 1800;

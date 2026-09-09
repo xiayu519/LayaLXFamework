@@ -12,11 +12,18 @@ export function parseBrowserOptions(args) {
     for (let index = 0; index < args.length; index += 2) {
         const flag = args[index];
         const value = args[index + 1];
-        if (!["--suite", "--probe"].includes(flag) || seen.has(flag) || !value || value.startsWith("--")) {
-            throw new Error("Usage: [--suite all|lifecycle|network|framework|targeted] [--probe <trusted-local-module.mjs>]");
+        if (!["--suite", "--probe", "--viewport"].includes(flag) || seen.has(flag) || !value || value.startsWith("--")) {
+            throw new Error("Usage: [--suite all|lifecycle|network|framework|targeted] [--probe <trusted-local-module.mjs>] [--viewport <width>x<height>]");
         }
         seen.add(flag);
         options[flag.slice(2)] = value;
+    }
+    if (options.viewport) {
+        if (!/^[1-9]\d{0,3}x[1-9]\d{0,3}$/.test(options.viewport)) {
+            throw new Error("Browser viewport must use positive CSS pixel dimensions, for example 390x844.");
+        }
+        const [width, height] = options.viewport.split("x").map(Number);
+        options.viewport = { width, height };
     }
     if (!Object.hasOwn(suites, options.suite)) throw new Error(`Unknown browser suite: ${options.suite}`);
     if (options.suite === "targeted" && !options.probe) {

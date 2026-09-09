@@ -150,6 +150,11 @@ try {
     await cdp.send("Runtime.enable");
     await cdp.send("Network.enable");
     await cdp.send("Page.enable");
+    if (probeOptions.viewport) {
+        await cdp.send("Emulation.setDeviceMetricsOverride", {
+            ...probeOptions.viewport, deviceScaleFactor: 1, mobile: false,
+        });
+    }
     await cdp.send("Page.navigate", { url: targetUrl });
 
     let runtimeState;

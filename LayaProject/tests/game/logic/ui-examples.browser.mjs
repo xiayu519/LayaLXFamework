@@ -44,6 +44,57 @@ async function runUIExamples() {
         return row;
     };
     const rows = new Set();
+    const platform = LX.Platform;
+    const originalViewport = Object.getOwnPropertyDescriptor(platform, "viewport");
+    const hostViewport = platform.viewport;
+    const layouts = [];
+    const frame = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const rect = (node) => {
+        const start = node.localToGlobal(new Laya.Point(0, 0));
+        const end = node.localToGlobal(new Laya.Point(node.width, node.height));
+        return { x: start.x, y: start.y, width: end.x - start.x, height: end.y - start.y };
+    };
+    const within = (inner, outer, label) => assert(inner.x >= outer.x - 1 && inner.y >= outer.y - 1
+        && inner.x + inner.width <= outer.x + outer.width + 1
+        && inner.y + inner.height <= outer.y + outer.height + 1, `${label} overflows ${JSON.stringify({ inner, outer })}`);
+    const checkLayout = (window) => {
+        const view = window.contentPane;
+        const layout = ui.layout.snapshot();
+        const safe = view.getChild("safeContent");
+        const top = safe.getChild("top");
+        const middle = safe.getChild("middle");
+        const bottom = safe.getChild("bottom");
+        assert(top && middle && bottom, "all three functional slots must be present");
+        assert(view.frame.parent === top && view.summaryText.parent === top, "header belongs to top");
+        assert(view.itemList.parent === middle, "list belongs to middle");
+        assert(view.selectionText.parent === bottom && view.useButton.parent.parent === bottom
+            && view.resetButton.parent.parent === bottom, "selection and actions belong to bottom");
+        const bleed = rect(view.getChild("fullBleed"));
+        assert(Math.abs(bleed.width - Laya.GRoot.inst.width) < 1
+            && Math.abs(bleed.height - Laya.GRoot.inst.height) < 1 && bleed.x === 0 && bleed.y === 0,
+            "fullBleed must cover the live viewport");
+        const safeRect = rect(safe);
+        within(safeRect, layout.safeArea, "safeContent");
+        assert(Math.abs(safeRect.width - layout.safeArea.width) < 1
+            && Math.abs(safeRect.height - layout.safeArea.height) < 1, "safeContent must fill the safe area");
+        const t = rect(top), m = rect(middle), b = rect(bottom);
+        assert(Math.abs(t.y - layout.topSafeArea.y) < 1, "top must start below the notch and capsule");
+        assert(Math.abs(b.y + b.height - safeRect.y - safeRect.height) < 1, "bottom must remain anchored");
+        assert(m.y >= t.y + t.height - 1 && m.y + m.height <= b.y + 1, "middle overlaps top or bottom");
+        assert(Math.abs(m.x + m.width / 2 - safeRect.x - safeRect.width / 2) < 1
+            && Math.abs(m.y + m.height / 2 - safeRect.y - safeRect.height / 2) < 1, "middle lost the safe-area center");
+        assert(middle.scaleX > 0 && middle.scaleX <= 1 && middle.scaleX === middle.scaleY, "middle must fit uniformly");
+        within(rect(view.frame), t, "header frame");
+        within(rect(window.closeButton), t, "close button");
+        within(rect(view.summaryText), t, "summary");
+        within(rect(view.itemList), m, "list");
+        within(rect(view.selectionText), b, "selection");
+        within(rect(view.useButton), b, "use button");
+        within(rect(view.resetButton), b, "reset button");
+        const reset = rect(view.resetButton), use = rect(view.useButton);
+        assert(reset.x + reset.width < use.x, `footer buttons overlap ${JSON.stringify({ reset, use })}`);
+        return { stage: `${view.width}x${view.height}`, middleScale: middle.scaleX };
+    };
     let renderedRows = 0;
     try {
         const status = visible("lx.status");
@@ -62,6 +113,37 @@ async function runUIExamples() {
             "fullscreen pane must follow the actual root");
         assert(window.closeButton === view.frame.getChild("closeButton"), "nested fullscreen frame close binding");
         assert(view.frame.title === "旅行背包", "typed frame binding");
+
+        const { width, height } = hostViewport;
+        const profiles = [
+            { name: "plain", viewport: { width, height } },
+            { name: "notch-capsule", viewport: {
+                width, height, safeArea: { x: 0, y: 44, width, height: height - 78 },
+                topRightAvoidance: { x: width - 100, y: 48, width: 88, height: 32 },
+            } },
+            { name: "side-insets", viewport: {
+                width, height, safeArea: { x: 20, y: 32, width: width - 40, height: height - 56 },
+                topRightAvoidance: { x: width - 110, y: 36, width: 88, height: 32 },
+            } },
+            { name: "restored", viewport: hostViewport },
+        ];
+        for (const profile of profiles) {
+            Object.defineProperty(platform, "viewport", { configurable: true, get: () => profile.viewport });
+            Laya.stage.event(Laya.Event.RESIZE);
+            await frame();
+            layouts.push({ profile: profile.name, ...checkLayout(window) });
+            const selected = await inspectRow(list, 9);
+            click(selected);
+            assert(list.selection.index === 9 && view.selectionText.text.includes("010"), `${profile.name}: select after reflow`);
+            const popup = await openConfirmation(view);
+            within(rect(popup.contentPane), ui.layout.snapshot().topSafeArea, `${profile.name}: popup`);
+            within(rect(popup.contentPane.confirmButton), rect(popup.contentPane), "popup confirm button");
+            within(rect(popup.closeButton), rect(popup.contentPane), "popup close button");
+            click(popup.contentPane.cancelButton);
+            await wait(() => popup.destroyed, "cancel after reflow");
+            click(view.resetButton);
+            assert(list.selection.index === 0, `${profile.name}: reset after reflow`);
+        }
 
         const row = await inspectRow(list, 89);
         rows.add(row);
@@ -124,11 +206,15 @@ async function runUIExamples() {
         await ui.waitForPendingLoads();
         assert(activeExamples().length === 0, "cancelled open left an orphan window");
         assert([...rows].every((row) => row.destroyed), "sampled virtual rows survived window destruction");
-        return { passed: true, items: 100, renderedRows, reopenCycles: 8, confirmation: "cancel / once / owner close", pendingOpen: "cancelled" };
+        return { passed: true, viewport: `${innerWidth}x${innerHeight}`, layouts, items: 100, renderedRows,
+            reopenCycles: 8, confirmation: "cancel / once / owner close", pendingOpen: "cancelled" };
     } finally {
         ui.close(confirmId);
         ui.close(inventoryId);
         await ui.waitForPendingLoads();
         await wait(() => activeExamples().length === 0, "final cleanup");
+        if (originalViewport) Object.defineProperty(platform, "viewport", originalViewport);
+        else delete platform.viewport;
+        Laya.stage.event(Laya.Event.RESIZE);
     }
 }

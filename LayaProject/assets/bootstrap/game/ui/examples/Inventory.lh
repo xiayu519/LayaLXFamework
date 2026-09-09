@@ -32,44 +32,79 @@
       "height": 1280,
       "_$child": [
         {
-          "_$id": "inventorymiddle",
+          "_$id": "inventorytop",
           "_$type": "GWidget",
-          "name": "middle",
-          "x": 40,
-          "y": 110,
-          "width": 640,
-          "height": 1060,
+          "name": "top",
+          "width": 720,
+          "height": 184,
           "_$child": [
             {
               "_$id": "inventoryframe",
               "_$prefab": "b8e7a102-1934-4120-918c-7de8d8daba02",
               "name": "frame",
-              "width": 640,
-              "height": 1060,
-              "_$var": true
+              "width": 672,
+              "height": 152,
+              "_$var": true,
+              "x": 24,
+              "y": 16,
+              "relations": [
+                {
+                  "_$type": "Relation",
+                  "target": {
+                    "_$ref": "inventorytop"
+                  },
+                  "data": [
+                    1,
+                    0
+                  ]
+                }
+              ]
             },
             {
               "_$id": "inventorysummary",
               "_$type": "GTextField",
               "name": "summaryText",
-              "x": 28,
-              "y": 126,
-              "width": 584,
-              "height": 34,
+              "x": 52,
+              "y": 128,
+              "width": 616,
+              "height": 32,
               "text": "100 种物品  /  共 300 件",
               "fontSize": 22,
               "color": "#7dd3fc",
               "valign": "middle",
-              "_$var": true
-            },
+              "_$var": true,
+              "relations": [
+                {
+                  "_$type": "Relation",
+                  "target": {
+                    "_$ref": "inventorytop"
+                  },
+                  "data": [
+                    1,
+                    0
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "_$id": "inventorymiddle",
+          "_$type": "GWidget",
+          "name": "middle",
+          "x": 40,
+          "y": 300,
+          "width": 640,
+          "height": 680,
+          "_$child": [
             {
               "_$id": "inventoryhint",
               "_$type": "GTextField",
               "name": "hintText",
-              "x": 28,
-              "y": 160,
-              "width": 584,
-              "height": 28,
+              "x": 24,
+              "y": 20,
+              "width": 592,
+              "height": 32,
               "text": "上下滑动浏览，选择一件物品",
               "fontSize": 18,
               "color": "#94a3b8",
@@ -80,7 +115,7 @@
               "_$type": "GList",
               "name": "itemList",
               "x": 24,
-              "y": 196,
+              "y": 72,
               "width": 592,
               "height": 576,
               "layout": {
@@ -106,62 +141,155 @@
                   "name": "InventoryItem"
                 }
               ]
-            },
+            }
+          ],
+          "background": {
+            "_$type": "DrawRoundRectCmd",
+            "fillColor": "#121f32",
+            "lineColor": "#33465f",
+            "lineWidth": 1,
+            "lt": 24,
+            "rt": 24,
+            "lb": 24,
+            "rb": 24
+          }
+        },
+        {
+          "_$id": "inventorybottom",
+          "_$type": "GWidget",
+          "name": "bottom",
+          "y": 1072,
+          "width": 720,
+          "height": 208,
+          "_$child": [
             {
               "_$id": "inventoryselectionbg",
               "_$type": "GWidget",
               "name": "selectionCard",
               "x": 24,
-              "y": 798,
-              "width": 592,
-              "height": 128,
+              "y": 16,
+              "width": 672,
+              "height": 176,
               "background": {
                 "_$type": "DrawRoundRectCmd",
-                "fillColor": "#0d192b",
-                "lineColor": "#2a3b52",
+                "fillColor": "#121f32",
+                "lineColor": "#33465f",
                 "lineWidth": 1,
-                "lt": 14,
-                "rt": 14,
-                "lb": 14,
-                "rb": 14
-              }
+                "lt": 24,
+                "rt": 24,
+                "lb": 24,
+                "rb": 24
+              },
+              "relations": [
+                {
+                  "_$type": "Relation",
+                  "target": {
+                    "_$ref": "inventorybottom"
+                  },
+                  "data": [
+                    1,
+                    0
+                  ]
+                }
+              ]
             },
             {
               "_$id": "inventoryselection",
               "_$type": "GTextField",
               "name": "selectionText",
               "x": 44,
-              "y": 810,
-              "width": 552,
-              "height": 104,
+              "y": 28,
+              "width": 632,
+              "height": 64,
               "text": "选择物品",
-              "fontSize": 23,
+              "fontSize": 22,
               "color": "#e2e8f0",
               "valign": "middle",
-              "leading": 12,
-              "_$var": true
+              "leading": 4,
+              "_$var": true,
+              "relations": [
+                {
+                  "_$type": "Relation",
+                  "target": {
+                    "_$ref": "inventorybottom"
+                  },
+                  "data": [
+                    1,
+                    0
+                  ]
+                }
+              ]
             },
             {
-              "_$id": "inventoryreset",
-              "_$prefab": "b8e7a101-1934-4120-918c-7de8d8daba01",
-              "name": "resetButton",
-              "x": 24,
-              "y": 956,
-              "width": 228,
+              "_$id": "inventoryactions",
+              "_$type": "GWidget",
+              "name": "actions",
+              "x": 44,
+              "y": 112,
+              "width": 632,
               "height": 62,
-              "title": "重置背包",
-              "_$var": true
-            },
-            {
-              "_$id": "inventoryuse",
-              "_$prefab": "b8e7a101-1934-4120-918c-7de8d8daba01",
-              "name": "useButton",
-              "x": 272,
-              "y": 956,
-              "width": 344,
-              "height": 62,
-              "title": "使用选中物品",
-              "_$var": true
+              "relations": [
+                {
+                  "_$type": "Relation",
+                  "target": {
+                    "_$ref": "inventorybottom"
+                  },
+                  "data": [
+                    1,
+                    0
+                  ]
+                }
+              ],
+              "_$child": [
+                {
+                  "_$id": "inventoryreset",
+                  "_$prefab": "b8e7a101-1934-4120-918c-7de8d8daba01",
+                  "name": "resetButton",
+                  "x": 0,
+                  "y": 0,
+                  "width": 228,
+                  "height": 62,
+                  "title": "重置背包",
+                  "_$var": true,
+                  "relations": [
+                    {
+                      "_$type": "Relation",
+                      "target": {
+                        "_$ref": "inventoryactions"
+                      },
+                      "data": [
+                        1,
+                        1
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "_$id": "inventoryuse",
+                  "_$prefab": "b8e7a101-1934-4120-918c-7de8d8daba01",
+                  "name": "useButton",
+                  "x": 248,
+                  "y": 0,
+                  "width": 384,
+                  "height": 62,
+                  "title": "使用选中物品",
+                  "_$var": true,
+                  "relations": [
+                    {
+                      "_$type": "Relation",
+                      "target": {
+                        "_$ref": "inventoryactions"
+                      },
+                      "data": [
+                        1,
+                        1,
+                        3,
+                        1
+                      ]
+                    }
+                  ]
+                }
+              ]
             }
           ]
         }

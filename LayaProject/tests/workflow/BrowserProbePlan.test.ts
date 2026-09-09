@@ -43,6 +43,20 @@ describe("browser verification scope", () => {
         })).toThrow(/Unknown browser suite/);
     });
 
+    it("parses an exact viewport without changing probe selection", async () => {
+        const options = parseBrowserOptions(["--viewport", "390x844", "--suite", "framework"]);
+        expect(options.viewport).toEqual({ width: 390, height: 844 });
+        const calls: string[] = [];
+        await runSelectedBrowserProbes(options, record(calls));
+        expect(calls).toEqual(["framework"]);
+    });
+
+    it.each(["0x844", "390x-1", "390.5x844", "390", "390x844x2", "Infinityx844", "10000x844"])(
+        "rejects invalid viewport %s before a build", (viewport) => {
+            expect(() => parseBrowserOptions(["--viewport", viewport])).toThrow(/viewport/);
+        },
+    );
+
     it("propagates probe failures and stops subsequent groups", async () => {
         const calls: string[] = [];
         await expect(runSelectedBrowserProbes(parseBrowserOptions([]), {
