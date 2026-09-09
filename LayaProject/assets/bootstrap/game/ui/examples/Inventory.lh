@@ -1,0 +1,171 @@
+{
+  "_$ver": 1,
+  "_$id": "inventoryroot",
+  "_$type": "GWidget",
+  "name": "Inventory",
+  "x": 0,
+  "y": 0,
+  "width": 720,
+  "height": 1280,
+  "_$runtime": "res://b8e7a107-1934-4120-918c-7de8d8daba07",
+  "_$child": [
+    {
+      "_$id": "inventorybleed",
+      "_$type": "GWidget",
+      "name": "fullBleed",
+      "x": 0,
+      "y": 0,
+      "width": 720,
+      "height": 1280,
+      "background": {
+        "_$type": "DrawRectCmd",
+        "fillColor": "#081222"
+      }
+    },
+    {
+      "_$id": "inventorysafe",
+      "_$type": "GWidget",
+      "name": "safeContent",
+      "x": 0,
+      "y": 0,
+      "width": 720,
+      "height": 1280,
+      "_$child": [
+        {
+          "_$id": "inventorymiddle",
+          "_$type": "GWidget",
+          "name": "middle",
+          "x": 40,
+          "y": 110,
+          "width": 640,
+          "height": 1060,
+          "_$child": [
+            {
+              "_$id": "inventoryframe",
+              "_$prefab": "b8e7a102-1934-4120-918c-7de8d8daba02",
+              "name": "frame",
+              "width": 640,
+              "height": 1060,
+              "_$var": true
+            },
+            {
+              "_$id": "inventorysummary",
+              "_$type": "GTextField",
+              "name": "summaryText",
+              "x": 28,
+              "y": 126,
+              "width": 584,
+              "height": 34,
+              "text": "100 种物品  /  共 300 件",
+              "fontSize": 22,
+              "color": "#7dd3fc",
+              "valign": "middle",
+              "_$var": true
+            },
+            {
+              "_$id": "inventoryhint",
+              "_$type": "GTextField",
+              "name": "hintText",
+              "x": 28,
+              "y": 160,
+              "width": 584,
+              "height": 28,
+              "text": "上下滑动浏览，选择一件物品",
+              "fontSize": 18,
+              "color": "#94a3b8",
+              "valign": "middle"
+            },
+            {
+              "_$id": "inventorylist",
+              "_$type": "GList",
+              "name": "itemList",
+              "x": 24,
+              "y": 196,
+              "width": 592,
+              "height": 576,
+              "layout": {
+                "type": 1,
+                "rowGap": 8
+              },
+              "scroller": {
+                "_$type": "Scroller",
+                "barDisplay": 5,
+                "direction": 0
+              },
+              "_$var": true,
+              "_templateNode": {
+                "_$ref": "inventorytemplate",
+                "_$tmpl": "itemTemplate"
+              },
+              "_initItemNum": 6,
+              "_isDemo": true,
+              "_$child": [
+                {
+                  "_$id": "inventorytemplate",
+                  "_$prefab": "b8e7a103-1934-4120-918c-7de8d8daba03",
+                  "name": "InventoryItem"
+                }
+              ]
+            },
+            {
+              "_$id": "inventoryselectionbg",
+              "_$type": "GWidget",
+              "name": "selectionCard",
+              "x": 24,
+              "y": 798,
+              "width": 592,
+              "height": 128,
+              "background": {
+                "_$type": "DrawRoundRectCmd",
+                "fillColor": "#0d192b",
+                "lineColor": "#2a3b52",
+                "lineWidth": 1,
+                "lt": 14,
+                "rt": 14,
+                "lb": 14,
+                "rb": 14
+              }
+            },
+            {
+              "_$id": "inventoryselection",
+              "_$type": "GTextField",
+              "name": "selectionText",
+              "x": 44,
+              "y": 810,
+              "width": 552,
+              "height": 104,
+              "text": "选择物品",
+              "fontSize": 23,
+              "color": "#e2e8f0",
+              "valign": "middle",
+              "leading": 12,
+              "_$var": true
+            },
+            {
+              "_$id": "inventoryreset",
+              "_$prefab": "b8e7a101-1934-4120-918c-7de8d8daba01",
+              "name": "resetButton",
+              "x": 24,
+              "y": 956,
+              "width": 228,
+              "height": 62,
+              "title": "重置背包",
+              "_$var": true
+            },
+            {
+              "_$id": "inventoryuse",
+              "_$prefab": "b8e7a101-1934-4120-918c-7de8d8daba01",
+              "name": "useButton",
+              "x": 272,
+              "y": 956,
+              "width": 344,
+              "height": 62,
+              "title": "使用选中物品",
+              "_$var": true
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

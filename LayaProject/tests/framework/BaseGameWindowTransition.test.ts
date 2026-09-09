@@ -10,7 +10,8 @@ class FakeWidget {
     height = 300;
     scaleX = 1;
     scaleY = 1;
-    mouseEnabled = true;
+    // Native GWindow starts in auto mode, whose public boolean getter returns false.
+    mouseEnabled = false;
 
     destroy(): void {
         this.destroyed = true;
@@ -127,6 +128,18 @@ beforeEach(() => {
 afterAll(() => vi.unstubAllGlobals());
 
 describe("BaseGameWindow popup transition", () => {
+    it("preserves an explicit input disable across the popup animation", async () => {
+        const window = new TestWindow(new FakeWidget() as unknown as Laya.GWidget);
+        window.mouseEnabled = false;
+        window.configurePopupTransition(true);
+        await window.present("args");
+        tweens[0].complete();
+        expect(window.mouseEnabled).toBe(false);
+        window.hide();
+        tweens[1].complete();
+        expect(window.mouseEnabled).toBe(false);
+    });
+
     it("keeps fullscreen windows on the native immediate lifecycle", async () => {
         const window = new TestWindow(new FakeWidget() as unknown as Laya.GWidget);
 

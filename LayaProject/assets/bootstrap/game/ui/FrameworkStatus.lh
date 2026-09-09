@@ -29,16 +29,16 @@
           "_$type": "GWidget",
           "name": "middle",
           "x": 49,
-          "y": 430,
+          "y": 390,
           "width": 622,
-          "height": 420,
+          "height": 500,
           "_$child": [
             {
               "_$id": "statuscard",
               "_$type": "GWidget",
               "name": "card",
               "width": 622,
-              "height": 420,
+              "height": 500,
               "background": {
                 "_$type": "DrawRoundRectCmd",
                 "lineWidth": 2,
@@ -94,6 +94,16 @@
                   "color": "#cbd5e1",
                   "align": "center",
                   "valign": "middle"
+                },
+                {
+                  "_$id": "statusexamples",
+                  "_$prefab": "b8e7a101-1934-4120-918c-7de8d8daba01",
+                  "name": "examplesButton",
+                  "x": 160,
+                  "y": 394,
+                  "width": 302,
+                  "height": 64,
+                  "title": "打开 UI 示例"
                 }
               ]
             }

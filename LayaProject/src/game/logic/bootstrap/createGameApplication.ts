@@ -14,6 +14,7 @@ import {
 } from "../presentation/ui/FrameworkStatusWindow";
 import { GameTablesService } from "../infrastructure/tables/GameTablesService";
 import type { Tables } from "../generated/tables/schema";
+import { registerUIExamples } from "./registerUIExamples";
 
 export const FRAMEWORK_STATUS_ROUTE = "lx.status";
 export { RUNTIME_CONFIG_ID };
@@ -36,6 +37,7 @@ export function createGameApplication(adapters: ApplicationAdapters = {}): Appli
             },
         ],
         configureUI(ui, content): void {
+            const examplesRoute = registerUIExamples(ui);
             const statusContent = content.get(FRAMEWORK_STATUS_ROUTE);
             const statusRoute: UIRoute<FrameworkStatusArgs> = {
                 id: statusContent.id,
@@ -43,7 +45,7 @@ export function createGameApplication(adapters: ApplicationAdapters = {}): Appli
                 layout: "fullscreen",
                 multiplicity: "singleton",
                 retention: "destroy",
-                create: (pane) => new FrameworkStatusWindow(pane),
+                create: (pane) => new FrameworkStatusWindow(pane, examplesRoute),
             };
             ui.register(statusRoute);
         },

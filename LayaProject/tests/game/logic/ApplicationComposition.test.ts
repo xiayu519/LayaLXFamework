@@ -8,6 +8,8 @@ import type { PurchasePlatform } from "../../../src/framework/platform/purchase/
 class FakeGWidget {
     destroyed = false;
     zOrder = 0;
+    on(): void {}
+    off(): void {}
     destroy(): void { this.destroyed = true; }
     findChild(): FakeTextField { return new FakeTextField(); }
 }
@@ -38,6 +40,9 @@ const clearRes = vi.fn();
 const tableBytes = readFileSync(resolve("assets/bootstrap/game/tables/tbtableappconfig.bin"));
 const runtimeConfig = JSON.parse(readFileSync(resolve("assets/bootstrap/game/config/runtime.json"), "utf8"));
 vi.stubGlobal("Laya", {
+    regClass: () => () => {},
+    Event: { CLICK: "click" },
+    GButton: FakeGWidget,
     GWidget: FakeGWidget,
     GTextField: FakeTextField,
     GWindow: FakeGWindow,

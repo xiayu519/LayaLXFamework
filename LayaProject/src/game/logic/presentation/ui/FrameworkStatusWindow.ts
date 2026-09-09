@@ -1,5 +1,8 @@
 import type { BindingToken } from "../../../../framework/application/ui/AsyncBindingGuard";
 import { BaseGameWindow } from "../../../../framework/presentation/ui/BaseGameWindow";
+import { LX } from "../../../../framework/LX";
+import type { UIRoute } from "../../../../framework/presentation/ui/UIRouter";
+import type { ExampleInventoryArgs } from "./examples/ExampleInventoryWindow";
 
 export interface FrameworkStatusArgs {
     readonly status: string;
@@ -7,7 +10,7 @@ export interface FrameworkStatusArgs {
 }
 
 export class FrameworkStatusWindow extends BaseGameWindow<FrameworkStatusArgs> {
-    constructor(contentPane: Laya.GWidget) {
+    constructor(contentPane: Laya.GWidget, private readonly examplesRoute?: UIRoute<ExampleInventoryArgs>) {
         super(contentPane);
         this.modal = false;
     }
@@ -19,5 +22,24 @@ export class FrameworkStatusWindow extends BaseGameWindow<FrameworkStatusArgs> {
             statusText.text = args.status;
             detailText.text = args.detail;
         });
+        if (!this.examplesRoute) return;
+        const route = this.examplesRoute;
+        const button = this.requireChild("examplesButton", Laya.GButton);
+        let opening = false;
+        const open = async (): Promise<void> => {
+            if (opening || !token.isCurrent()) return;
+            opening = true;
+            try {
+                await LX.UI.show(route, { title: "旅行背包" }, { signal: token.signal });
+            } catch (error) {
+                if (token.isCurrent()) {
+                    console.error("[UI examples] inventory failed", error);
+                    LX.UI.tip("暂时无法打开，请重试");
+                }
+            } finally { opening = false; }
+        };
+        const click = (): void => { void open(); };
+        button.on(Laya.Event.CLICK, this, click);
+        this.presentation.defer(() => button.off(Laya.Event.CLICK, this, click));
     }
 }

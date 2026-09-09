@@ -118,6 +118,8 @@ LX.UI.tip("金币不足");
 
 完整 UI route、层级和生命周期说明见 [UI 与运行时架构](LayaProject/docs/architecture.md#ui-生命周期)。
 
+启动页的 **打开 UI 示例** 提供全屏背包、100 项虚拟列表和确认弹窗；预制体复用、类型化节点与接入方式见 [可调用 UI 示例](LayaProject/docs/ui-examples.md)。
+
 ### Prefab 对象池
 
 ```ts

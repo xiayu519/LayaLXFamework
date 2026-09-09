@@ -40,6 +40,9 @@ export abstract class BaseGameWindow<TArgs> extends Laya.GWindow {
 
     protected constructor(contentPane: Laya.GWidget) {
         super();
+        // Native auto input reads as false; restoring that boolean after a Tween disables the subtree.
+        // GWindow already listens for mouse input. Make its enabled state explicit before transitions.
+        this.mouseEnabled = true;
         this.contentPane = contentPane;
     }
 

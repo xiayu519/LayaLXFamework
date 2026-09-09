@@ -1,0 +1,58 @@
+{
+  "_$ver": 1,
+  "_$id": "confirmationroot",
+  "_$type": "GWidget",
+  "name": "Confirmation",
+  "x": 0,
+  "y": 0,
+  "width": 560,
+  "height": 390,
+  "_$runtime": "res://b8e7a108-1934-4120-918c-7de8d8daba08",
+  "_$child": [
+    {
+      "_$id": "confirmationframe",
+      "_$prefab": "b8e7a102-1934-4120-918c-7de8d8daba02",
+      "name": "frame",
+      "width": 560,
+      "height": 390,
+      "_$var": true
+    },
+    {
+      "_$id": "confirmationmessage",
+      "_$type": "GTextField",
+      "name": "messageText",
+      "x": 30,
+      "y": 124,
+      "width": 500,
+      "height": 144,
+      "text": "确定使用这件物品？",
+      "fontSize": 23,
+      "color": "#e2e8f0",
+      "valign": "middle",
+      "leading": 12,
+      "_$var": true
+    },
+    {
+      "_$id": "confirmationcancel",
+      "_$prefab": "b8e7a101-1934-4120-918c-7de8d8daba01",
+      "name": "cancelButton",
+      "x": 30,
+      "y": 300,
+      "width": 232,
+      "height": 62,
+      "title": "取消",
+      "_$var": true
+    },
+    {
+      "_$id": "confirmationaccept",
+      "_$prefab": "b8e7a101-1934-4120-918c-7de8d8daba01",
+      "name": "confirmButton",
+      "x": 282,
+      "y": 300,
+      "width": 248,
+      "height": 62,
+      "title": "确认使用",
+      "_$var": true
+    }
+  ]
+}
