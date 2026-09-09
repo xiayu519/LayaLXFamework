@@ -20,4 +20,4 @@ source: code-verified
 
 ## Evidence
 
-`tests/SaveStore.test.ts` 覆盖缺失、损坏、迁移成功、迁移缺失/抛错、非法默认值和未来版本保留。
+[SaveStore.test.ts](../../../tests/framework/SaveStore.test.ts) 覆盖缺失、损坏、迁移成功、迁移缺失/抛错、非法默认值和未来版本保留。

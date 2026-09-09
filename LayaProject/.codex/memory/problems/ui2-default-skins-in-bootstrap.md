@@ -20,4 +20,4 @@ source: code-verified
 
 ## Verification
 
-原地重新构建后 `release/web/internal/UI` 不再存在，发布目录降为 1,654,886 字节；`npm run verify` 的 Laya CLI、产物检查和 Headless Chromium 全部通过。`validate:assets` 与 `validate:build` 保持回归门禁。
+当时原地重新构建后 `release/web/internal/UI` 不再存在，发布目录降为 1,654,886 字节，并通过产物检查和 Headless Chromium。现行配置见 [PlayerSettings.json](../../../settings/PlayerSettings.json)，验收入口按 [当前验证规则](../../../AGENTS.md) 选择；历史包体大小不作为当前预算或通过证据。

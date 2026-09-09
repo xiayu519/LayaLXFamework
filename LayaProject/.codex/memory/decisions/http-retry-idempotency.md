@@ -18,4 +18,4 @@ source: code-verified
 
 ## Evidence
 
-`tests/LayaAdapters.test.ts` 覆盖验证前失败、JSON body、GET 重试上限、终态元数据、POST 幂等键和超时中止。
+[LayaAdapters.test.ts](../../../tests/framework/LayaAdapters.test.ts) 覆盖验证前失败、JSON body、GET 重试上限、终态元数据、POST 幂等键和超时中止。

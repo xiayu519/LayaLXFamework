@@ -20,7 +20,7 @@ source: code-verified
 - `--channel main` 是 snapshot 模式，只在下游显式执行同步时解析 channel 最新提交；lock 固定当时的 commit，之后不会随 channel 自动漂移。
 - lock v2 记录 `source.mode`、`source.ref`、`commit`、`manifestVersion`、manifest 哈希和逐文件哈希；校验器继续兼容既有 release lock v1。
 - snapshot 上游校验检出 lock 中的 commit，并要求该 commit 仍可从 channel 到达；用于同步的 channel 禁止 force-push。
-- managed files 在两种模式下都保持下游只读，同步仍经独立分支和完整回归。
+- managed files 在两种模式下都保持下游只读；同步步骤与按影响验收以 [当前发行规则](../../../.agents/skills/framework-sync/references/distribution.md) 为准。
 
 ## Consequences
 

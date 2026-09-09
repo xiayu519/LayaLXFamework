@@ -10,7 +10,7 @@ source: code-verified
 
 # Data pipelines v5
 
-替代 [Data pipelines v4](data-pipelines-v4.md)。
+路径曾把固定逻辑库误当成游戏身份；当前配置依据见 [GameProject.json](../../../settings/GameProject.json)。
 
 ## Decision
 
@@ -21,7 +21,7 @@ source: code-verified
 
 ## Evidence
 
-`GameProject.test.ts` 覆盖 schema 2、旧 schema 1 和越界路径；Luban 陈旧检查、doctor、类型检查与游戏表单测负责实际链路。
+[GameProject.test.ts](../../../tests/workflow/GameProject.test.ts) 覆盖 schema 2、旧 schema 1 和越界路径；生成与运行链路见 [Luban Skill](../../../.agents/skills/luban-tables/SKILL.md)。
 
 ## Re-evaluate when
 

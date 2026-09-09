@@ -10,7 +10,7 @@ source: code-verified
 
 # Laya resource package layout v2
 
-替代 [旧资源布局](resource-package-layout.md)。
+启动资源按所有权拆分的原因是让下游可修改自己的资源，而上游同步仍能保护框架启动依赖。现行布局见 [ResourceLayout.json](../../../settings/ResourceLayout.json)。
 
 ## Decision
 

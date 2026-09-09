@@ -23,7 +23,6 @@ const requiredFields = [
     "last_verified",
     "source",
 ];
-const allowedStatuses = new Set(["active", "superseded", "archived"]);
 const allowedSources = new Set(["user-confirmed", "code-verified", "external-verified"]);
 
 function portable(path) {
@@ -87,7 +86,8 @@ function parseEntry(memory, path) {
         }
     }
     const title = source.match(/^#\s+(.+)$/m)?.[1] ?? portable(relative(memory.root, path));
-    return { path, source, metadata, title, hasFrontmatter: Boolean(match) };
+    return { path, source, body: match ? source.slice(match[0].length) : source,
+        searchPath: portable(relative(memory.root, path)), metadata, title, hasFrontmatter: Boolean(match) };
 }
 
 function checkMemory(memory) {
@@ -138,8 +138,8 @@ function checkMemory(memory) {
         if (entry.metadata.type !== entryKinds.get(folder)) {
             errors.push(`${displayPath} type must be '${entryKinds.get(folder)}'.`);
         }
-        if (!allowedStatuses.has(entry.metadata.status)) {
-            errors.push(`${displayPath} has invalid status '${entry.metadata.status}'.`);
+        if (entry.metadata.status !== "active") {
+            errors.push(`${displayPath} must be active; remove retired memory and its index link (history belongs in Git).`);
         }
         if (!allowedSources.has(entry.metadata.source)) {
             errors.push(`${displayPath} has invalid source '${entry.metadata.source}'.`);
@@ -152,6 +152,13 @@ function checkMemory(memory) {
         }
         if (!linked.has(relativePath)) {
             errors.push(`${displayPath} is not linked from INDEX.md.`);
+        }
+        for (const match of entry.body.matchAll(/\[[^\]]+\]\(([^)]+)\)/g)) {
+            const target = match[1].split("#", 1)[0];
+            if (!target || /^[a-z][a-z0-9+.-]*:/i.test(target)) continue;
+            if (!existsSync(resolve(dirname(path), target))) {
+                errors.push(`${displayPath} target does not exist: ${target}`);
+            }
         }
     }
     return { errors, count: files.length };
@@ -176,9 +183,6 @@ function check() {
 function search(rawArguments) {
     let limit = 3;
     const argumentsCopy = [...rawArguments];
-    const historyIndex = argumentsCopy.indexOf("--include-history");
-    const includeHistory = historyIndex >= 0;
-    if (includeHistory) argumentsCopy.splice(historyIndex, 1);
     const limitIndex = argumentsCopy.indexOf("--limit");
     if (limitIndex >= 0) {
         limit = Number(argumentsCopy[limitIndex + 1]);
@@ -187,21 +191,21 @@ function search(rawArguments) {
     const terms = [...new Set(argumentsCopy.flatMap(tokenize))];
     if (terms.length === 0 || argumentsCopy.some((argument) => argument.startsWith("--"))
         || !Number.isInteger(limit) || limit < 1 || limit > 10) {
-        console.error("Usage: project-memory.mjs search <keyword...> [--limit 1..10] [--include-history]");
+        console.error("Usage: project-memory.mjs search <keyword...> [--limit 1..10]");
         process.exitCode = 2;
         return;
     }
 
     const matches = activeMemories()
         .flatMap((memory) => entryFiles(memory).map((path) => parseEntry(memory, path)))
-        .filter((entry) => entry.metadata.status === "active" || includeHistory)
+        .filter((entry) => entry.metadata.status === "active")
         .map((entry) => {
             const metadata = entry.metadata;
             const fields = [metadata.scope, metadata.description, metadata.trigger, entry.title,
-                portable(relative(projectRoot, entry.path))]
+                entry.searchPath]
                 .filter(Boolean)
                 .map((item) => item.normalize("NFKC").toLowerCase());
-            const body = entry.source.normalize("NFKC").toLowerCase();
+            const body = entry.body.normalize("NFKC").toLowerCase();
             const score = terms.reduce((total, term) => {
                 const fieldHits = fields.reduce((count, item) => count + (item.includes(term) ? 3 : 0), 0);
                 return total + fieldHits + (body.includes(term) ? 1 : 0);
@@ -216,11 +220,12 @@ function search(rawArguments) {
         console.log("No project memory matched.");
         return;
     }
+    console.log("Project memory is recall only; check current instructions, scope and evidence before use.");
     for (const { entry } of matches) {
         const metadata = entry.metadata;
         console.log(
             `${portable(relative(projectRoot, entry.path))} | ${metadata.status} | ${metadata.type} | ${metadata.scope} | `
-            + `${metadata.description} | trigger: ${metadata.trigger}`,
+            + `${metadata.description} | trigger: ${metadata.trigger} | verified: ${metadata.last_verified} | source: ${metadata.source}`,
         );
     }
 }

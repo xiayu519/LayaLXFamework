@@ -12,6 +12,8 @@ source: user-confirmed
 
 ## Confirmed preference
 
-## Required behavior
+## Current guidance
+
+<link to current rule; do not duplicate instructions>
 
 ## Evidence

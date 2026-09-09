@@ -24,4 +24,4 @@ LayaAir 3.4 为 `bin/bytes/fui` 注册 `BytesAssetLoader`；它把 fetch 的 Arr
 
 ## Verification
 
-实际 LayaAir 3.4.1 Web 构建由 Headless Chromium 加载 `.bin`，`LX.Config` 查询值为 `LXFamework`。
+当时实际 LayaAir 3.4.1 Web 构建由 Headless Chromium 加载 `.bin`，表查询值为 `LXFamework`。当前二进制表入口已独立为 `LX.Tables`，见 [Luban Skill](../../../.agents/skills/luban-tables/SKILL.md)；旧 `config/game` 路径仅是复现背景。

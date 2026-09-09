@@ -1,18 +1,22 @@
 # Project memory policy
 
-项目记忆是仓库内、可审查的长期知识，不等同于 Codex 官方个人 Memories。
+项目记忆是仓库内、按需检索的团队经验。它不自动注入会话，不承担会话恢复或个人偏好自动提取。
+
+Codex 官方 [Memories](https://learn.chatgpt.com/docs/customization/memories) 是客户端功能，启用后从符合条件的既往会话在后台生成 `~/.codex/memories/` 状态，与本项目 `.codex/memory/` 路径不同。升级模型不等于启用记忆；官方记忆通过客户端设置或 `/memories` 管理，项目不自动启停、不手改生成文件，也不建立双向同步或复制会话日志。
+
+两者都只提供回忆线索。必守团队规则在 `AGENTS.md`、Skill 或版本化文档维护，模型默认值只在配置维护。使用记忆前核对当前任务范围、`last_verified` 与证据；标签 `active` 不证明内容仍正确。与当前用户指令、规则、配置或实现冲突时采用现行依据，不让旧记忆触发额外审批、切模型或扩大验证。
 
 公共框架经验位于根 `.codex/memory/`；只适用于某个产品的经验位于 `src/game/<game-id>/.codex/memory/`。游戏目录启动时查询结果按“公共 + 当前游戏”叠加，不能把单个游戏结论提升为公共规则。
 
 ## 记录条件
 
-满足以下任一条件且有证据时记录：
+先检索同主题；仅在现行规则/代码没有完整表达可复用原因、失败边界或纠正背景，且有证据时记录：
 
 - 开发者明确纠正了工作方式、验收定义或长期偏好。
 - 问题已复现并定位，修复或规避已通过相应验证。
-- 架构/产品决定已经批准，未来任务必须遵守其语义。
+- 架构/产品决定已经批准，需要保留不易从实现推断的理由与重新评估条件。
 
-临时进度、未证实推断、单次命令输出、容易从代码直接读取的事实不记录。敏感信息永不记录。
+临时进度、未证实推断、单次命令输出、环境绝对路径、模型档位副本和测试清单不记录。敏感信息永不记录。经验被规则吸收后只保留独有背景与现行入口链接；没有额外价值则删除。
 
 ## 类型与字段
 
@@ -20,6 +24,8 @@
 - `decisions/`：上下文、决定、理由、影响和重新评估条件。
 - `feedback/`：开发者纠正、适用范围和后续执行方式。
 
-每条必须包含 `type`、`scope`、`description`、`trigger`、`status`、`last_verified`、`source`。`source` 仅允许 `user-confirmed`、`code-verified`、`external-verified`；`status` 仅允许 `active`、`superseded`、`archived`。
+每条必须包含 `type`、`scope`、`description`、`trigger`、`status`、`last_verified`、`source`。`source` 仅允许 `user-confirmed`、`code-verified`、`external-verified`；工作集只接受 `status: active`。日期表示最后一次内容证据核验，不因排版或路径修正刷新。
 
-INDEX 只保留一行摘要链接；正文每条不超过 4096 bytes。若规则升级，保留旧条目并标记替代关系，避免无痕改写历史。
+INDEX 只保留一行摘要链接；正文每条不超过 4096 bytes。证据和现行规则优先用可校验的本地 Markdown 链接，避免失效路径被当作已验证结论。
+
+过时或冲突条目直接删除，同时清理 INDEX 和正文引用，不新增 `superseded`/`archived` 记录、兼容迁移或替代链。只修正仍有效条目的错误片段时可原地更新。历史按需通过 Git 查询；历史内容不能重新成为当前指令。

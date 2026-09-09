@@ -83,7 +83,13 @@ Windows 与 macOS 共用同一套 AGENTS、Skills 和 npm 命令。GitHub Action
 
 ## 项目记忆
 
-公共框架经验存放在根 `.codex/memory/`，单个游戏经验存放在 `src/game/<id>/.codex/memory/`；游戏目录查询时叠加两者。`project-memory.mjs search` 默认只返回 active；查历史加 `--include-history`，输出状态，废弃决定不再作为当前指令。只记录经验证的长期内容，历史正文保留替代关系。
+公共框架经验存放在根 `.codex/memory/`，单个游戏经验存放在 `src/game/<id>/.codex/memory/`；游戏目录查询时叠加两者。只在需要既往经验时运行 `project-memory.mjs search <关键词>`，读取少量命中并核对日期、范围和当前证据；无命中就回到代码/文档。记忆不新增审批、模型选择或验证规则。
+
+工作集只保留有效且有独立价值的经验，过时、冲突或已被规则完整吸收的条目直接删除并清理链接；历史查 Git。`check:memory` 检查 active 状态、索引与正文的本地链接。具体记录条件见 [memory-policy.md](../LayaProject/.agents/skills/project-memory/references/memory-policy.md)。
+
+Codex 官方 [Memories](https://learn.chatgpt.com/docs/customization/memories) 位于用户目录 `~/.codex/memories/`，由客户端在启用后后台生成；与仓库记忆可互补。项目不自动启停官方记忆、不手改其生成状态或同步两套目录。团队必守规则继续放在 AGENTS/Skill/版本化文档，不能依赖个人记忆传给其他成员。
+
+本次冲突清理、检索回归与独立执行证据见 [项目记忆验收](../LayaProject/docs/project-memory-validation.md)。
 
 ## 依据
 

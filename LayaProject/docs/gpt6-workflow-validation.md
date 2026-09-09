@@ -2,6 +2,8 @@
 
 日期：2026-09-08。环境：Windows、Node v24.14.0、本地已登录 Codex CLI 0.153.2。范围：Codex 配置、规则、Skill、记忆检索、验证工具及上游同步契约；未修改游戏/引擎实现。
 
+后续记忆工作集与历史检索策略已于 2026-09-09 调整，见 [项目记忆验收](project-memory-validation.md)。下文保留迁移当时的结果，不作为现行记忆维护规则。
+
 ## 配置与依据
 
 当前配置为 `gpt-6-astra`，执行默认 `medium`，verbosity 为 `low`；以 [当前配置](../.codex/config.toml) 为准。后续兼容性复核移除了初次迁移写入的 `plan_mode_reasoning_effort = "medium"`，不再由项目额外固定 Plan 档位。[官方配置参考](https://learn.chatgpt.com/docs/config-file/config-reference) 明确 Plan 未设置时使用客户端内建预设，并非保证继承执行档位；模式切换以客户端实际选择为准。
