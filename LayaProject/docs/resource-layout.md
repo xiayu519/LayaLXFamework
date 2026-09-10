@@ -47,7 +47,7 @@ assets/
 }
 ```
 
-启动流程只等待 `bootstrap`。用户首次可交互后可低并发预取最可能进入的功能；低频功能在进入前调用 `await Laya.loader.loadPackage("packages/<feature>")`。资源退出仍按实际复用率、内存预算和 `LX.Res` 所有权释放，不因分包改变 Loader 生命周期。
+启动流程只等待 `bootstrap`。用户首次可交互后可低并发预取最可能进入的功能；低频功能在进入前调用 `await Laya.loader.loadPackage("packages/<feature>")`。资源退出仍按实际复用率、内存预算和 `lx.res` 所有权释放，不因分包改变 Loader 生命周期。
 
 具体小游戏平台的主包、单分包、总包和远程包限制必须以当次发布的官方规则为准，通过 `npm run analyze:packages -- --build-root <发布目录> --main-limit-bytes <值> --subpackage-limit-bytes <值>` 验证，不在框架中写死易变化的限制。
 

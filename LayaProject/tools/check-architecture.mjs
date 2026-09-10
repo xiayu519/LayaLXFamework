@@ -32,10 +32,10 @@ const frameworkAccessFromGame = {
     bootstrap: new Set(["bootstrap", "application", "domain", "infrastructure", "presentation", "platform", "root"]),
     root: new Set(["root"]),
 };
-const mainPath = join(sourceRoot, "Main.ts");
-const lxPath = join(sourceRoot, "framework", "LX.ts");
+const mainPath = join(sourceRoot, "AppEntry.ts");
+const lxPath = join(sourceRoot, "framework", "lx.ts");
 const gameCompositionBridgePath = join(sourceRoot, "game", "bootstrap", "createApplication.ts");
-const runtimeHostPath = join(sourceRoot, "framework", "bootstrap", "LXRuntimeHost");
+const runtimeHostPath = join(sourceRoot, "framework", "bootstrap", "lxRuntimeHost");
 const runtimeHostCallers = new Set([
     lxPath,
     join(sourceRoot, "framework", "bootstrap", "createRuntime.ts"),
@@ -131,14 +131,14 @@ for (const file of sourceFiles) {
         const targetLocation = locationOf(target);
 
         if (target === runtimeHostPath && !runtimeHostCallers.has(file)) {
-            failures.push(`${localPath(file)}: LXRuntimeHost is private to framework runtime bootstrap.`);
+            failures.push(`${localPath(file)}: lxRuntimeHost is private to framework runtime bootstrap.`);
         }
 
         if (sourceLocation.scope === "root") {
             const targetRelative = relative(sourceRoot, target).split(sep).join("/");
             if (file !== mainPath
-                || (targetRelative !== "framework/LX" && targetRelative !== "game/bootstrap/createApplication")) {
-                failures.push(`${localPath(file)}: root entry may only import game bootstrap and the LX facade.`);
+                || (targetRelative !== "framework/lx" && targetRelative !== "game/bootstrap/createApplication")) {
+                failures.push(`${localPath(file)}: root entry may only import game bootstrap and the lx facade.`);
             }
             continue;
         }
@@ -193,7 +193,7 @@ for (const file of sourceFiles) {
         failures.push(`${localPath(file)}: duplicates a Laya built-in manager.`);
     }
     if (/\b(?:new|extends)\s+LXFamework\b|\bimport\s*\{[^}]*\bLXFamework\b/.test(source)) {
-        failures.push(`${localPath(file)}: runtime code must expose and consume LX, not a LXFamework class.`);
+        failures.push(`${localPath(file)}: runtime code must expose and consume lx, not a LXFamework class.`);
     }
 }
 
@@ -207,8 +207,8 @@ if (existsSync(lxPath)) {
         lxSource.matchAll(/^export\s+(?:class|const|function|interface|type)\s+(\w+)/gm),
         (match) => match[1],
     );
-    if (exports.length !== 1 || exports[0] !== "LX") {
-        failures.push("src/framework/LX.ts must export only the LX runtime facade.");
+    if (exports.length !== 1 || exports[0] !== "lx") {
+        failures.push("src/framework/lx.ts must export only the lx runtime facade.");
     }
 }
 

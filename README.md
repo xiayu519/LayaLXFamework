@@ -2,7 +2,7 @@
 
 LayaLXFamework 是基于 **LayaAir 3.4.1** 的 2D 游戏客户端框架，提供 UI、Prefab 对象池、音频、JSON、Luban Tables、客户端设置、网络和性能检查等常用能力。
 
-项目继续使用 LayaAir 原生 `.ls/.lh`、ui2、`Laya.loader`、`Laya.Scene`、`Laya.timer`、`Laya.Tween`、`Laya.Pool` 和 `Laya.SoundManager`。业务通过 `LX` 访问已组装的公共能力。
+项目继续使用 LayaAir 原生 `.ls/.lh`、ui2、`Laya.loader`、`Laya.Scene`、`Laya.timer`、`Laya.Tween`、`Laya.Pool` 和 `Laya.SoundManager`。业务通过 `lx` 访问已组装的公共能力。
 
 ## GPT-6 开发工作流
 
@@ -47,83 +47,87 @@ LayaLXFamework/
    └─ docs/                       详细技术文档
 ```
 
-## LX API
+命名与迁移见 [代码约定](LayaProject/docs/code-style.md)；动态图集、未完成加载、对象池与 GC 边界见 [UI 资源生命周期](LayaProject/docs/ui-resource-lifecycle.md)。
+
+## lx API
 
 | 入口 | 用途 |
 | --- | --- |
-| `LX.Ready` | 运行时是否已经启动完成 |
-| `LX.UI` | 窗口打开、关闭、层级、栈查询和 Tip |
-| `LX.Res` | Laya 原生 `Laya.loader` |
-| `LX.Scene` | Laya 原生 `Laya.Scene` |
-| `LX.Content` | 内容 ID 与资源 URL 目录 |
-| `LX.Config` | 普通 JSON 加载、校验和释放 |
-| `LX.Tables` | Luban 生成表入口 |
-| `LX.Pool` | Prefab 实例池 |
-| `LX.Audio` | BGM、SFX 和音频设置 |
-| `LX.Storage` | 客户端语言、静音和音量设置 |
-| `LX.Net` | HTTP 请求、超时、取消和有限重试 |
-| `LX.Platform` | 平台类型、安全区、时间和外部链接 |
-| `LX.Performance` | DrawCall、三角形和资源内存快照 |
+| `lx.ready` | 运行时是否已经启动完成 |
+| `lx.stop()` / `lx.snapshot()` | 停止应用 / 查询运行时诊断 |
+| `lx.ui` | 应用窗口、场景 UI 路由注册、安全区布局、红点和 Tip |
+| `lx.res` | Laya 原生 `Laya.loader` |
+| `lx.scene` | Laya 原生 `Laya.Scene` |
+| `lx.sceneFlow` | 业务场景切换、Loading、准备流程和离场回收 |
+| `lx.content` | 内容 ID 与资源 URL 目录 |
+| `lx.config` | 普通 JSON 加载、校验和释放 |
+| `lx.tables` | Luban 生成表入口 |
+| `lx.pool` | Prefab 实例池 |
+| `lx.audio` | BGM、SFX 和音频设置 |
+| `lx.storage` | 客户端语言、静音和音量设置 |
+| `lx.net` | HTTP 请求、超时、取消和有限重试 |
+| `lx.platform` | 平台类型、安全区、时间和外部链接 |
+| `lx.purchase` | 支付平台接口；默认实现不支持购买和恢复，尚非完整支付业务 |
+| `lx.performance` | DrawCall、三角形和资源内存快照 |
+
+应用由 `src/AppEntry.ts` 的原生 `main()` 启动，`CompilerSettings.mainScript` 通过 UUID 引用它；引擎已经完成初始化，入口不再调用 `Laya.init()`。`src/game/bootstrap/createApplication.ts` 负责桥接游戏组合根。应用寿命独立于场景，停机使用 `await lx.stop()`；完整预览应选择 IDE 的启动场景预览。
 
 ### UI
 
-UI route 由游戏组装入口注册。业务通过 route ID 使用窗口：
+UI 的 owner、host 和 layout 分开决定：owner 管生命周期，host 是实际父节点，layout 管全屏或弹窗适配。场景可以同时拥有页面、HUD 和弹窗，也可以让一个页面拥有子弹窗。
+
+| 入口 | 归属与宿主 |
+| --- | --- |
+| `scene.ui.show()` / `session.ui.show()` | 场景拥有，原生 GWidget Runtime 挂场景 `uiRoot` |
+| `session.show()` | 当前 UI 展示拥有，沿用场景 `uiRoot`；父关闭会清理子 UI |
+| `lx.ui.show()` | 应用拥有，原生 GWindow 挂 GRoot；用于 Loading、系统窗口等 |
+
+场景 UI 在组合根使用 `registerView({ id, url, viewType, bind })` 注册。当前模板已注册旅行背包，可在 `BaseGameScene` 生命周期内打开：
+
+`scene.ui` 始终属于指定的场景实例；获取当前主场景用 `lx.sceneFlow.current`。宿主由 `.ls` 原生导出 `uiRoot`，位置和尺寸用 `scene.ui.setViewport({ x, y, width, height })` 设置，层级可调整 `scene.ui.root.zOrder`；无参数 `setViewport()` 恢复全屏跟随，祖先保持无变换的屏幕坐标空间。
 
 ```ts
-const inventory = await LX.UI.show("game.inventory", {
-    playerId: "player-1",
+const inventory = await this.ui.show("lx.examples.inventory", { title: "旅行背包" });
+this.ui.close("lx.examples.inventory", inventory);
+```
+
+正式业务优先保存注册返回的 typed route，以获得参数检查。窗口固定 `Root/full + safeContent(top/full/mid/bottom)` 完整骨架：拉伸列表放内层 full，固定居中面板放 mid，弹窗只动画 mid；不用的槽位留空保留。节点由 `.lh` 和 IDE Runtime / `.generated.ts` 或原生 `@property` 绑定，不维护另一套 Binder，不手改生成字段。
+
+`bind(view, args, session)` 负责本次展示。下面片段中的 `view` 是带有对应 IDE 字段的业务 Runtime，`model` 与 `changes` 由游戏服务注入：
+
+```ts
+session.bindData(changes, "changed", () => {
+    view.quantityText.text = String(model.totalQuantity);
 });
-
-LX.UI.close("game.inventory", inventory);
-LX.UI.closeTop();
+session.bindRedDot(view.badge, "inventory", { countText: view.badgeCount });
+view.closeButton.on(Laya.Event.CLICK, view, session.close);
+session.lifetime.defer(() => view.closeButton.off(Laya.Event.CLICK, view, session.close));
 ```
 
-查询当前窗口状态：
+业务按背包、角色、任务等大功能共享模型，不按 UI 新建数据；一个模型可通知多个 UI，一个 UI 也可订阅多个模型。业务先更新模型再发原生事件。绑定首次同步读快照，后续用原生 `callLater` 合并刷新；页面暂停解除订阅，恢复重读，关闭释放。服务器奖励不因 UI 关闭而丢弃；跨 `await` 的界面回写才检查 `session.token`。
+
+会换图的 UI 引用 [DynamicImage.lh](LayaProject/assets/bootstrap/framework/ui/components/DynamicImage.lh)，使用原生 `src` API。关闭会立即取消展示，底层异步 `bind()` 与共享加载仍追踪至结束；原生组件销毁稳定后再执行 GC。动态图集与渲染池的 3.4.1 兼容修复见 [资源生命周期](LayaProject/docs/ui-resource-lifecycle.md)。
+
+`navigation: page/overlay`、`modal`、`closeOnMaskClick` 与布局独立配置。场景弹窗使用宿主局部 Mask，应用窗口使用原生 GRoot.modalLayer；`center-popup` 默认启用遮罩和点击空白关闭。singleton 按 owner 隔离，hide 缓存只在 owner 存活期间复用。
+
+应用窗口才使用 `register({ create })`、`BaseGameWindow<TArgs>` 和 `lx.ui.show()`。基类提供同名 protected `bindData` / `bindRedDot`，展示清理登记在 `presentation`，实例清理登记在 `lifetime`；`onClosed()` 用于关闭后处理。
+
+查询与公共提示：
 
 ```ts
-const all = LX.UI.listManaged();
-const visible = LX.UI.listVisible();
-const top = LX.UI.getTop();
-const bottom = LX.UI.getBottom();
-const snapshot = LX.UI.snapshot();
+const sceneViews = this.ui.snapshot().views; // BaseGameScene 内，包含当前场景的子 UI 和隐藏缓存。
+const snapshot = lx.ui.snapshot(); // scenes 汇总场景 UI；managed/visible/top/bottom 为应用窗口。
+lx.ui.tip("金币不足");
 ```
 
-窗口脚本继承 `BaseGameWindow<TArgs>`。异步数据使用本次打开对应的 `BindingToken` 回写：
+详细说明见 [UI 布局与归属](LayaProject/docs/ui-layout.md)、[数据驱动 UI](LayaProject/docs/ui-data-binding.md)、[红点](LayaProject/docs/ui-red-dots.md)和[场景切换](LayaProject/docs/scene-flow.md)。
 
-```ts
-class InventoryWindow extends BaseGameWindow<InventoryArgs> {
-    protected async onBind(args: InventoryArgs, token: BindingToken): Promise<void> {
-        const title = this.requireChild("titleText", Laya.GTextField);
-        const data = await loadInventory(args.playerId);
-
-        token.commit(() => {
-            title.text = data.title;
-        });
-    }
-}
-```
-
-动态图片直接使用 ui2：
-
-```ts
-const avatar = this.requireChild("avatar", Laya.GLoader);
-avatar.src = "packages/profile/images/avatar.png";
-```
-
-公共短提示：
-
-```ts
-LX.UI.tip("金币不足");
-```
-
-完整 UI route、层级和生命周期说明见 [UI 与运行时架构](LayaProject/docs/architecture.md#ui-生命周期)。
-
-启动页的 **打开 UI 示例** 提供全屏背包、100 项虚拟列表和确认弹窗；预制体复用、类型化节点与接入方式见 [可调用 UI 示例](LayaProject/docs/ui-examples.md)。
+启动状态页的 **打开旅行背包** 提供全屏拉伸列表、**居中展示** 和确认弹窗。**模拟服务器奖励（6 秒）**、**重新领取补给**、**重送上次补给** 演示关闭后到账、全量快照和旧响应过滤；这里使用模拟消息，尚未连接实际服务器。入口和复测说明见 [可调用 UI 示例](LayaProject/docs/ui-examples.md)。
 
 ### Prefab 对象池
 
 ```ts
-LX.Pool.register<Laya.Sprite>({
+lx.pool.register<Laya.Sprite>({
     id: "battle.bullet",
     url: "packages/battle/prefabs/Bullet.lh",
     maxIdle: 32,
@@ -138,13 +142,15 @@ LX.Pool.register<Laya.Sprite>({
     },
 });
 
-const bullet = await LX.Pool.acquire<Laya.Sprite>("battle.bullet");
+const bullet = await lx.pool.acquire<Laya.Sprite>("battle.bullet");
 Laya.stage.addChild(bullet);
 
-LX.Pool.release("battle.bullet", bullet);
+lx.pool.release("battle.bullet", bullet);
 ```
 
-使用 `LX.Pool.snapshot()` 查看 active、pending、idle 和加载状态；无借出实例时可调用 `LX.Pool.drain(id)` 排空。
+使用 `lx.pool.snapshot()` 查看 active、pending、idle 和加载状态；无借出实例时可调用 `lx.pool.drain(id)` 排空。
+
+异步借用可传 `lx.pool.acquire(id, { signal: scene.signal })`：场景退出只取消当前借用者，其他调用者共用的加载继续。成功返回后检查 owner 是否仍有效，再挂载并登记归还；已失效则立即归还。
 
 ### 普通 JSON
 
@@ -174,10 +180,10 @@ function isMapData(value: unknown): value is MapData {
     return typeof map.width === "number" && typeof map.height === "number";
 }
 
-const map = await LX.Config.load("map.level-001", isMapData);
+const map = await lx.config.load("map.level-001", isMapData);
 
 // 对应 owner 退出且无人继续使用后释放。
-LX.Config.release("map.level-001");
+lx.config.release("map.level-001");
 ```
 
 普通 JSON 与 Luban Tables 的用途和目录见 [JSON 与 Luban Tables](LayaProject/docs/data-assets.md)。
@@ -195,7 +201,7 @@ npm run tables:check
 业务读取生成表：
 
 ```ts
-const tables = LX.Tables.require<GameTables>();
+const tables = lx.tables.require<GameTables>();
 const appConfig = tables.TbTableAppConfig.get(1);
 ```
 
@@ -204,31 +210,31 @@ const appConfig = tables.TbTableAppConfig.get(1);
 ```ts
 const battleOwner = {};
 
-LX.Audio.playBgm("packages/battle/audio/bgm/battle.mp3");
-const hit = LX.Audio.playSfx(
+lx.audio.playBgm("packages/battle/audio/bgm/battle.mp3");
+const hit = lx.audio.playSfx(
     "packages/battle/audio/sfx/hit.wav",
     1,
     battleOwner,
 );
 
 hit.stop();
-LX.Audio.stopOwner(battleOwner);
-LX.Audio.stopBgm();
+lx.audio.stopOwner(battleOwner);
+lx.audio.stopBgm();
 ```
 
 保存并应用客户端设置：
 
 ```ts
-const settings = LX.Storage.load().value;
+const settings = lx.storage.load().value;
 
-LX.Storage.save({
+lx.storage.save({
     ...settings,
     muted: false,
     musicVolume: 0.8,
     soundVolume: 1,
 });
 
-LX.Audio.applySettings(LX.Storage.load().value);
+lx.audio.applySettings(lx.storage.load().value);
 ```
 
 ### 网络
@@ -236,7 +242,7 @@ LX.Audio.applySettings(LX.Storage.load().value);
 ```ts
 const controller = new AbortController();
 
-const response = await LX.Net.request<PlayerProfile>("/api/profile", {
+const response = await lx.net.request<PlayerProfile>("/api/profile", {
     method: "GET",
     responseType: "json",
     timeoutMs: 10_000,
@@ -253,25 +259,27 @@ console.log(response.status, response.data);
 
 ### 原生资源、场景、平台与性能
 
-`LX.Res` 和 `LX.Scene` 保留 LayaAir 原生 API：
+`lx.res` 和 `lx.scene` 保留 LayaAir 原生 API：
 
 ```ts
-const prefab = await LX.Res.load(
+const prefab = await lx.res.load(
     "packages/battle/prefabs/Enemy.lh",
     { type: Laya.Loader.HIERARCHY },
 );
 
-await LX.Scene.open("packages/battle/scenes/Battle.ls");
+// 独立原生 Scene 可直接使用 lx.scene；需要框架场景生命周期时，注册后使用：
+await lx.sceneFlow.open(battleSceneRoute, { levelId: 1 });
 ```
 
 平台信息与渲染快照：
 
 ```ts
-const platform = LX.Platform.kind;
-const safeArea = LX.Platform.safeArea;
-const render = LX.Performance.capture();
+const platform = lx.platform.kind;
+const hostSafeArea = lx.platform.viewport.safeArea; // 宿主窗口坐标。
+const safeArea = lx.ui.layout.snapshot().safeArea; // Laya Stage 逻辑坐标。
+const render = lx.performance.capture();
 
-LX.Performance.assertBudget({
+lx.performance.assertBudget({
     drawCalls2D: 20,
     drawCalls: 20,
     triangles: 1_000,

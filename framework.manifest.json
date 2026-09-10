@@ -22,8 +22,8 @@
     "LayaProject/settings/AssetImportPolicy.json",
     "LayaProject/settings/LayaSourceBaseline.json",
     "LayaProject/settings/PerformanceBudgets.json",
-    "LayaProject/src/Main.ts",
-    "LayaProject/src/Main.ts.meta",
+    "LayaProject/src/AppEntry.ts",
+    "LayaProject/src/AppEntry.ts.meta",
     "LayaProject/src/framework/**",
     "LayaProject/tests/framework/**",
     "LayaProject/tests/workflow/**",
@@ -112,6 +112,9 @@
         "levels",
         "tables"
       ]
+    },
+    "LayaProject/settings/CompilerSettings.json": {
+      "mainScript": "res://7bad1742-6eed-4d8d-81c0-501dc5bf03d6"
     },
     "LayaProject/settings/PlayerSettings.json": {
       "modules": {

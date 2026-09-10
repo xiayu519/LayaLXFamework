@@ -3,6 +3,7 @@ import {
     LifetimeScope,
     type Cleanup,
 } from "../../application/lifecycle/LifetimeScope";
+import type { SceneUI } from "../ui/SceneUI";
 
 export interface SceneResourceRequest {
     readonly url: string;
@@ -30,10 +31,38 @@ export interface SceneTransitionPauseContext {
  * that is not already a hierarchy dependency.
  */
 export abstract class BaseGameScene<TArgs = void> extends Laya.Scene {
+    /** Native Runtime export variable uiRoot, or assign an exported node before first accessing ui. */
+    uiRoot: Laya.GWidget | null = null;
+
     private readonly sceneLifetime = new LifetimeScope();
+    private readonly sceneController = new AbortController();
     private transitionLoadingCompletion: (() => void) | undefined;
     private transitionPaused = false;
     private transitionLeaving = false;
+    private uiFactory: (() => SceneUI) | undefined;
+    private uiValue: SceneUI | undefined;
+
+    /** Cancel scene-owned async acquisitions; unlike transition context.signal this spans the whole scene. */
+    get signal(): AbortSignal { return this.sceneController.signal; }
+
+    /** This scene instance's UI; never implicitly redirects to SceneFlow.current. */
+    get ui(): SceneUI {
+        if (this.destroyed || this.transitionLeaving && !this.uiValue) throw new Error("Scene UI is no longer available.");
+        if (!this.uiValue) {
+            if (!this.uiFactory) throw new Error("Scene UI is not configured; open this scene through lx.sceneFlow.");
+            this.uiValue = this.uiFactory();
+        }
+        return this.uiValue;
+    }
+
+    /** @internal Configured before preparation; scenes that have no UI allocate no UI context. */
+    configureUI(factory: () => SceneUI): void {
+        if (this.uiFactory) throw new Error("Scene UI was already configured.");
+        this.uiFactory = factory;
+    }
+
+    /** @internal Pending native loads must settle before Scene.gc can collect old hierarchy dependencies. */
+    async waitForUI(): Promise<void> { await this.uiValue?.waitForPendingLoads(); }
 
     constructor() {
         super();
@@ -106,6 +135,7 @@ export abstract class BaseGameScene<TArgs = void> extends Laya.Scene {
     async leaveForTransition(): Promise<void> {
         if (this.transitionLeaving || this.destroyed) return;
         this.transitionLeaving = true;
+        this.sceneController.abort();
         await this.onTransitionLeaving();
     }
 
@@ -116,8 +146,11 @@ export abstract class BaseGameScene<TArgs = void> extends Laya.Scene {
 
     override destroy(destroyChild = true): void {
         if (this.destroyed) return;
+        this.sceneController.abort();
         this.transitionLoadingCompletion = undefined;
+        this.uiFactory = undefined;
         const errors: unknown[] = [];
+        try { this.uiValue?.dispose(); } catch (error) { errors.push(error); }
         try {
             this.sceneLifetime.dispose();
         } catch (error) {

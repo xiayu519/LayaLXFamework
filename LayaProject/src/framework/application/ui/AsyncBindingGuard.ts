@@ -62,7 +62,7 @@ export class AsyncBindingGuard {
 
 export class BindingCancelledError extends Error {
     constructor() {
-        super("UI request was cancelled or superseded.");
+        super("Request was cancelled or superseded.");
         this.name = "BindingCancelledError";
     }
 }

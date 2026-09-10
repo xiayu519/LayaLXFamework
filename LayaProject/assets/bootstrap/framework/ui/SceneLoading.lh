@@ -1,10 +1,12 @@
 {
   "_$ver": 1,
   "_$id": "lxsceneloadingroot",
+  "_$runtime": "res://94aa744b-a0b8-4fa4-a8b3-e1f0eed986a7",
   "_$type": "GWidget",
   "name": "SceneLoading",
   "width": 720,
   "height": 1280,
+  "mouseThrough": true,
   "_$child": [
     {
       "_$id": "lxsceneloadingbleed",
@@ -12,11 +14,11 @@
       "name": "full",
       "width": 720,
       "height": 1280,
+      "mouseThrough": true,
       "background": {
         "_$type": "DrawRectCmd",
         "fillColor": "#08101e"
-      },
-      "mouseThrough": true
+      }
     },
     {
       "_$id": "lxsceneloadingrootsafe",
@@ -24,6 +26,7 @@
       "name": "safeContent",
       "width": 720,
       "height": 1280,
+      "mouseThrough": true,
       "_$child": [
         {
           "_$id": "lxsceneloadingroot_safe_top",
@@ -49,6 +52,7 @@
           "y": 455,
           "width": 604,
           "height": 370,
+          "mouseThrough": true,
           "_$child": [
             {
               "_$id": "lxsceneloadingcard",
@@ -58,17 +62,18 @@
               "height": 370,
               "background": {
                 "_$type": "DrawRoundRectCmd",
-                "lineWidth": 2,
-                "lineColor": "#38bdf8",
-                "fillColor": "#111c2f",
                 "lt": 24,
                 "rt": 24,
                 "lb": 24,
-                "rb": 24
+                "rb": 24,
+                "lineWidth": 2,
+                "lineColor": "#38bdf8",
+                "fillColor": "#111c2f"
               },
               "_$child": [
                 {
                   "_$id": "lxsceneloadingphase",
+                  "_$var": true,
                   "_$type": "GTextField",
                   "name": "phaseText",
                   "x": 40,
@@ -77,13 +82,15 @@
                   "height": 52,
                   "text": "正在加载场景",
                   "fontSize": 30,
-                  "bold": true,
                   "color": "#f8fafc",
+                  "bold": true,
                   "align": "center",
-                  "valign": "middle"
+                  "valign": "middle",
+                  "letterSpacing": 0
                 },
                 {
                   "_$id": "lxsceneloadingsceneprogress",
+                  "_$var": true,
                   "_$type": "GTextField",
                   "name": "sceneProgressText",
                   "x": 40,
@@ -93,11 +100,12 @@
                   "text": "场景 0%",
                   "fontSize": 22,
                   "color": "#cbd5e1",
-                  "align": "left",
-                  "valign": "middle"
+                  "valign": "middle",
+                  "letterSpacing": 0
                 },
                 {
                   "_$id": "lxsceneloadingresourceprogress",
+                  "_$var": true,
                   "_$type": "GTextField",
                   "name": "resourceProgressText",
                   "x": 312,
@@ -108,7 +116,8 @@
                   "fontSize": 22,
                   "color": "#cbd5e1",
                   "align": "right",
-                  "valign": "middle"
+                  "valign": "middle",
+                  "letterSpacing": 0
                 },
                 {
                   "_$id": "lxsceneloadingtrack",
@@ -120,32 +129,34 @@
                   "height": 28,
                   "background": {
                     "_$type": "DrawRoundRectCmd",
-                    "fillColor": "#1e293b",
                     "lt": 14,
                     "rt": 14,
                     "lb": 14,
-                    "rb": 14
+                    "rb": 14,
+                    "fillColor": "#1e293b"
                   },
                   "_$child": [
                     {
                       "_$id": "lxsceneloadingfill",
+                      "_$var": true,
                       "_$type": "GWidget",
                       "name": "progressFill",
                       "width": 524,
                       "height": 28,
                       "background": {
                         "_$type": "DrawRoundRectCmd",
-                        "fillColor": "#38bdf8",
                         "lt": 14,
                         "rt": 14,
                         "lb": 14,
-                        "rb": 14
+                        "rb": 14,
+                        "fillColor": "#38bdf8"
                       }
                     }
                   ]
                 },
                 {
                   "_$id": "lxsceneloadingpercent",
+                  "_$var": true,
                   "_$type": "GTextField",
                   "name": "percentText",
                   "x": 40,
@@ -154,15 +165,15 @@
                   "height": 72,
                   "text": "0%",
                   "fontSize": 42,
-                  "bold": true,
                   "color": "#4ade80",
+                  "bold": true,
                   "align": "center",
-                  "valign": "middle"
+                  "valign": "middle",
+                  "letterSpacing": 0
                 }
               ]
             }
-          ],
-          "mouseThrough": true
+          ]
         },
         {
           "_$id": "lxsceneloadingroot_safe_bottom",
@@ -172,9 +183,7 @@
           "height": 0,
           "mouseThrough": true
         }
-      ],
-      "mouseThrough": true
+      ]
     }
-  ],
-  "mouseThrough": true
+  ]
 }

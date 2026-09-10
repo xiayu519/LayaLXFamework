@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, extname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveComponentScript } from "./asset-script-reference.mjs";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const assetsRoot = join(projectRoot, "assets");
@@ -110,15 +111,14 @@ for (const path of hierarchyFiles) {
             if (typeof component.scriptPath !== "string") {
                 continue;
             }
-            const scriptPath = resolve(dirname(path), component.scriptPath);
-            const metaPath = `${scriptPath}.meta`;
-            if (!existsSync(scriptPath) || !existsSync(metaPath)) {
-                failures.push(`${localPath}: script component path '${component.scriptPath}' is missing.`);
-                continue;
-            }
-            const scriptMeta = readJson(metaPath);
-            if (scriptMeta?.uuid !== component._$type) {
-                failures.push(`${localPath}: script component uuid does not match ${relative(projectRoot, metaPath)}.`);
+            try {
+                resolveComponentScript(assetsRoot, path, component.scriptPath, component._$type, (scriptPath) => {
+                    const metaPath = `${scriptPath}.meta`;
+                    if (!existsSync(scriptPath) || !existsSync(metaPath)) return undefined;
+                    return readJson(metaPath)?.uuid;
+                });
+            } catch (error) {
+                failures.push(`${localPath}: ${error.message}`);
             }
         }
     });

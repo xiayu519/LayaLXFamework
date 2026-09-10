@@ -1,8 +1,8 @@
-import type { BindingToken } from "../../application/ui/AsyncBindingGuard";
 import { BaseGameWindow } from "../ui/BaseGameWindow";
 import { UILayer } from "../ui/UILayer";
 import { UIRouter, type UIRoute } from "../ui/UIRouter";
 import type { SceneLoadingPresenter, SceneTransitionPhase, SceneTransitionProgress } from "./SceneFlow";
+import { SceneLoadingView } from "./SceneLoadingView";
 
 export const DEFAULT_SCENE_LOADING_ROUTE_ID = "lx.scene-loading";
 export const DEFAULT_SCENE_LOADING_URL = "bootstrap/framework/ui/SceneLoading.lh";
@@ -30,7 +30,10 @@ export class DefaultSceneLoadingPresenter implements SceneLoadingPresenter {
             layout: "fullscreen",
             multiplicity: "singleton",
             retention: "hide",
-            create: (pane) => new SceneLoadingWindow(pane),
+            create: (pane) => {
+                if (!(pane instanceof SceneLoadingView)) throw new Error("SceneLoading.lh requires SceneLoadingView Runtime.");
+                return new SceneLoadingWindow(pane);
+            },
         });
     }
 
@@ -60,45 +63,35 @@ export class DefaultSceneLoadingPresenter implements SceneLoadingPresenter {
 }
 
 class SceneLoadingWindow extends BaseGameWindow<SceneTransitionProgress> {
-    private readonly phaseText: Laya.GTextField;
-    private readonly sceneText: Laya.GTextField;
-    private readonly resourceText: Laya.GTextField;
-    private readonly percentText: Laya.GTextField;
-    private readonly progressFill: Laya.GWidget;
     private readonly progressWidth: number;
 
-    constructor(contentPane: Laya.GWidget) {
-        super(contentPane);
+    constructor(private readonly view: SceneLoadingView) {
+        super(view);
         this.modal = true;
-        this.phaseText = this.requireChild("phaseText", Laya.GTextField);
-        this.sceneText = this.requireChild("sceneProgressText", Laya.GTextField);
-        this.resourceText = this.requireChild("resourceProgressText", Laya.GTextField);
-        this.percentText = this.requireChild("percentText", Laya.GTextField);
-        this.progressFill = this.requireChild("progressFill", Laya.GWidget);
-        this.progressWidth = this.progressFill.width;
+        this.progressWidth = view.progressFill.width;
     }
 
     setProgress(progress: SceneTransitionProgress): void {
         const overallPercent = toPercent(progress.overall);
-        this.phaseText.text = PHASE_LABELS[progress.phase];
-        this.phaseText.color = "#f8fafc";
-        this.sceneText.text = `场景 ${toPercent(progress.scene)}%`;
-        this.resourceText.text = `资源 ${toPercent(progress.resources)}%`;
-        this.percentText.text = `${overallPercent}%`;
-        this.percentText.color = "#4ade80";
-        this.progressFill.width = Math.round(this.progressWidth * progress.overall);
+        this.view.phaseText.text = PHASE_LABELS[progress.phase];
+        this.view.phaseText.color = "#f8fafc";
+        this.view.sceneProgressText.text = `场景 ${toPercent(progress.scene)}%`;
+        this.view.resourceProgressText.text = `资源 ${toPercent(progress.resources)}%`;
+        this.view.percentText.text = `${overallPercent}%`;
+        this.view.percentText.color = "#4ade80";
+        this.view.progressFill.width = Math.round(this.progressWidth * progress.overall);
     }
 
     setFailure(progress: SceneTransitionProgress, error: unknown): void {
         this.setProgress(progress);
         const cancelled = error instanceof Error && error.name === "SceneTransitionCancelledError";
-        this.phaseText.text = cancelled ? "加载已取消" : "加载失败，请重试";
-        this.phaseText.color = "#f87171";
-        this.percentText.color = "#f87171";
+        this.view.phaseText.text = cancelled ? "加载已取消" : "加载失败，请重试";
+        this.view.phaseText.color = "#f87171";
+        this.view.percentText.color = "#f87171";
     }
 
-    protected onBind(progress: SceneTransitionProgress, token: BindingToken): void {
-        token.commit(() => this.setProgress(progress));
+    protected onBind(progress: SceneTransitionProgress): void {
+        this.setProgress(progress);
     }
 }
 

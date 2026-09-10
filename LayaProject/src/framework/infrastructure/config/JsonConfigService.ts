@@ -105,7 +105,7 @@ export class JsonConfigService {
 
         const entry = this.content.get(id);
         if (entry.kind !== "data") {
-            throw new Error(`Content '${id}' must use kind 'data' to load through LX.Config.`);
+            throw new Error(`Content '${id}' must use kind 'data' to load through lx.config.`);
         }
         const record: ConfigRecord = {
             id,

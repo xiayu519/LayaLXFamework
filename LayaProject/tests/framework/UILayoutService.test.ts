@@ -52,6 +52,19 @@ const stage = new FakeStage();
 afterEach(() => vi.unstubAllGlobals());
 
 describe("UILayoutService", () => {
+    it("clips safe areas and capsule avoidance into a local host rectangle", async () => {
+        root.width = stage.width = 720; root.height = stage.height = 1280;
+        vi.stubGlobal("Laya", { GWidget: FakeWidget, GRoot: { inst: root }, stage });
+        const { UILayoutService } = await import("../../src/framework/presentation/ui/UILayoutService");
+        const layout = new UILayoutService(createPlatform({ width: 720, height: 1280,
+            safeArea: { x: 20, y: 40, width: 680, height: 1200 },
+            topRightAvoidance: { x: 600, y: 48, width: 100, height: 32 } }));
+        layout.refresh();
+        const local = layout.snapshotForHost({ x: 10, y: 60, width: 600, height: 1200 });
+        expect(local.viewport).toEqual({ x: 0, y: 0, width: 600, height: 1200 });
+        expect(local.safeArea).toEqual({ x: 10, y: 0, width: 590, height: 1180 });
+        expect(local.topSafeArea).toEqual({ x: 10, y: 28, width: 590, height: 1152 });
+    });
     it.each(["fullscreen", "center-popup"] as const)("adapts all retained empty slots for %s", async mode => {
         root.width = stage.width = 720; root.height = stage.height = 1280;
         vi.stubGlobal("Laya", { GWidget: FakeWidget, GRoot: { inst: root }, stage });

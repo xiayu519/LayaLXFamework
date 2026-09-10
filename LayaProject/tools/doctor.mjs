@@ -111,10 +111,14 @@ if (!startupUuid || sceneMeta.uuid !== startupUuid) {
 }
 
 const scene = readJson(join(projectRoot, "assets", startupScene));
-const mainMeta = readJson(join(projectRoot, "src", "Main.ts.meta"));
-const mainComponent = scene._$comp?.find((component) => component._$type === mainMeta.uuid);
-if (!mainComponent || resolve(dirname(join(projectRoot, "assets", startupScene)), mainComponent.scriptPath) !== join(projectRoot, "src", "Main.ts")) {
-    errors.push("ResourceLayout.startupScene must attach src/Main.ts using its meta uuid and a resolving relative path.");
+const entryMeta = readJson(join(projectRoot, "src", "AppEntry.ts.meta"));
+const compiler = readJson(join(projectRoot, "settings", "CompilerSettings.json"));
+if (!entryMeta.uuid || compiler.mainScript !== `res://${entryMeta.uuid}`
+    || !existsSync(join(projectRoot, "src", "AppEntry.ts"))) {
+    errors.push("CompilerSettings.mainScript must resolve to src/AppEntry.ts using its meta uuid.");
+}
+if (scene._$comp?.some((component) => component._$type === entryMeta.uuid)) {
+    errors.push("The native application entry must not be attached to the Startup scene as a Script.");
 }
 
 const typescriptPackage = readJson(join(projectRoot, "node_modules", "typescript", "package.json"));
@@ -181,7 +185,7 @@ const requiredPaths = [
     "settings/HeadlessValidation.json",
     "settings/PerformanceBudgets.json",
     "settings/LayaSourceBaseline.json",
-    "src/framework/LX.ts",
+    "src/framework/lx.ts",
     "src/framework/bootstrap/AppBootstrap.ts",
     "src/game/bootstrap/createApplication.ts",
     "tools/test-headless.mjs",

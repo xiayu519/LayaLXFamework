@@ -14,9 +14,9 @@ source: code-verified
 
 ## Decision
 
-- 普通 JSON 按用途进入命名游戏的 `config/data/maps/levels`，通过 `LX.Config` 加载、校验和释放，不经过 Luban。
+- 普通 JSON 按用途进入命名游戏的 `config/data/maps/levels`，通过 `lx.config` 加载、校验和释放，不经过 Luban。
 - `settings/GameProject.json` schema 2 使用 `logicRoot`，不再把 `logic` 声明为 `gameId`。模板默认将 Luban 运行支持与生成代码放入 `src/game/logic/generated`，数据进入 `assets/bootstrap/game/tables`。
-- 命名游戏需要独立 Tables 类型时，在 schema 2 显式设置 `gameRoot` 并把生成代码调整到 `src/game/<game-id>/generated`；framework 仍只提供通用 `LX.Config` 和 `LX.Tables`。
+- 命名游戏需要独立 Tables 类型时，在 schema 2 显式设置 `gameRoot` 并把生成代码调整到 `src/game/<game-id>/generated`；framework 仍只提供通用 `lx.config` 和 `lx.tables`。
 - 同步后的旧下游 schema 1 `gameId` 保持兼容，避免仅更新框架工具就破坏现有项目。
 
 ## Evidence

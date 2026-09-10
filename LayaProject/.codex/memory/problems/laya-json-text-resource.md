@@ -12,7 +12,7 @@ source: code-verified
 
 ## Reproduction
 
-Node 单测把 `Laya.loader.load(..., Loader.JSON)` 模拟为裸对象时通过，但真实 LayaAir 3.4.1 发布包在 `LX.Config` 校验阶段失败。
+Node 单测把 `Laya.loader.load(..., Loader.JSON)` 模拟为裸对象时通过，但真实 LayaAir 3.4.1 发布包在 `lx.config` 校验阶段失败。
 
 ## Root cause
 

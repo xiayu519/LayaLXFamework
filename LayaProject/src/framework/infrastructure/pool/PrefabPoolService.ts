@@ -1,3 +1,5 @@
+import { awaitBinding, BindingCancelledError } from "../../application/ui/AsyncBindingGuard";
+
 export interface PrefabPoolDefinition<TNode extends Laya.Node = Laya.Node> {
     readonly id: string;
     readonly url: string;
@@ -81,8 +83,11 @@ export class PrefabPoolService {
         });
     }
 
-    async acquire<TNode extends Laya.Node>(id: string): Promise<TNode> {
+    /** Cancellation ends only this acquisition; shared native loading continues for other owners. */
+    async acquire<TNode extends Laya.Node>(id: string, options: { readonly signal?: AbortSignal } = {}): Promise<TNode> {
         this.requireActive();
+        const { signal } = options;
+        if (signal?.aborted) throw new BindingCancelledError();
         const pool = this.requirePool(id);
         const limit = pool.definition.maxActive;
         if (limit !== undefined && pool.active.size + pool.pendingAcquires >= limit) {
@@ -92,8 +97,10 @@ export class PrefabPoolService {
         try {
             let node = this.takeIdle(pool);
             if (!node) {
-                const prefab = await this.loadPrefab(pool);
+                const loading = this.loadPrefab(pool);
+                const prefab = await (signal ? awaitBinding(loading, signal) : loading);
                 this.requireActive();
+                if (signal?.aborted) throw new BindingCancelledError();
                 const created: unknown = pool.definition.create?.(prefab) ?? prefab.create();
                 if (!(created instanceof Laya.Node)) {
                     throw new Error(`Prefab pool '${id}' factory must create a Laya.Node.`);
@@ -113,6 +120,7 @@ export class PrefabPoolService {
                 node.active = true;
                 pool.definition.onAcquire?.(node);
                 this.requireActive();
+                if (signal?.aborted) throw new BindingCancelledError();
                 if (node.destroyed) throw new Error(`Prefab pool '${id}' onAcquire destroyed its node.`);
             } catch (error) {
                 pool.active.delete(node);

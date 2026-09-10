@@ -58,7 +58,7 @@ const load = vi.fn(async (
     return input.map(({ url }) => url === failedResourceUrl ? null : { url });
 });
 
-vi.stubGlobal("Laya", {
+vi.stubGlobal("Laya", { property: () => () => {},
     Scene: FakeScene,
     Prefab: FakePrefab,
     Loader: { HIERARCHY: "HIERARCHY" },
@@ -173,6 +173,23 @@ beforeEach(() => {
 afterAll(() => vi.unstubAllGlobals());
 
 describe("SceneFlow", () => {
+    it("keeps the scene signal through reversible pause but aborts before leave and direct destruction", async () => {
+        let abortedBeforeLeave = false;
+        class LeavingScene extends TestScene {
+            protected override onTransitionLeaving(): void { abortedBeforeLeave = this.signal.aborted; }
+        }
+        const scene = new LeavingScene("lifetime");
+        await scene.pauseForTransition({ nextRouteId: "next" });
+        await scene.resumeAfterTransitionFailure();
+        expect(scene.signal.aborted).toBe(false);
+        await scene.leaveForTransition();
+        expect(abortedBeforeLeave).toBe(true);
+        const direct = new TestScene("direct");
+        const cancelled = vi.fn(); direct.signal.addEventListener("abort", cancelled);
+        direct.destroy(); direct.destroy();
+        expect(cancelled).toHaveBeenCalledOnce();
+    });
+
     it("collects the old scene before loading the new hierarchy and resources", async () => {
         const presenter = new FakeLoadingPresenter();
         const flow = new SceneFlow({ loadingPresenter: presenter, waitForFrame: async () => {} });
@@ -374,5 +391,182 @@ describe("SceneFlow", () => {
         expect(presenter.updated).toHaveLength(0);
         expect(presenter.hides).toBe(0);
         expect(progress[progress.length - 1]?.overall).toBe(1);
+    });
+});
+
+type SceneUIContext = import("../../src/framework/presentation/ui/SceneUI").SceneUI;
+
+class UIAwareScene extends TestScene {
+    preparedUI: SceneUIContext | undefined;
+    protected override onPrepare(context: ScenePhaseContext<TestArgs>): void {
+        this.preparedUI = this.ui;
+        super.onPrepare(context);
+    }
+}
+
+function fakeSceneUI() {
+    return { dispose: vi.fn(), waitForPendingLoads: vi.fn(async () => {}) };
+}
+
+function uiGate() {
+    let resolve!: () => void;
+    const promise = new Promise<void>(complete => { resolve = complete; });
+    return { promise, resolve };
+}
+
+describe("SceneFlow UI ownership", () => {
+    it("configures UI before preparation and disposes it before native Scene destruction", async () => {
+        const ui = fakeSceneUI();
+        const createUI = vi.fn(() => ui as unknown as SceneUIContext);
+        const flow = new SceneFlow({ waitForFrame: async () => {}, configureScene: scene => scene.configureUI(createUI) });
+        const route = flow.register<TestArgs>({ id: "ui", url: "ui.ls" });
+        let scene!: UIAwareScene;
+        factories.set("ui.ls", () => (scene = new UIAwareScene("ui")));
+        await flow.open(route, {}, { showLoading: false });
+        expect(scene.preparedUI).toBe(ui);
+        expect(createUI).toHaveBeenCalledOnce();
+        const nativeDestroy = vi.spyOn(FakeScene.prototype, "destroy").mockImplementation(function (this: FakeScene) {
+            expect(ui.dispose).toHaveBeenCalledOnce();
+            this.destroyed = true;
+            this.parent = null;
+        });
+        flow.dispose();
+        expect(nativeDestroy).toHaveBeenCalledOnce();
+        expect(scene.destroyed).toBe(true);
+        expect(() => scene.ui).toThrow("no longer available");
+        flow.dispose();
+        expect(ui.dispose).toHaveBeenCalledOnce();
+    });
+
+    it("allocates no UI context for scenes that never request one", async () => {
+        const createUI = vi.fn(() => fakeSceneUI() as unknown as SceneUIContext);
+        const flow = new SceneFlow({ waitForFrame: async () => {}, configureScene: scene => scene.configureUI(createUI) });
+        const route = flow.register<TestArgs>({ id: "world", url: "world.ls" });
+        factories.set("world.ls", () => new TestScene("world"));
+        await flow.open(route, {}, { showLoading: false });
+        flow.dispose();
+        expect(createUI).not.toHaveBeenCalled();
+    });
+
+    it("waits for cancelled UI native loads before GC and loading the next scene", async () => {
+        const pending = uiGate();
+        const ui = fakeSceneUI();
+        ui.dispose.mockImplementation(() => transitionTimeline.push("ui:dispose"));
+        ui.waitForPendingLoads.mockImplementation(async () => {
+            transitionTimeline.push("ui:wait");
+            await pending.promise;
+            transitionTimeline.push("ui:settled");
+        });
+        const flow = new SceneFlow({ waitForFrame: async () => {}, configureScene: scene => {
+            scene.configureUI(() => ui as unknown as SceneUIContext);
+        } });
+        const a = flow.register<TestArgs>({ id: "a", url: "a.ls" });
+        const b = flow.register<TestArgs>({ id: "b", url: "b.ls" });
+        let sceneA!: UIAwareScene;
+        factories.set("a.ls", () => (sceneA = new UIAwareScene("a")));
+        factories.set("b.ls", () => new TestScene("b"));
+        await flow.open(a, {}, { showLoading: false });
+        transitionTimeline.length = 0;
+        const switching = flow.open(b, {}, { showLoading: false });
+        await vi.waitFor(() => expect(ui.waitForPendingLoads).toHaveBeenCalledOnce());
+        expect(sceneA.destroyed).toBe(true);
+        expect(sceneGc).not.toHaveBeenCalled();
+        expect(transitionTimeline).not.toContain("load:b.ls");
+        pending.resolve();
+        await switching;
+        expect(transitionTimeline.indexOf("ui:dispose")).toBeLessThan(transitionTimeline.indexOf("a:destroy"));
+        expect(transitionTimeline.indexOf("ui:settled")).toBeLessThan(transitionTimeline.indexOf("gc"));
+        expect(transitionTimeline.indexOf("gc")).toBeLessThan(transitionTimeline.indexOf("load:b.ls"));
+        flow.dispose();
+    });
+
+    it("stops resource collection when scene-owned UI cleanup fails", async () => {
+        const ui = fakeSceneUI();
+        ui.dispose.mockImplementation(() => { throw new Error("UI cleanup failed"); });
+        const flow = new SceneFlow({ waitForFrame: async () => {}, configureScene: scene => {
+            scene.configureUI(() => ui as unknown as SceneUIContext);
+        } });
+        const a = flow.register<TestArgs>({ id: "a", url: "a.ls" });
+        const b = flow.register<TestArgs>({ id: "b", url: "b.ls" });
+        let sceneA!: UIAwareScene;
+        factories.set("a.ls", () => (sceneA = new UIAwareScene("a")));
+        factories.set("b.ls", () => new TestScene("b"));
+        await flow.open(a, {}, { showLoading: false });
+        await expect(flow.open(b, {}, { showLoading: false })).rejects.toThrow("cleanup");
+        expect(sceneA.destroyed).toBe(true);
+        expect(sceneGc).not.toHaveBeenCalled();
+        expect(transitionTimeline).not.toContain("load:b.ls");
+        expect(() => flow.dispose()).toThrow("cleanup");
+    });
+
+    it("allows the leaving hook to access an existing UI context without allocating a new one", async () => {
+        const ui = fakeSceneUI();
+        let leavingUI: SceneUIContext | undefined;
+        class LeavingScene extends UIAwareScene {
+            protected override onTransitionLeaving(): void { leavingUI = this.ui; }
+        }
+        const createUI = vi.fn(() => ui as unknown as SceneUIContext);
+        const flow = new SceneFlow({ waitForFrame: async () => {}, configureScene: scene => scene.configureUI(createUI) });
+        const a = flow.register<TestArgs>({ id: "a", url: "a.ls" });
+        const b = flow.register<TestArgs>({ id: "b", url: "b.ls" });
+        factories.set("a.ls", () => new LeavingScene("a"));
+        factories.set("b.ls", () => new TestScene("b"));
+        await flow.open(a, {}, { showLoading: false });
+        await flow.open(b, {}, { showLoading: false });
+        expect(leavingUI).toBe(ui);
+        expect(createUI).toHaveBeenCalledOnce();
+        flow.dispose();
+    });
+
+    it("does not run transition GC after runtime disposal while UI loads are settling", async () => {
+        const pending = uiGate();
+        const ui = fakeSceneUI();
+        ui.waitForPendingLoads.mockImplementation(() => pending.promise);
+        const flow = new SceneFlow({ waitForFrame: async () => {}, configureScene: scene => {
+            scene.configureUI(() => ui as unknown as SceneUIContext);
+        } });
+        const a = flow.register<TestArgs>({ id: "a", url: "a.ls" });
+        const b = flow.register<TestArgs>({ id: "b", url: "b.ls" });
+        factories.set("a.ls", () => new UIAwareScene("a"));
+        factories.set("b.ls", () => new TestScene("b"));
+        await flow.open(a, {}, { showLoading: false });
+        const switching = flow.open(b, {}, { showLoading: false });
+        const rejection = expect(switching).rejects.toBeInstanceOf(SceneTransitionCancelledError);
+        await vi.waitFor(() => expect(ui.waitForPendingLoads).toHaveBeenCalledOnce());
+        flow.dispose();
+        pending.resolve();
+        await rejection;
+        expect(sceneGc).not.toHaveBeenCalled();
+        expect(transitionTimeline).not.toContain("load:b.ls");
+    });
+
+    it("reports late scene cleanup failures through draining after runtime disposal", async () => {
+        const leaving = uiGate();
+        const release = uiGate();
+        class BrokenScene extends TestScene {
+            constructor() {
+                super("broken");
+                this.own(() => { throw new Error("late scene owner cleanup failed"); });
+            }
+            protected override async onTransitionLeaving(): Promise<void> {
+                leaving.resolve();
+                await release.promise;
+            }
+        }
+        const flow = new SceneFlow({ waitForFrame: async () => {} });
+        const source = flow.register<TestArgs>({ id: "source", url: "source.ls" });
+        const target = flow.register<TestArgs>({ id: "target", url: "target.ls" });
+        factories.set("source.ls", () => new BrokenScene());
+        factories.set("target.ls", () => new TestScene("target"));
+        await flow.open(source, {}, { showLoading: false });
+        const switching = flow.open(target, {}, { showLoading: false }).catch(error => error);
+        await leaving.promise;
+        flow.dispose();
+        const drain = flow.waitForPendingLoads().then(() => undefined, error => error);
+        release.resolve();
+        await switching;
+        expect(await drain).toBeInstanceOf(Error);
+        expect(sceneGc).not.toHaveBeenCalled();
+        expect(transitionTimeline).not.toContain("load:target.ls");
     });
 });

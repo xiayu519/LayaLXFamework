@@ -10,6 +10,9 @@ import { syncModalOrder } from "./UIModalOrder";
 import { destroyManagedWindow, getWindowCleanupDiagnostic,
     type CleanupWindowRecord, type UIWindowCleanupDiagnostic } from "./UIWindowCleanup";
 import { UILayoutService, type UIWindowLayout } from "./UILayoutService";
+import { SceneUI } from "./SceneUI";
+import type { UIViewRoute } from "./UIViewRoute";
+import type { RedDotStore } from "./RedDotStore";
 import {
     compareVisibleWindows,
     resolveLayer,
@@ -44,6 +47,7 @@ export interface UIWindowInfo {
 }
 
 export interface UIRouterSnapshot {
+    readonly scenes: readonly ReturnType<SceneUI["snapshot"]>[];
     readonly loading: Readonly<Record<string, number>>;
     readonly pendingRequests: readonly UIRequestInfo[];
     readonly nativeLoads: number;
@@ -75,8 +79,14 @@ interface WindowRecord extends CleanupWindowRecord {
 type UnknownRoute = UIRoute<unknown>;
 type UnknownWindow = BaseGameWindow<unknown>;
 
+interface UIRouterOptions {
+    readonly redDots?: RedDotStore;
+}
+
 export class UIRouter implements WindowLifecycleObserver {
     private readonly routes = new Map<string, UnknownRoute>();
+    private readonly viewRoutes = new Map<string, UIViewRoute<unknown>>();
+    private readonly scenes = new Set<SceneUI>();
     private readonly singletonWindows = new Map<string, UnknownWindow>();
     private readonly multipleWindows = new Map<string, Set<UnknownWindow>>();
     private readonly records = new Map<UnknownWindow, WindowRecord>();
@@ -92,8 +102,41 @@ export class UIRouter implements WindowLifecycleObserver {
     constructor(
         private readonly tips?: TipQueue,
         private readonly layoutService?: UILayoutService,
+        private readonly options: UIRouterOptions = {},
     ) {
         this.unsubscribeLayout = layoutService?.subscribe(() => this.layoutManagedWindows());
+    }
+
+    get redDots(): RedDotStore {
+        const store = this.options.redDots;
+        if (!store) throw new Error("UI red dots are not configured.");
+        return store;
+    }
+
+    /** @internal Optional in isolated hosts which do not use badges. */
+    get bindingStore(): RedDotStore | undefined { return this.options.redDots; }
+
+    registerView<TArgs, TView extends Laya.GWidget>(route: UIViewRoute<TArgs, TView>): UIViewRoute<TArgs, TView> {
+        this.requireActive();
+        if (!route.id || !route.url || !route.viewType) throw new Error("UI view id, url and Runtime type are required.");
+        if (route.multiplicity === "multiple" && route.retention === "hide") {
+            throw new Error(`UI route '${route.id}' cannot combine multiplicity 'multiple' with retention 'hide'.`);
+        }
+        if (this.routes.has(route.id) || this.viewRoutes.has(route.id)) throw new Error(`Duplicate UI route '${route.id}'.`);
+        this.viewRoutes.set(route.id, route as unknown as UIViewRoute<unknown>);
+        return route;
+    }
+
+    /** @internal BaseGameScene owns the returned scope and destroys it before its native children. */
+    createSceneUI(root: Laya.GWidget): SceneUI {
+        this.requireActive();
+        const scene = new SceneUI(root, this, this.layout, id => this.viewRoutes.get(id), scope => {
+            void scope.waitForPendingLoads().then(() => {
+                this.scenes.delete(scope);
+            });
+        });
+        this.scenes.add(scene);
+        return scene;
     }
 
     get layout(): UILayoutService {
@@ -109,7 +152,7 @@ export class UIRouter implements WindowLifecycleObserver {
         if (route.multiplicity === "multiple" && route.retention === "hide") {
             throw new Error(`UI route '${route.id}' cannot combine multiplicity 'multiple' with retention 'hide'.`);
         }
-        if (this.routes.has(route.id)) {
+        if (this.routes.has(route.id) || this.viewRoutes.has(route.id)) {
             throw new Error(`Duplicate UI route '${route.id}'.`);
         }
         this.routes.set(route.id, route as unknown as UnknownRoute);
@@ -218,6 +261,7 @@ export class UIRouter implements WindowLifecycleObserver {
             if (request.phase === "loading") loading[request.routeId] = (loading[request.routeId] ?? 0) + 1;
         }
         return Object.freeze({
+            scenes: [...this.scenes].map(scene => scene.snapshot()),
             loading: Object.freeze(loading),
             pendingRequests,
             nativeLoads: this.nativeLoads.size,
@@ -251,6 +295,9 @@ export class UIRouter implements WindowLifecycleObserver {
             }
             this.requests.cancel();
         }
+        for (const scene of [...this.scenes]) {
+            try { scene.dispose(); } catch (error) { errors.push(error); }
+        }
         for (const record of Array.from(this.records.values())) {
             try {
                 this.destroyWindow(record);
@@ -259,6 +306,7 @@ export class UIRouter implements WindowLifecycleObserver {
             }
         }
         this.routes.clear();
+        this.viewRoutes.clear();
         if (errors.length > 0) {
             throw new UIRouterCleanupError(errors);
         }
@@ -270,6 +318,7 @@ export class UIRouter implements WindowLifecycleObserver {
             await Promise.allSettled([...this.pendingLoads, ...this.nativeLoads]);
         }
         await this.tips?.waitForPending();
+        await Promise.all([...this.scenes].map(scene => scene.waitForPendingLoads()));
     }
 
     onHidden(window: UnknownWindow): void {
@@ -293,6 +342,11 @@ export class UIRouter implements WindowLifecycleObserver {
 
     onOrderChanged(): void {
         this.syncModalLayer();
+    }
+
+    onBinding(operation: Promise<void>): void {
+        this.pendingLoads.add(operation);
+        operation.then(() => this.pendingLoads.delete(operation), () => this.pendingLoads.delete(operation));
     }
 
     private async showRoute<TArgs>(routeId: string, args: TArgs, request: UIRequest): Promise<BaseGameWindow<TArgs>> {
@@ -374,6 +428,7 @@ export class UIRouter implements WindowLifecycleObserver {
         request.window = window;
         const layout = resolveWindowLayout(route);
         try {
+            window.configureBindings(this.bindingStore);
             window.modal = route.modal ?? layout === "center-popup";
             window.zOrder = resolveLayer(route) * 1000;
             window.configurePopupTransition(layout === "center-popup");

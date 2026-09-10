@@ -16,7 +16,7 @@ source: user-confirmed
 
 ## Decision
 
-`LX.Res` 精确返回 `Laya.loader`，`LX.Scene` 精确返回 `Laya.Scene`。删除平行资源、场景、Spine、动态图片和时钟抽象。层级加载默认不设置 group；先销毁节点/组件，等待加载和渲染提交稳定，再在功能切换或停机边界调用 `Laya.Scene.gc()`。UIRouter、PrefabPoolService 和 AudioService 只保留 Laya 没有提供的业务约束。
+`lx.res` 精确返回 `Laya.loader`，`lx.scene` 精确返回 `Laya.Scene`。删除平行资源、场景、Spine、动态图片和时钟抽象。层级加载默认不设置 group；先销毁节点/组件，等待加载和渲染提交稳定，再在功能切换或停机边界调用 `Laya.Scene.gc()`。UIRouter、PrefabPoolService 和 AudioService 只保留 Laya 没有提供的业务约束。
 
 ## Consequences
 

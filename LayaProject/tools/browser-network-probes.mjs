@@ -2,7 +2,7 @@
 export function handleNetworkProbe(request, response, pathname) {
     if (!pathname.startsWith("/__lx_http/")) return false;
     const send = (status, data) => {
-        response.writeHead(status, { "Content-Type": "application/json", "X-LX-Probe": "engine", "Cache-Control": "no-store" });
+        response.writeHead(status, { "Content-Type": "application/json", "X-lx-Probe": "engine", "Cache-Control": "no-store" });
         response.end(data === undefined ? undefined : JSON.stringify(data));
     };
     const action = pathname.slice("/__lx_http/".length);
@@ -22,9 +22,9 @@ export function handleNetworkProbe(request, response, pathname) {
     return true;
 }
 
-/** Self-contained browser function, executed against LX.Net and the real Laya engine. */
+/** Self-contained browser function, executed against lx.net and the real Laya engine. */
 export async function runNetworkProbes() {
-    const net = globalThis.LX.Net;
+    const net = globalThis.lx.net;
     const assert = (condition, label) => { if (!condition) throw new Error(`Network probe: ${label}`); };
     for (const status of [201, 202, 204, 205]) {
         const result = await net.request(`__lx_http/${status}`);
@@ -53,10 +53,10 @@ export async function runNetworkProbes() {
     const operation = net.request("__lx_http/delay", { signal: controller.signal });
     controller.abort();
     await expectError(operation, "abort");
-    const render = globalThis.LX.Performance.capture();
+    const render = globalThis.lx.performance.capture();
     assert(render.statisticsReady && render.gpuBytes > 0 && render.drawCalls2D > 0, "nonzero engine statistics");
     let rejected = false;
-    try { globalThis.LX.Performance.assertBudget({ gpuBytes: 0 }, render); } catch { rejected = true; }
+    try { globalThis.lx.performance.assertBudget({ gpuBytes: 0 }, render); } catch { rejected = true; }
     assert(rejected, "GPU budget really rejects");
     return { http2xx: true, emptyJson: true, headers: true, payloads: true, cancellation: true, render };
 }

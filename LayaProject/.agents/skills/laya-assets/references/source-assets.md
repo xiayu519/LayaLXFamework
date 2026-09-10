@@ -1,7 +1,7 @@
 # Source asset invariants
 
 - `settings/BuildSettings.json` 的 `startupScene` 必须解析到对应 `.ls.meta` UUID。
-- `.ls/.lh` 中脚本组件 `_$type` 与 `scriptPath` 必须匹配目标 `.ts.meta`。
+- `.ls/.lh` 中脚本组件 `_$type` 与 `scriptPath` 必须匹配目标 `.ts.meta`。官方 IDE 的 `scriptPath` 相对 `assets` 根解析；历史相对 `.ls/.lh` 目录的写法仅在同一脚本 UUID 匹配时兼容。
 - 同类源资产 UUID 全局唯一；`_$ref` 必须指向同一资产树内真实节点。
 - `res://<uuid>` 必须存在对应 `.meta`；移动源文件时同步维护引用而非生成第二个身份。
 - 字符串动态加载的启动资源根需要进入 `BuildSettings.alwaysIncluded`，并用发布后 manifest/文件检查证明入包；功能分包由独立的小游戏分包流程负责。

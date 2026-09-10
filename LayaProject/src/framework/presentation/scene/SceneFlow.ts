@@ -58,13 +58,14 @@ export class SceneFlow {
     private pausedScene: UnknownScene | undefined;
     private pauseOperation: { readonly scene: UnknownScene; readonly promise: Promise<void> } | undefined;
     private releaseOperation: Promise<void> | undefined;
+    private readonly cleanupFailures: unknown[] = [];
     private loadingRequestId: number | undefined;
     private requestVersion = 0;
     private stateValue: SceneFlowSnapshot["state"] = "idle";
     private progressValue: SceneTransitionProgress | undefined;
     private lastErrorValue: string | undefined;
 
-    constructor(options: SceneFlowOptions = {}) {
+    constructor(private readonly options: SceneFlowOptions = {}) {
         this.loadingPresenter = options.loadingPresenter;
         this.waitForFrame = options.waitForFrame ?? waitForNextFrame;
     }
@@ -143,7 +144,7 @@ export class SceneFlow {
         this.activeController?.abort();
         this.activeController = undefined;
         this.loadingRequestId = undefined;
-        const errors: unknown[] = [];
+        const errors: unknown[] = [...this.cleanupFailures];
         try {
             this.loadingPresenter?.hide();
         } catch (error) {
@@ -165,6 +166,7 @@ export class SceneFlow {
 
     async waitForPendingLoads(): Promise<void> {
         while (this.pending.size > 0) await Promise.allSettled([...this.pending]);
+        if (this.cleanupFailures.length) throw new SceneFlowCleanupError([...this.cleanupFailures]);
     }
 
     private async openRoute<TArgs>(
@@ -237,6 +239,7 @@ export class SceneFlow {
                 throw new Error(`Scene route '${route.id}' root must extend BaseGameScene.`);
             }
             nextScene = node as BaseGameScene<TArgs>;
+            this.options.configureScene?.(nextScene as BaseGameScene<unknown>);
             if (hasLoading) nextScene.bindTransitionLoadingCompletion(requestLoadingClose);
             if (creationErrors.length > 0) {
                 throw new SceneCreationError(route.id, creationErrors);
@@ -291,6 +294,7 @@ export class SceneFlow {
                     destroyScene(nextScene, opened ? "transition-rollback" : "preparation-rollback");
                 } catch (cleanupError) {
                     cleanupErrors.push(cleanupError);
+                    this.cleanupFailures.push(cleanupError);
                 }
             }
             const oldSceneAvailable = !committed && this.ownsRequest(requestId) && oldRecord
@@ -331,15 +335,22 @@ export class SceneFlow {
             const clear = () => {
                 if (this.releaseOperation === operation) this.releaseOperation = undefined;
             };
-            operation.then(clear, clear);
+            operation.then(clear, error => {
+                // A stop/superseding request may report cancellation, but teardown failure must
+                // still reach runtime cleanup before it decides whether global GC is safe.
+                this.cleanupFailures.push(error);
+                clear();
+            });
         }
         if (operation) await operation;
     }
 
     private async releaseAndCollectScene(scene: UnknownScene): Promise<void> {
         await leaveAndDestroyScene(scene, "scene-replaced");
+        await scene.waitForUI();
         await this.waitForFrame();
-        Laya.Scene.gc();
+        // Runtime shutdown owns collection once disposal starts, including a late native UI load.
+        if (this.stateValue !== "disposed" && !this.cleanupFailures.length) Laya.Scene.gc();
     }
 
     private completeSceneLoading(requestId: number, scene: UnknownScene): void {

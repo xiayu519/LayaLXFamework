@@ -45,6 +45,48 @@ beforeEach(() => {
 afterAll(() => vi.unstubAllGlobals());
 
 describe("PrefabPoolService", () => {
+    it("cancels one pending owner without cancelling another owner of the shared prefab", async () => {
+        let complete!: (value: unknown) => void;
+        loaderLoad.mockReturnValue(new Promise(resolve => { complete = resolve; }));
+        const pool = new PrefabPoolService();
+        pool.register({ id: "shared", url: "shared.lh", maxIdle: 1 });
+        const first = new AbortController();
+        const cancelled = pool.acquire("shared", { signal: first.signal });
+        const other = pool.acquire("shared");
+        const rejected = expect(cancelled).rejects.toThrow("cancelled");
+        first.abort();
+        await rejected;
+        expect(pool.snapshot()[0]).toMatchObject({ pending: 1, active: 0, loading: true });
+        const prefab = { create: vi.fn(() => new FakeNode()) };
+        complete(prefab);
+        const node = await other;
+        expect(loaderLoad).toHaveBeenCalledOnce();
+        expect(prefab.create).toHaveBeenCalledOnce();
+        pool.release("shared", node);
+        pool.drain("shared");
+        expect(node.destroyed).toBe(true);
+        pool.dispose();
+    });
+
+    it("never loads for an already cancelled owner and consumes a late shared load failure", async () => {
+        const pool = new PrefabPoolService();
+        pool.register({ id: "cancel", url: "cancel.lh", maxIdle: 0 });
+        const signal = new AbortController();
+        signal.abort();
+        await expect(pool.acquire("cancel", { signal: signal.signal })).rejects.toThrow("cancelled");
+        expect(loaderLoad).not.toHaveBeenCalled();
+        let fail!: (error: Error) => void;
+        loaderLoad.mockReturnValue(new Promise((_resolve, reject) => { fail = reject; }));
+        const pending = new AbortController();
+        const result = pool.acquire("cancel", { signal: pending.signal });
+        const rejected = expect(result).rejects.toThrow("cancelled");
+        pending.abort();
+        await rejected;
+        pool.dispose();
+        fail(new Error("late network failure"));
+        await pool.waitForPendingLoads();
+        expect(pool.snapshot()).toEqual([]);
+    });
     it("reuses Laya.Pool nodes and rejects double or foreign returns", async () => {
         const prefab = { create: vi.fn(() => new FakeNode()) };
         loaderLoad.mockResolvedValue(prefab);

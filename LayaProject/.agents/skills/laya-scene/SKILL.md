@@ -5,8 +5,9 @@ description: 实现或诊断 Laya Scene 加载、打开、关闭、销毁、切�
 
 # Laya Scene
 
-1. 直接使用 `Laya.Scene`；`LX.Scene` 是同一类。加载层级资源使用 `Laya.loader.load(url, { type: Laya.Loader.HIERARCHY })`，打开/关闭使用 Scene 公共 API。
+1. 直接使用 `Laya.Scene`；`lx.scene` 是同一类。加载层级资源使用 `Laya.loader.load(url, { type: Laya.Loader.HIERARCHY })`，打开/关闭使用 Scene 公共 API。
 2. 明确 `close` 与 `destroy`：移除的 Scene 不会自动销毁；需要自动销毁时设置 `autoDestroyAtClosed`，否则在 owner 边界显式 `destroy()`。
-3. 连续导航确有晚到覆盖风险时，在 `src/game/<id>/application/` 为该业务流增加单调 request version；过期实例立即销毁。不要预设公共 `SceneRouter`。
-4. 场景节点全部销毁、异步加载稳定后再调用 `Laya.Scene.gc()`；不向层级加载默认附加资源 group。
-5. 按改动验证快速切换、晚到结果、重复关闭或销毁；Scene 引擎行为按 [Headless 范围](../laya-headless/references/verification.md) 用专项 probe 验收，共享停机变化再扩大覆盖。
+3. 业务场景切换复用现有 `lx.sceneFlow` 与 `BaseGameScene` 的请求失效、Loading、失败保护和清理，见 [场景流程](../../../docs/scene-flow.md)；不再叠加导航管理器。原生独立 Scene 操作不强制经过切换事务。
+4. 需要 UI 的场景在 `.ls` 声明直接子节点 `uiRoot: GWidget`，通过 `this.ui` 使用场景归属。场景的页面、HUD 和弹窗均为原生 GWidget Runtime，挂 uiRoot；应用 lx.ui 的 GWindow 才挂 GRoot。owner、host、layout 独立，session.show 的子窗口归父展示，session.ui.show 的独立窗口归场景；离场销毁可见、隐藏缓存和待加载，不能只关闭可见窗口。应用由原生 main() 启动、lx.stop() 停机，不绑定 Startup Scene 寿命。
+5. 先使场景 UI 和异步失效，停止副作用并销毁 owner，等待原生加载稳定后再调用 `Laya.Scene.gc()`。`describeResources()` 是加载需求，不是独占卸载清单；不默认附加资源 group。
+6. 按改动验证快速切换、晚到结果、隐藏 UI 缓存、重复关闭或销毁；Scene 引擎行为按 [Headless 范围](../laya-headless/references/verification.md) 用专项 probe 验收，共享停机变化再扩大覆盖。

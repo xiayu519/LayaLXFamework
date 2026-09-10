@@ -86,6 +86,19 @@ export class UILayoutService {
         return this.currentValue;
     }
 
+    /** Clip platform safe areas to a screen-space host and express them in its local coordinates. */
+    snapshotForHost(host: UIHostRect): UILayoutSnapshot {
+        const clip = (area: UILayoutRect): UILayoutRect => {
+            const x = clamp(area.x - host.x, 0, host.width);
+            const y = clamp(area.y - host.y, 0, host.height);
+            const right = clamp(area.x + area.width - host.x, x, host.width);
+            const bottom = clamp(area.y + area.height - host.y, y, host.height);
+            return freezeRect(x, y, right - x, bottom - y);
+        };
+        return Object.freeze({ viewport: freezeRect(0, 0, host.width, host.height),
+            safeArea: clip(this.currentValue.safeArea), topSafeArea: clip(this.currentValue.topSafeArea) });
+    }
+
     subscribe(listener: (snapshot: UILayoutSnapshot) => void): () => void {
         this.listeners.add(listener);
         if (this.currentValue.viewport.width > 0 && this.currentValue.viewport.height > 0) {
@@ -105,10 +118,20 @@ export class UILayoutService {
         this.refresh();
         const layout = this.currentValue;
         if (layout.viewport.width <= 0 || layout.viewport.height <= 0) return;
-        const pane = window.contentPane;
         const target = mode === "safe-screen" ? layout.topSafeArea : layout.viewport;
         setRect(window, target);
+        this.applyView(window.contentPane, mode, true);
+    }
+
+    /** Layout a native Runtime prefab directly under a scene's screen-space uiRoot. */
+    applyView(pane: Laya.GWidget, mode: UIWindowLayout = "fullscreen", inWindow = false,
+        hostLayout?: UILayoutSnapshot): void {
+        this.refresh();
+        const layout = hostLayout ?? this.currentValue;
+        if (layout.viewport.width <= 0 || layout.viewport.height <= 0) return;
+        const target = mode === "safe-screen" ? layout.topSafeArea : layout.viewport;
         setRect(pane, freezeRect(0, 0, target.width, target.height));
+        if (!inWindow) { pane.x = target.x; pane.y = target.y; }
         if (mode === "fullscreen" || mode === "center-popup") this.applyFullScreenShell(pane, layout);
         if (mode === "center-popup") {
             const full = childWidget(pane, UI_LAYOUT_NODE_NAMES.full);

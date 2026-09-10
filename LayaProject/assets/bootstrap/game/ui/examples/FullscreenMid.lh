@@ -1,6 +1,7 @@
 {
   "_$ver": 1,
   "_$id": "fullscreenmidroot",
+  "_$runtime": "res://e1a01a2b-160e-4e48-aa36-13e8b3b7ac8b",
   "_$type": "GWidget",
   "name": "FullscreenMid",
   "width": 720,

@@ -6,25 +6,25 @@
 
 | 上游管理 | 下游管理 |
 | --- | --- |
-| `src/framework/**`、`src/Main.ts` | `src/game/**` |
+| `src/framework/**`、`src/AppEntry.ts` 及其 `.meta` | `src/game/**`（含 IDE 生成的 Runtime 字段） |
 | `assets/bootstrap/framework/**` | `assets/bootstrap/game/**`、`assets/packages/**`、`assets/shared/**` |
 | 根 `.agents/**`、`.codex/**`、`AGENTS.md` | `src/game/<game-id>/AGENTS.md`、`.agents/**`、`.codex/memory/**` |
 | `tools/**`、`tests/framework/**`、`tests/workflow/**` | `tests/game/**`、游戏专属工具 |
 | `Design/tools/**`、`Design/genBin.*` | `Design/Tables/**` |
 
-`package.json`、`LayaProject.laya`、`PlayerSettings.json`、`ResourceLayout.json` 和 `tsconfig.json` 归下游维护，但 manifest 会校验框架依赖的最小 JSON 字段；下游可添加游戏字段，不能删除或改写公共契约。`PlayerSettings.json` 的公共契约只约束框架所需模块、ui2 插件和 Spine 版本，不包含 `resolution`；同步会保留每个项目自己选择的 `designWidth`、`designHeight`、`scaleMode` 和 `screenMode`。
+`package.json`、`LayaProject.laya`、`PlayerSettings.json`、`CompilerSettings.json`、`ResourceLayout.json` 和 `tsconfig.json` 归下游维护，但 manifest 会校验框架依赖的最小 JSON 字段；下游可添加游戏字段，不能删除或改写公共契约。`CompilerSettings.mainScript` 必须引用 `AppEntry.ts.meta` 的 UUID，其余编译选项保留。`PlayerSettings.json` 的公共契约只约束框架所需模块、ui2 插件和 Spine 版本，不包含 `resolution`；同步会保留每个项目自己选择的 `designWidth`、`designHeight`、`scaleMode` 和 `screenMode`。
 
 ## 启动扩展点
 
 ```text
-src/Main.ts
+Laya.init() -> src/AppEntry.ts main()
   -> src/game/bootstrap/createApplication.ts
   -> 未接入命名游戏时调用 src/game/logic 中的可调用模板逻辑
   -> 开始业务后由 src/game/<game-id>/bootstrap 接管组合
   -> src/framework/bootstrap/createRuntime.ts
 ```
 
-`Main.ts` 只处理 Laya Script 的启动、停止和失败回滚。`logic` 不是游戏目录；固定桥接与命名游戏组合都归下游，framework 不依赖 game。
+`AppEntry.ts` 使用 Laya 原生启动脚本入口，负责去重启动和失败回滚，不重复初始化引擎；停机调用 `await lx.stop()`。应用生命周期不依赖 `Startup.ls`，销毁业务场景或启动展示场景不会停止应用。IDE 的“启动场景预览”执行配置的 `main()`；“当前场景预览”只打开当前资产，需要应用服务时应切回启动预览。`logic` 不是游戏目录；固定桥接与命名游戏组合都归下游，framework 不依赖 game。
 
 ## 发布与同步
 

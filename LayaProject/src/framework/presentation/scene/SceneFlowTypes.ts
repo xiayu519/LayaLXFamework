@@ -38,6 +38,8 @@ export interface SceneLoadingPresenter {
 }
 
 export interface SceneFlowOptions {
+    /** @internal Runtime composition configures scene-local UI before preparation. */
+    readonly configureScene?: (scene: import("./BaseGameScene").BaseGameScene<unknown>) => void;
     readonly loadingPresenter?: SceneLoadingPresenter;
     readonly waitForFrame?: () => Promise<void>;
 }

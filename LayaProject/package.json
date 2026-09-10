@@ -19,6 +19,7 @@
     "check:framework-integrity": "node tools/framework-distribution.mjs check",
     "check:framework-upstream": "node tools/framework-distribution.mjs upstream",
     "typecheck": "node tools/typecheck.mjs",
+    "ui:generate": "node tools/layaair.mjs run -p . --skip-package-install --script-file=tools/native-ui-bindings.ts --script=NativeUIBindings.generate",
     "test": "vitest run",
     "test:unit": "vitest run tests/framework tests/game --exclude tests/framework/HttpTransportEngine.test.ts",
     "test:framework-sync": "vitest run tests/workflow/FrameworkDistribution.test.ts",

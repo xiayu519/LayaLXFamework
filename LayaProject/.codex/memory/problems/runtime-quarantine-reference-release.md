@@ -2,7 +2,7 @@
 type: problem
 scope: runtime-lifecycle
 description: clean unbind 若仍由模块级隔离集合强引用，旧 runtime 对象图会一直存活到下一次 bind；完成清理后必须主动解除引用。
-trigger: 修改 LX runtime 绑定、停机隔离、晚到清理或检查旧 runtime 的内存可达性时。
+trigger: 修改 lx runtime 绑定、停机隔离、晚到清理或检查旧 runtime 的内存可达性时。
 status: active
 last_verified: 2026-09-05
 source: code-verified
@@ -12,7 +12,7 @@ source: code-verified
 
 ## Reproduction
 
-`unbindLXRuntime` 把已退役 runtime 放入模块级 `Set`；正常 clean unbind 也保留该强引用，且原实现只在下一次 `bindLXRuntime` 时检查和删除。应用不再启动新 runtime 时，旧 runtime 与其 service 对象图持续可达。
+`unbindLxRuntime` 把已退役 runtime 放入模块级 `Set`；正常 clean unbind 也保留该强引用，且原实现只在下一次 `bindLxRuntime` 时检查和删除。应用不再启动新 runtime 时，旧 runtime 与其 service 对象图持续可达。
 
 ## Root cause
 
@@ -24,4 +24,4 @@ clean unbind 立即返回，不进入隔离集合。确有晚到清理时只临�
 
 ## Verification
 
-`tests/framework/LX.test.ts` 覆盖 clean 停机、未完成清理阻止替换，以及“晚到清理完成且没有再次 bind”时仍会主动释放隔离引用。
+`tests/framework/lx.test.ts` 覆盖 clean 停机、未完成清理阻止替换，以及“晚到清理完成且没有再次 bind”时仍会主动释放隔离引用。

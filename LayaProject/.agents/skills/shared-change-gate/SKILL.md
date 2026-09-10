@@ -1,6 +1,6 @@
 ---
 name: shared-change-gate
-description: 业务实现过程中发现公共能力不足，拟把代码上移到 src/framework、修改 LX/共享契约或多人工作流，但尚未证明应公共化时使用；先停止该边界写入并判断保持 game 局部还是提交公共变更。已批准的公共改动不触发。
+description: 业务实现过程中发现公共能力不足，拟把代码上移到 src/framework、修改 lx/共享契约或多人工作流，但尚未证明应公共化时使用；先停止该边界写入并判断保持 game 局部还是提交公共变更。已批准的公共改动不触发。
 ---
 
 # Shared Change Gate

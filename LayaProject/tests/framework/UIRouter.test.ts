@@ -434,9 +434,13 @@ describe("UIRouter", () => {
             expect(settled).toBeInstanceOf(Error);
             expect(signal.aborted).toBe(true);
             expect(router.snapshot().pendingRequests).toEqual([]);
-            await router.waitForPendingLoads();
-            fail(new Error("late failure"));
+            let drained = false;
+            const draining = router.waitForPendingLoads().then(() => { drained = true; });
             await Promise.resolve();
+            expect(drained).toBe(false);
+            fail(new Error("late failure"));
+            await draining;
+            expect(drained).toBe(true);
         },
     );
 

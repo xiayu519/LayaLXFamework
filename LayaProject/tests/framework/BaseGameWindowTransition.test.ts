@@ -113,6 +113,7 @@ vi.stubGlobal("Laya", {
 const { BaseGameWindow } = await import("../../src/framework/presentation/ui/BaseGameWindow") as {
     BaseGameWindow: typeof BaseGameWindowType;
 };
+const { UIPopupTransition } = await import("../../src/framework/presentation/ui/UIPopupTransition");
 
 class TestWindow extends BaseGameWindow<string> {
     shownCount = 0;
@@ -300,5 +301,100 @@ describe("BaseGameWindow popup transition", () => {
         expect(window.destroyed).toBe(true);
         expect(pane.destroyed).toBe(true);
         expect(window.isShowing).toBe(false);
+    });
+});
+
+function createPageTransition() {
+    const view = new FakeWidget();
+    view.width = 720; view.height = 1280; view.mouseEnabled = true;
+    const safe = new FakeWidget();
+    const mid = new FakeWidget();
+    safe.children.set("mid", mid);
+    view.children.set("safeContent", safe);
+    return { view, safe, mid, transition: new UIPopupTransition(view as unknown as Laya.GWidget) };
+}
+
+describe("UIPopupTransition native page reuse", () => {
+    it("animates only safeContent/mid and cancels a pending close when shown again", () => {
+        const { view, safe, mid, transition } = createPageTransition();
+        const firstShown = vi.fn();
+        const closed = vi.fn();
+        const reopened = vi.fn();
+        transition.show(firstShown);
+        expect(transition.phase).toBe("showing");
+        expect(mid).toMatchObject({ x: 175, y: 105, scaleX: 0.3, scaleY: 0.3 });
+        expect(view).toMatchObject({ x: 0, y: 0, width: 720, height: 1280, scaleX: 1, scaleY: 1, mouseEnabled: false });
+        expect(safe).toMatchObject({ x: 0, y: 0, scaleX: 1, scaleY: 1 });
+        transition.hide(closed);
+        const closing = tweens[1];
+        expect(tweens[0].killed).toBe(true);
+        transition.show(reopened);
+        expect(closing.killed).toBe(true);
+        closing.fireLateCallback(); tweens[0].fireLateCallback();
+        expect(closed).not.toHaveBeenCalled();
+        expect(firstShown).not.toHaveBeenCalled();
+        expect(transition.phase).toBe("showing");
+        expect(tweens[2].durationMs).toBe(200);
+        tweens[2].complete(); tweens[2].fireLateCallback();
+        expect(reopened).toHaveBeenCalledOnce();
+        expect(transition.phase).toBe("idle");
+        expect(view.mouseEnabled).toBe(true);
+        expect(mid).toMatchObject({ x: 0, y: 0, scaleX: 1, scaleY: 1 });
+    });
+
+    it.each(["showing", "hiding"] as const)("retains the completion callback after relayout during %s", phase => {
+        const { view, mid, transition } = createPageTransition();
+        const completed = vi.fn();
+        if (phase === "showing") transition.show(completed);
+        else transition.hide(completed);
+        const stale = tweens[0];
+        transition.relayout(() => {
+            mid.x = 12; mid.y = 18; mid.scaleX = 0.8; mid.scaleY = 0.9;
+            view.height = 900;
+        });
+        expect(stale.killed).toBe(true);
+        stale.fireLateCallback();
+        expect(completed).not.toHaveBeenCalled();
+        expect(transition.phase).toBe(phase);
+        expect(view.mouseEnabled).toBe(false);
+        expect(tweens[1].durationMs).toBe(200);
+        tweens[1].complete();
+        expect(completed).toHaveBeenCalledOnce();
+        expect(mid).toMatchObject({ x: 12, y: 18, scaleX: 0.8, scaleY: 0.9 });
+        expect(view).toMatchObject({ height: 900, scaleX: 1, scaleY: 1, mouseEnabled: true });
+    });
+
+    it("cancels without calling completion and retains an explicitly disabled input state", () => {
+        const { view, mid, transition } = createPageTransition();
+        view.mouseEnabled = false;
+        const completed = vi.fn();
+        transition.hide(completed);
+        transition.hide(vi.fn());
+        expect(tweens).toHaveLength(1);
+        transition.cancel(); transition.cancel();
+        tweens[0].fireLateCallback();
+        expect(completed).not.toHaveBeenCalled();
+        expect(transition.phase).toBe("idle");
+        expect(mid).toMatchObject({ x: 0, y: 0, scaleX: 1, scaleY: 1 });
+        expect(view.mouseEnabled).toBe(false);
+    });
+
+    it("honors cancellation or destruction triggered by relayout instead of restarting stale animation", () => {
+        const { transition } = createPageTransition();
+        const completed = vi.fn();
+        transition.show(completed);
+        transition.relayout(() => transition.cancel());
+        expect(tweens).toHaveLength(1);
+        expect(transition.phase).toBe("idle");
+        tweens[0].fireLateCallback();
+        expect(completed).not.toHaveBeenCalled();
+
+        const next = createPageTransition();
+        next.transition.hide(completed);
+        next.transition.relayout(() => next.view.destroy());
+        expect(tweens).toHaveLength(2);
+        expect(next.transition.phase).toBe("idle");
+        tweens[1].fireLateCallback();
+        expect(completed).not.toHaveBeenCalled();
     });
 });

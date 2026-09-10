@@ -1,10 +1,12 @@
 /** Self-contained browser function: stringify and evaluate with awaitPromise/returnByValue. */
 export async function runFrameworkProbes(validation) {
-    const { LX, Laya } = globalThis;
-    const ui = LX.UI;
+    const { lx, Laya } = globalThis;
+    const ui = lx.ui;
     const root = Laya.GRoot.inst;
-    const base = ui.snapshot().managed.find((entry) => entry.routeId === validation.uiProbe.baseRouteId);
-    if (!base) throw new Error("Framework probe requires an existing registered window constructor.");
+    const base = lx.sceneFlow.current?.ui.snapshot().views.find((entry) => entry.routeId === validation.uiProbe.baseRouteId);
+    const loading = ui.snapshot().managed.find(entry => entry.routeId === "lx.scene-loading");
+    if (!base || !loading) throw new Error("Framework probe requires a native scene page and loading window.");
+    const WindowBase = Object.getPrototypeOf(loading.window.constructor);
     const assert = (condition, message) => {
         if (!condition) throw new Error(`Framework probe failed: ${message}`);
     };
@@ -37,7 +39,7 @@ export async function runFrameworkProbes(validation) {
     const isolatedRouters = [];
     let poolRegistered = false;
     const poolId = `${prefix}_pool`;
-    class ProbeWindow extends base.window.constructor {
+    class ProbeWindow extends WindowBase {
         constructor(pane) {
             super(pane);
             live.add(this);
@@ -59,8 +61,8 @@ export async function runFrameworkProbes(validation) {
 
     try {
         const layout = ui.layout.snapshot();
-        const fullBleed = base.window.contentPane.getChildByName("full");
-        const safeContent = base.window.contentPane.getChildByName("safeContent");
+        const fullBleed = base.view.getChildByName("full");
+        const safeContent = base.view.getChildByName("safeContent");
         const middle = safeContent?.getChildByName("mid");
         assert(layout.viewport.width === root.width && layout.viewport.height === root.height,
             `layout viewport ${JSON.stringify(layout.viewport)} differs from GRoot ${root.width}x${root.height}`);
@@ -128,9 +130,13 @@ export async function runFrameworkProbes(validation) {
             else controller.abort();
             assert(!(await bounded(result, `binding cancellation by ${action}`)).ok, "cancelled binding unexpectedly succeeded");
             assert(tokenSignal.aborted, "binding token did not receive cancellation");
-            await bounded(router.waitForPendingLoads(), "UI drain after binding cancellation");
+            let drained = false;
+            const draining = router.waitForPendingLoads().then(() => { drained = true; });
+            await frame();
+            assert(!drained, "UI cleanup stopped tracking the underlying binding");
             assert(router.snapshot().pendingRequests.length === 0, "cancelled binding remained pending");
             lateReject(new Error("expected rejection after binding cancellation"));
+            await bounded(draining, "UI drain after late binding settlement");
             await frame();
             router.dispose();
         }
@@ -167,7 +173,7 @@ export async function runFrameworkProbes(validation) {
                 return window;
             },
         });
-        LX.Pool.register({
+        lx.pool.register({
             id: poolId, url: validation.uiProbe.prefabUrl, maxIdle: 1, maxActive: 1,
             create: (prefab) => { counts.poolCreated += 1; return prefab.create(); },
             onAcquire: () => { counts.poolAcquired += 1; },
@@ -176,22 +182,22 @@ export async function runFrameworkProbes(validation) {
         poolRegistered = true;
         for (let cycle = 0; cycle < 100; cycle += 1) {
             const window = await ui.show(repeatedRoute, {});
-            const node = await LX.Pool.acquire(poolId);
+            const node = await lx.pool.acquire(poolId);
             root.addChild(node);
             await frame();
-            LX.Pool.release(poolId, node);
-            LX.Pool.drain(poolId);
+            lx.pool.release(poolId, node);
+            lx.pool.drain(poolId);
             ui.close(repeatedRoute.id);
             await frame();
             assert(window.destroyed && node.destroyed, `cycle ${cycle} retained a node owner`);
-            const snapshot = LX.Pool.snapshot().find((entry) => entry.id === poolId);
+            const snapshot = lx.pool.snapshot().find((entry) => entry.id === poolId);
             assert(snapshot?.active === 0 && snapshot.pending === 0 && snapshot.idle === 0
                 && snapshot.cleanupFailures === 0, `cycle ${cycle} pool counts did not return to zero`);
             assert(ui.listManaged().length === before.managed && root.numChildren === before.children,
                 `cycle ${cycle} UI/root counts did not return to baseline`);
         }
         await ui.waitForPendingLoads();
-        await LX.Pool.waitForPendingLoads();
+        await lx.pool.waitForPendingLoads();
         Laya.Scene.gc();
         await frame();
         const after = { managed: ui.listManaged().length, children: root.numChildren };
@@ -212,7 +218,7 @@ export async function runFrameworkProbes(validation) {
             try { router.dispose(); } catch (error) { errors.push(error); }
         }
         if (poolRegistered) {
-            try { LX.Pool.drain(poolId); } catch (error) { errors.push(error); }
+            try { lx.pool.drain(poolId); } catch (error) { errors.push(error); }
         }
         if (errors.length) throw new Error(`Framework probe cleanup failed: ${errors.map(String).join("; ")}`);
     }

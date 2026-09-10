@@ -4,6 +4,7 @@ import { ContentCatalog, type ContentEntry } from "../infrastructure/content/Con
 import { JsonConfigService } from "../infrastructure/config/JsonConfigService";
 import { LayaHttpTransport, type HttpTransport } from "../infrastructure/network/HttpTransport";
 import { RenderPerformance } from "../infrastructure/performance/RenderPerformance";
+import { LayaGraphicsCleanup } from "../infrastructure/performance/LayaGraphicsCleanup";
 import { PrefabPoolService } from "../infrastructure/pool/PrefabPoolService";
 import {
     LayaLocalStorageDriver,
@@ -15,6 +16,8 @@ import { createDefaultPlatformService } from "../platform/createDefaultPlatformS
 import type { PurchasePlatform } from "../platform/purchase/PurchasePlatform";
 import { UnsupportedPurchasePlatform } from "../platform/purchase/UnsupportedPurchasePlatform";
 import { UIRouter } from "../presentation/ui/UIRouter";
+import { RedDotStore } from "../presentation/ui/RedDotStore";
+import { RedDotBinding } from "../presentation/ui/RedDotBinding";
 import { TipQueue } from "../presentation/ui/TipQueue";
 import { UILayoutService } from "../presentation/ui/UILayoutService";
 import { DefaultSceneLoadingPresenter } from "../presentation/scene/DefaultSceneLoadingPresenter";
@@ -23,7 +26,7 @@ import {
     type SceneLoadingPresenter,
 } from "../presentation/scene/SceneFlow";
 import { AppBootstrap, type AppService, type BootstrapOptions } from "./AppBootstrap";
-import { bindLXRuntime, unbindLXRuntime } from "./LXRuntimeHost";
+import { bindLxRuntime, unbindLxRuntime } from "./lxRuntimeHost";
 
 export interface ClientSettings extends AudioSettings {
     readonly language: string;
@@ -118,10 +121,21 @@ export function createRuntime(
     const http = adapters.http ?? new LayaHttpTransport();
     const uiLayout = new UILayoutService(platform);
     const tips = new TipQueue(pool, "bootstrap/framework/ui/Tip.lh", {}, uiLayout);
-    const ui = new UIRouter(tips, uiLayout);
+    const redDots = new RedDotStore();
+    const ui = new UIRouter(tips, uiLayout, { redDots });
     const sceneLoadingPresenter = definition.createSceneLoadingPresenter?.(ui, content)
         ?? new DefaultSceneLoadingPresenter(ui);
-    const sceneFlow = new SceneFlow({ loadingPresenter: sceneLoadingPresenter });
+    const sceneFlow = new SceneFlow({ loadingPresenter: sceneLoadingPresenter,
+        configureScene(scene) {
+            scene.configureUI(() => {
+                const root = scene.uiRoot;
+                if (!(root instanceof Laya.GWidget) || root.destroyed || !scene.contains(root)) {
+                    throw new Error("Assign uiRoot to a screen-space GWidget inside this scene in the IDE.");
+                }
+                return ui.createSceneUI(root);
+            });
+        },
+    });
 
     definition.configureUI?.(ui, content);
     definition.configureSceneFlow?.(sceneFlow, content);
@@ -154,12 +168,15 @@ export function createRuntime(
         start(): void {},
         async stop(): Promise<void> {
             const errors: unknown[] = [];
+            const deadline = Date.now() + pendingLoadTimeoutMs;
             let safeToCollect = true;
             if (!await collectCleanup(errors, () => sceneFlow.dispose())) safeToCollect = false;
             await collectCleanup(errors, () => ui.dispose());
             await collectCleanup(errors, () => pool.dispose());
             if (!await collectCleanup(errors, () => audio.dispose())) safeToCollect = false;
             if (!await collectCleanup(errors, () => config.dispose())) safeToCollect = false;
+            if (RedDotBinding.defaultStore === redDots) RedDotBinding.setDefaultStore(undefined);
+            await collectCleanup(errors, () => redDots.dispose());
             const waits = [
                 ["scene-flow", () => sceneFlow.waitForPendingLoads()],
                 ["ui", () => ui.waitForPendingLoads()],
@@ -175,6 +192,21 @@ export function createRuntime(
             }
             if (!await collectCleanup(errors, () => ui.dispose())) safeToCollect = false;
             if (!await collectCleanup(errors, () => pool.dispose())) safeToCollect = false;
+            // Native components (including GLoader's FrameAnimation) finish destruction on a frame.
+            // A suspended renderer must time out visibly rather than report successful early GC.
+            if (safeToCollect) {
+                const frameOwner = {};
+                pendingCleanup.add("native-destruction");
+                try {
+                    const settled = new Promise<void>(resolve => Laya.timer.frameOnce(1, frameOwner, resolve));
+                    if (!await collectCleanup(errors, () => waitWithDeadline(settled, Math.max(1, deadline - Date.now())))) {
+                        safeToCollect = false;
+                    }
+                } finally {
+                    Laya.timer.clearAll(frameOwner);
+                    pendingCleanup.delete("native-destruction");
+                }
+            }
             const state = bootstrap.snapshot();
             if (state.pending.some((operation) => operation.serviceName !== "runtime-cleanup")
                 || state.failedStops.length > 0 || state.lateCleanupErrors > 0) {
@@ -190,7 +222,7 @@ export function createRuntime(
     };
     const gameServices = definition.createServices?.(context) ?? [];
     const bootstrap = new AppBootstrap(
-        [platform, uiLayout, cleanupService, preferencesService, ...gameServices],
+        [new LayaGraphicsCleanup(), platform, uiLayout, cleanupService, preferencesService, ...gameServices],
         definition.lifecycle,
     );
 
@@ -204,11 +236,13 @@ export function createRuntime(
                 pendingCleanup: [...pendingCleanup], gc });
         },
         async start(): Promise<void> {
-            bindLXRuntime(runtime);
+            bindLxRuntime(runtime);
             try {
+                RedDotBinding.setDefaultStore(redDots);
                 await bootstrap.start();
             } catch (error) {
-                unbindLXRuntime(runtime);
+                if (RedDotBinding.defaultStore === redDots) RedDotBinding.setDefaultStore(undefined);
+                unbindLxRuntime(runtime);
                 throw error;
             }
         },
@@ -216,7 +250,7 @@ export function createRuntime(
             try {
                 await bootstrap.stop();
             } finally {
-                unbindLXRuntime(runtime);
+                unbindLxRuntime(runtime);
             }
         },
     };

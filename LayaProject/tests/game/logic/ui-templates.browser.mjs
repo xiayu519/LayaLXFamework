@@ -9,9 +9,9 @@ export default function uiTemplatesProbe() {
 }
 
 async function runTemplates() {
-    const { LX, Laya } = globalThis;
-    const ui = LX.UI, root = Laya.GRoot.inst, platform = LX.Platform;
-    const Base = ui.listVisible().find(entry => entry.routeId === "lx.status").window.constructor;
+    const { lx, Laya } = globalThis;
+    const ui = lx.ui, root = Laya.GRoot.inst, platform = lx.platform;
+    const Base = Object.getPrototypeOf(ui.listManaged().find(entry => entry.routeId === "lx.scene-loading").window.constructor);
     const assert = (ok, message) => { if (!ok) throw new Error(`UI templates: ${message}`); };
     const wait = async (condition, message) => {
         const end = performance.now() + 4000;

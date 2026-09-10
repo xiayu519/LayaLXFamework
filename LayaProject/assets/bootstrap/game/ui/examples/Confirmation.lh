@@ -1,13 +1,12 @@
 {
   "_$ver": 1,
   "_$id": "confirmationroot",
+  "_$runtime": "res://b8e7a108-1934-4120-918c-7de8d8daba08",
   "_$type": "GWidget",
   "name": "Confirmation",
-  "x": 0,
-  "y": 0,
   "width": 720,
   "height": 1280,
-  "_$runtime": "res://b8e7a108-1934-4120-918c-7de8d8daba08",
+  "mouseThrough": true,
   "_$child": [
     {
       "_$id": "confirmationroot_background",
@@ -23,6 +22,7 @@
       "name": "safeContent",
       "width": 720,
       "height": 1280,
+      "mouseThrough": true,
       "_$child": [
         {
           "_$id": "confirmationroot_safe_top",
@@ -44,19 +44,28 @@
           "_$id": "confirmationmid",
           "_$type": "GWidget",
           "name": "mid",
+          "x": 80,
+          "y": 445,
           "width": 560,
           "height": 390,
+          "mouseThrough": true,
           "_$child": [
             {
               "_$id": "confirmationframe",
               "_$prefab": "b8e7a102-1934-4120-918c-7de8d8daba02",
+              "_$var": true,
               "name": "frame",
+              "active": true,
+              "x": 0,
+              "y": 0,
               "width": 560,
               "height": 390,
-              "_$var": true
+              "visible": true,
+              "title": "旅行背包"
             },
             {
               "_$id": "confirmationmessage",
+              "_$var": true,
               "_$type": "GTextField",
               "name": "messageText",
               "x": 30,
@@ -68,34 +77,35 @@
               "color": "#e2e8f0",
               "valign": "middle",
               "leading": 12,
-              "_$var": true
+              "letterSpacing": 0
             },
             {
               "_$id": "confirmationcancel",
               "_$prefab": "b8e7a101-1934-4120-918c-7de8d8daba01",
+              "_$var": true,
               "name": "cancelButton",
+              "active": true,
               "x": 30,
               "y": 300,
               "width": 232,
               "height": 62,
-              "title": "取消",
-              "_$var": true
+              "visible": true,
+              "title": "取消"
             },
             {
               "_$id": "confirmationaccept",
               "_$prefab": "b8e7a101-1934-4120-918c-7de8d8daba01",
+              "_$var": true,
               "name": "confirmButton",
+              "active": true,
               "x": 282,
               "y": 300,
               "width": 248,
               "height": 62,
-              "title": "确认使用",
-              "_$var": true
+              "visible": true,
+              "title": "确认使用"
             }
-          ],
-          "x": 80,
-          "y": 445,
-          "mouseThrough": true
+          ]
         },
         {
           "_$id": "confirmationroot_safe_bottom",
@@ -105,9 +115,7 @@
           "height": 0,
           "mouseThrough": true
         }
-      ],
-      "mouseThrough": true
+      ]
     }
-  ],
-  "mouseThrough": true
+  ]
 }

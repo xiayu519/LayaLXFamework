@@ -13,6 +13,7 @@ import { dirname, extname, join, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { WebSocket } from "ws";
 import { runFrameworkProbes } from "./browser-framework-probes.mjs";
+import { handleResourceFixture } from "./browser-resource-fixtures.mjs";
 import { handleNetworkProbe, runNetworkProbes } from "./browser-network-probes.mjs";
 import { parseBrowserOptions, runSelectedBrowserProbes } from "./browser-probe-plan.mjs";
 
@@ -21,6 +22,7 @@ const environmentGuide = "../Books/LXFamework-Environment.md";
 const releaseRoot = join(projectRoot, "release", "web");
 const performanceSettings = JSON.parse(readFileSync(join(projectRoot, "settings", "PerformanceBudgets.json"), "utf8"));
 const headlessValidation = JSON.parse(readFileSync(join(projectRoot, "settings", "HeadlessValidation.json"), "utf8"));
+const resourceLayout = JSON.parse(readFileSync(join(projectRoot, "settings", "ResourceLayout.json"), "utf8"));
 const probeOptions = parseBrowserOptions(process.argv.slice(2));
 const extraProbe = probeOptions.probe
     ? (await import(pathToFileURL(resolve(probeOptions.probe)).href)).default
@@ -57,6 +59,7 @@ const server = createServer((request, response) => {
         return;
     }
     if (handleNetworkProbe(request, response, pathname)) return;
+    if (handleResourceFixture(request, response, pathname)) return;
     if (pathname === "/__lx_probe_slow.png") {
         setTimeout(() => {
             response.writeHead(200, { "Content-Type": "image/png", "Cache-Control": "no-store" });
@@ -177,6 +180,7 @@ try {
         || !runtimeState.spineReady
         || runtimeState.spineVersion !== playerSettings.spineVersion
         || !runtimeState.performanceReady
+        || !runtimeState.entryReady
         || !runtimeState.ownershipReady
         || (headlessValidation.status
             && runtimeState.statusText !== headlessValidation.status.expected)
@@ -190,6 +194,20 @@ try {
     }
     if (consoleErrors.length > 0 || runtimeErrors.length > 0 || failedRequests.length > 0) {
         throw new Error(`browser errors: ${consoleErrors.concat(runtimeErrors, failedRequests).join(" | ")}`);
+    }
+    const entryLifecycle = await cdp.send("Runtime.evaluate", {
+        expression: `(async () => {
+            const ui = globalThis.lx.ui;
+            await globalThis.$_main_();
+            const startup = await globalThis.Laya.Scene.open(${JSON.stringify(resourceLayout.startupScene)}, false);
+            startup.destroy();
+            await globalThis.$_main_();
+            return globalThis.lx.ready && globalThis.lx.ui === ui && startup.destroyed;
+        })()`,
+        awaitPromise: true, returnByValue: true,
+    });
+    if (entryLifecycle.exceptionDetails || entryLifecycle.result?.value !== true) {
+        throw new Error(`native entry must survive scene destruction and repeated startup: ${JSON.stringify(entryLifecycle)}`);
     }
     const runBuiltin = async (probe) => {
         const result = await cdp.send("Runtime.evaluate", {
@@ -215,7 +233,7 @@ try {
                 }),
             ]);
             if (result.exceptionDetails || result.result?.value?.passed !== true) {
-                throw new Error(`Extra browser probe failed: ${JSON.stringify(result)}`);
+                throw new Error(`Extra browser probe failed: ${JSON.stringify(result)}; browser errors: ${JSON.stringify(consoleErrors.concat(runtimeErrors, failedRequests))}`);
             }
             console.log(`Extra browser probe: ${JSON.stringify(result.result.value)}`);
         } finally { clearTimeout(timeout); }
@@ -230,27 +248,25 @@ try {
         expression: `(async () => {
             const validation = ${JSON.stringify(headlessValidation)};
             const services = {
-                config: globalThis.LX.Config,
-                tables: globalThis.LX.Tables,
-                ui: globalThis.LX.UI,
-                pool: globalThis.LX.Pool,
-                audio: globalThis.LX.Audio,
+                config: globalThis.lx.config,
+                tables: globalThis.lx.tables,
+                ui: globalThis.lx.ui,
+                pool: globalThis.lx.pool,
+                audio: globalThis.lx.audio,
             };
-            const startup = Array.from(globalThis.Laya.Scene.unDestroyedScenes)
-                .find((scene) => Boolean(scene.getComponent?.(globalThis.Laya.Script)));
-            if (!startup) throw new Error("Startup scene was not found.");
-            startup.destroy();
+            await globalThis.lx.stop();
             const deadline = performance.now() + 5000;
-            const isAttached = () => { try { globalThis.LX.snapshot(); return true; } catch { return false; } };
+            const isAttached = () => { try { globalThis.lx.snapshot(); return true; } catch { return false; } };
             while (isAttached() && performance.now() < deadline) {
                 await new Promise((resolve) => setTimeout(resolve, 20));
             }
             return {
-                ready: globalThis.LX.Ready,
+                ready: globalThis.lx.ready,
                 attached: isAttached(),
                 configReady: services.config.ready,
                 tablesReady: services.tables.ready,
                 managedUI: services.ui.snapshot().managed.length,
+                sceneUI: services.ui.snapshot().scenes.length,
                 pools: services.pool.snapshot().length,
                 sfx: services.audio.snapshot().activeSfx,
                 configCached: validation.runtimeConfig
@@ -271,6 +287,7 @@ try {
         || shutdownState?.configReady !== false
         || shutdownState?.tablesReady !== false
         || shutdownState?.managedUI !== 0
+        || shutdownState?.sceneUI !== 0
         || shutdownState?.pools !== 0
         || shutdownState?.sfx !== 0
         || shutdownState?.configCached !== false
@@ -283,7 +300,7 @@ try {
     console.log(
         `Browser OK: ${runtimeState.title}, LayaAir ${runtimeState.engineVersion}, pure 2D, `
         + `config=${runtimeState.configValue}, tables=${runtimeState.tableValue}, UI/Spine ${runtimeState.spineVersion}/performance ready, `
-        + `status=${runtimeState.statusText}, suite=${probeOptions.suite}, probes=${completedProbes.join(",")} passed, clean scene shutdown, no errors.`,
+        + `status=${runtimeState.statusText}, suite=${probeOptions.suite}, probes=${completedProbes.join(",")} passed, clean application shutdown, no errors.`,
     );
 } finally {
     socket?.close();
@@ -354,25 +371,25 @@ async function runEngineLifecycleProbes(cdp) {
             await delay(150);
 
             const poolId = "__lx_headless_prefab";
-            globalThis.LX.Pool.register({
+            globalThis.lx.pool.register({
                 id: poolId,
                 url: validation.uiProbe.prefabUrl,
                 maxIdle: 1,
                 maxActive: 1,
             });
-            const firstNode = await globalThis.LX.Pool.acquire(poolId);
-            globalThis.LX.Pool.release(poolId, firstNode);
-            const secondNode = await globalThis.LX.Pool.acquire(poolId);
+            const firstNode = await globalThis.lx.pool.acquire(poolId);
+            globalThis.lx.pool.release(poolId, firstNode);
+            const secondNode = await globalThis.lx.pool.acquire(poolId);
             const poolReused = firstNode === secondNode;
-            globalThis.LX.Pool.release(poolId, secondNode);
-            globalThis.LX.Pool.drain(poolId);
-            const poolDrained = globalThis.LX.Pool.snapshot()
+            globalThis.lx.pool.release(poolId, secondNode);
+            globalThis.lx.pool.drain(poolId);
+            const poolDrained = globalThis.lx.pool.snapshot()
                 .find((entry) => entry.id === poolId)?.idle === 0;
 
-            globalThis.LX.UI.tip("Headless tip one");
-            globalThis.LX.UI.tip("Headless tip two");
+            globalThis.lx.ui.tip("Headless tip one");
+            globalThis.lx.ui.tip("Headless tip two");
             await waitUntil(() => {
-                const snapshot = globalThis.LX.UI.snapshot().tips;
+                const snapshot = globalThis.lx.ui.snapshot().tips;
                 const root = globalThis.Laya.GRoot.inst;
                 const view = Array.from({ length: root.numChildren }, (_, index) => root.getChildAt(index))
                     .find((node) => node.name === "LXTip");
@@ -380,7 +397,7 @@ async function runEngineLifecycleProbes(cdp) {
                     && snapshot.queued === 1
                     && view?.getChildByName?.("messageText")?.text === "Headless tip one";
             }, 3000, "the first queued tip");
-            const firstTip = globalThis.LX.UI.snapshot().tips;
+            const firstTip = globalThis.lx.ui.snapshot().tips;
             const tipRoot = globalThis.Laya.GRoot.inst;
             const firstTipView = Array.from({ length: tipRoot.numChildren }, (_, index) => tipRoot.getChildAt(index))
                 .find((node) => node.name === "LXTip");
@@ -389,41 +406,45 @@ async function runEngineLifecycleProbes(cdp) {
                 && firstTipView?.getChildByName?.("messageText")?.text === "Headless tip one";
             const firstTipAt = performance.now();
             await waitUntil(() => {
-                const snapshot = globalThis.LX.UI.snapshot().tips;
+                const snapshot = globalThis.lx.ui.snapshot().tips;
                 return snapshot.shown >= 2 && snapshot.active === 2 && snapshot.queued === 0;
             }, 3000, "the second queued tip");
-            const secondTip = globalThis.LX.UI.snapshot().tips;
+            const secondTip = globalThis.lx.ui.snapshot().tips;
             const tipCadence = performance.now() - firstTipAt >= 450
                 && secondTip.shown >= 2
                 && secondTip.active === 2
                 && secondTip.queued === 0;
             await waitUntil(() => {
-                const idle = globalThis.LX.Pool.snapshot()
+                const idle = globalThis.lx.pool.snapshot()
                     .find((entry) => entry.id === "lx.ui.tip")?.idle ?? 0;
-                return globalThis.LX.UI.snapshot().tips.active === 0 && idle >= 2;
+                return globalThis.lx.ui.snapshot().tips.active === 0 && idle >= 2;
             }, 3000, "queued tips to return to the pool");
-            const idleTips = globalThis.LX.Pool.snapshot().find((entry) => entry.id === "lx.ui.tip")?.idle ?? 0;
-            const tipsReleased = globalThis.LX.UI.snapshot().tips.active === 0 && idleTips >= 2;
-            globalThis.LX.UI.tip("Headless tip three");
+            const idleTips = globalThis.lx.pool.snapshot().find((entry) => entry.id === "lx.ui.tip")?.idle ?? 0;
+            const tipsReleased = globalThis.lx.ui.snapshot().tips.active === 0 && idleTips >= 2;
+            globalThis.lx.ui.tip("Headless tip three");
             await waitUntil(() => {
-                const pool = globalThis.LX.Pool.snapshot().find((entry) => entry.id === "lx.ui.tip");
+                const pool = globalThis.lx.pool.snapshot().find((entry) => entry.id === "lx.ui.tip");
                 return pool?.active === 1 && pool.idle >= 1;
             }, 3000, "a pooled tip to be reused");
-            const reusedTipPool = globalThis.LX.Pool.snapshot()
+            const reusedTipPool = globalThis.lx.pool.snapshot()
                 .find((entry) => entry.id === "lx.ui.tip");
             const tipReused = reusedTipPool?.active === 1 && reusedTipPool.idle >= 1;
             await waitUntil(
-                () => globalThis.LX.UI.snapshot().tips.active === 0,
+                () => globalThis.lx.ui.snapshot().tips.active === 0,
                 3000,
                 "the reused tip to finish",
             );
 
-            const statusInfo = globalThis.LX.UI.snapshot().managed
+            const sceneUI = globalThis.lx.sceneFlow.current?.ui;
+            const statusInfo = sceneUI?.snapshot().views
                 .find((entry) => entry.routeId === validation.uiProbe.baseRouteId);
-            if (!statusInfo) throw new Error("Status window was not available for the UI probe.");
-            const ProbeWindow = class extends statusInfo.window.constructor {};
+            const loadingInfo = globalThis.lx.ui.snapshot().managed
+                .find((entry) => entry.routeId === "lx.scene-loading");
+            if (!statusInfo || !loadingInfo) throw new Error("Scene status view or system loading window was not available for the UI probe.");
+            const BaseWindow = Object.getPrototypeOf(loadingInfo.window.constructor);
+            const ProbeWindow = class extends BaseWindow { onBind() {} };
             const routeId = "__lx_headless_modal";
-            globalThis.LX.UI.register({
+            globalThis.lx.ui.register({
                 id: routeId,
                 url: validation.uiProbe.prefabUrl,
                 layer: 3,
@@ -432,29 +453,32 @@ async function runEngineLifecycleProbes(cdp) {
                 retention: "destroy",
                 create: (pane) => new ProbeWindow(pane),
             });
-            const popup = await globalThis.LX.UI.show(routeId, validation.uiProbe.args);
+            const popup = await globalThis.lx.ui.show(routeId, validation.uiProbe.args);
             await delay(40);
             const root = globalThis.Laya.GRoot.inst;
             const modalLayer = root.modalLayer;
             const popupIndex = root.getChildIndex(popup);
             const modalIndex = root.getChildIndex(modalLayer);
-            const statusIndex = root.getChildIndex(statusInfo.window);
-            const modalOrdered = popupIndex > modalIndex
-                && modalIndex > statusIndex
+            const modalOrdered = popupIndex === modalIndex + 1
+                && modalIndex >= 0
+                && statusInfo.view.parent === sceneUI.root
+                && !(statusInfo.view instanceof globalThis.Laya.GWindow)
                 && modalLayer.zOrder === popup.zOrder
-                && globalThis.LX.UI.getTop()?.window === popup;
+                && globalThis.lx.ui.getTop()?.window === popup;
+            const popupMid = popup.contentPane.getChildByName("safeContent").getChildByName("mid");
             const popupAnimating = popup.hasPopupTransition === true
                 && popup.mouseEnabled === false
-                && popup.contentPane.scaleX !== 1;
-            globalThis.LX.UI.close(routeId, popup);
+                && popupMid.scaleX !== 1
+                && popup.contentPane.scaleX === 1;
+            globalThis.lx.ui.close(routeId, popup);
             await waitUntil(
                 () => popup.destroyed
-                    && !globalThis.LX.UI.snapshot().managed.some((entry) => entry.routeId === routeId),
+                    && !globalThis.lx.ui.snapshot().managed.some((entry) => entry.routeId === routeId),
                 1000,
                 "the interrupted popup transition to finish destruction",
             );
             const uiDestroyed = popup.destroyed
-                && !globalThis.LX.UI.snapshot().managed.some((entry) => entry.routeId === routeId);
+                && !globalThis.lx.ui.snapshot().managed.some((entry) => entry.routeId === routeId);
 
             await delay(80);
             globalThis.Laya.Scene.gc();
@@ -658,43 +682,44 @@ async function waitForRuntime(cdp, timeoutMs) {
                     }
                     return null;
                 };
-                const status = globalThis.Laya?.stage
-                    ?.getChildAt(0)
-                    ?.getComponent?.(globalThis.Laya?.Script);
-                const statusText = findStatusText(globalThis.Laya?.GRoot?.inst);
-                const ready = globalThis.LX?.Ready === true;
+                const statusText = findStatusText(globalThis.Laya?.stage);
+                const ready = globalThis.lx?.ready === true;
                 const configReady = !validation.runtimeConfig
-                    || (ready && globalThis.LX.Config.ready === true);
+                    || (ready && globalThis.lx.config.ready === true);
                 const tablesReady = !validation.tables
-                    || (ready && globalThis.LX.Tables.ready === true);
+                    || (ready && globalThis.lx.tables.ready === true);
                 const configValue = validation.runtimeConfig && configReady
-                    ? globalThis.LX.Config.require(validation.runtimeConfig.id)?.[validation.runtimeConfig.property] ?? null
+                    ? globalThis.lx.config.require(validation.runtimeConfig.id)?.[validation.runtimeConfig.property] ?? null
                     : null;
                 const tableValue = validation.tables && tablesReady
-                    ? globalThis.LX.Tables.require()?.[validation.tables.table]
+                    ? globalThis.lx.tables.require()?.[validation.tables.table]
                         ?.get(validation.tables.key)?.[validation.tables.property] ?? null
                     : null;
                 let render = null;
                 let ownershipReady = false;
                 if (ready) {
-                    const sample = globalThis.LX.Performance.capture();
+                    const sample = globalThis.lx.performance.capture();
                     if (sample.statisticsReady) {
-                        render = globalThis.LX.Performance.assertBudget(${JSON.stringify(startupRenderBudget)}, sample);
+                        render = globalThis.lx.performance.assertBudget(${JSON.stringify(startupRenderBudget)}, sample);
                     }
-                    const ui = globalThis.LX.UI.snapshot();
+                    const ui = globalThis.lx.ui.snapshot();
                     const expectedRoute = validation.uiProbe?.baseRouteId;
+                    const sceneUI = globalThis.lx.sceneFlow.current?.ui;
+                    const statusView = sceneUI?.snapshot().views
+                        .find((entry) => entry.routeId === expectedRoute);
                     ownershipReady = (!expectedRoute
-                        || (ui.loading[expectedRoute] === undefined
-                            && ui.managed.some((entry) => entry.routeId === expectedRoute)
-                            && ui.visible.some((entry) => entry.routeId === expectedRoute)
-                            && ui.top?.routeId === expectedRoute
-                            && ui.bottom?.routeId === expectedRoute))
-                        && globalThis.LX.Res === globalThis.Laya.loader
-                        && globalThis.LX.Scene === globalThis.Laya.Scene;
+                        || (statusView?.visible === true
+                            && statusView.view.parent === sceneUI.root
+                            && !(statusView.view instanceof globalThis.Laya.GWindow)
+                            && sceneUI.snapshot().pendingRequests.length === 0
+                            && ui.scenes.some((scene) => scene.views.some((entry) => entry.view === statusView.view))
+                            && !ui.managed.some((entry) => entry.routeId === expectedRoute)))
+                        && globalThis.lx.res === globalThis.Laya.loader
+                        && globalThis.lx.scene === globalThis.Laya.Scene;
                 }
                 return {
                     ready,
-                    uiReady: ready && Boolean(globalThis.LX.UI),
+                    uiReady: ready && Boolean(globalThis.lx.ui),
                     configReady,
                     configValue,
                     tablesReady,
@@ -712,7 +737,7 @@ async function waitForRuntime(cdp, timeoutMs) {
                     engineVersion: globalThis.Laya?.LayaEnv?.version ?? null,
                     has3D: typeof globalThis.Laya?.Scene3D === "function",
                     stageChildren: globalThis.Laya?.stage?.numChildren ?? -1,
-                    scriptReady: Boolean(status),
+                    entryReady: typeof globalThis.$_main_ === "function" && typeof globalThis.lx?.stop === "function",
                 };
             })()`,
             returnByValue: true,

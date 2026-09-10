@@ -4,8 +4,9 @@ export default function uiExamplesProbe() {
 }
 
 async function runUIExamples() {
-    const { LX, Laya } = globalThis;
-    const ui = LX.UI;
+    const { lx, Laya } = globalThis;
+    const ui = lx.sceneFlow.current.ui;
+    const layoutService = lx.ui.layout;
     const inventoryId = "lx.examples.inventory";
     const confirmId = "lx.examples.confirm";
     const centeredId = "lx.examples.fullscreen-mid";
@@ -19,8 +20,10 @@ async function runUIExamples() {
             await new Promise((resolve) => setTimeout(resolve, 10));
         }
     };
-    const visible = (id) => ui.listVisible().find((entry) => entry.routeId === id)?.window;
-    const activeExamples = () => ui.listManaged().filter((entry) => entry.routeId.startsWith("lx.examples."));
+    const visible = (id) => ui.snapshot().views.find(entry => entry.routeId === id && entry.visible)?.view;
+    const paneOf = target => target instanceof Laya.GWindow ? target.contentPane : target;
+    const closeButtonOf = target => target instanceof Laya.GWindow ? target.closeButton : target.frame.getChild("closeButton");
+    const activeExamples = () => ui.snapshot().views.filter(entry => entry.visible && entry.routeId.startsWith("lx.examples."));
     const skeleton = (pane) => {
         assert(pane.children.map(node => node.name).join("/") === "full/safeContent", "root skeleton order");
         const safe = pane.getChild("safeContent");
@@ -51,7 +54,7 @@ async function runUIExamples() {
         return row;
     };
     const rows = new Set();
-    const platform = LX.Platform;
+    const platform = lx.platform;
     const originalViewport = Object.getOwnPropertyDescriptor(platform, "viewport");
     const hostViewport = platform.viewport;
     const layouts = [];
@@ -65,8 +68,8 @@ async function runUIExamples() {
         && inner.x + inner.width <= outer.x + outer.width + 1
         && inner.y + inner.height <= outer.y + outer.height + 1, `${label} overflows ${JSON.stringify({ inner, outer })}`);
     const checkLayout = (window) => {
-        const view = window.contentPane;
-        const layout = ui.layout.snapshot();
+        const view = paneOf(window);
+        const layout = layoutService.snapshot();
         const safe = skeleton(view);
         const top = safe.getChild("top");
         const content = safe.getChild("full");
@@ -93,7 +96,7 @@ async function runUIExamples() {
             "full content width must follow the safe area");
         assert(content.scaleX === 1 && content.scaleY === 1, "scrolling content must resize without scaling rows");
         within(rect(view.frame), t, "header frame");
-        within(rect(window.closeButton), t, "close button");
+        within(rect(closeButtonOf(window)), t, "close button");
         within(rect(view.summaryText), t, "summary");
         within(rect(view.midExampleButton), t, "centered example entry");
         assert(rect(view.summaryText).x + rect(view.summaryText).width <= rect(view.midExampleButton).x,
@@ -118,20 +121,20 @@ async function runUIExamples() {
     try {
         const status = visible("lx.status");
         assert(status, "startup window missing");
-        skeleton(status.contentPane);
-        const entryButton = status.contentPane.findChild("examplesButton", Laya.GButton);
-        assert(entryButton.title === "打开 UI 示例", "startup button label");
+        skeleton(paneOf(status));
+        const entryButton = paneOf(status).findChild("examplesButton", Laya.GButton);
+        assert(entryButton.title === "打开旅行背包", "startup button label");
         click(entryButton);
         await wait(() => visible(inventoryId), "startup example button");
         const window = visible(inventoryId);
-        const view = window.contentPane;
+        const view = paneOf(window);
         const list = view.itemList;
         await wait(() => list.numChildren > 0, "virtual rows");
         renderedRows = list.numChildren;
         assert(list.numItems === 100 && renderedRows < 25, "list must virtualize 100 entries");
         assert(view.width === Laya.GRoot.inst.width && view.height === Laya.GRoot.inst.height,
             "fullscreen pane must follow the actual root");
-        assert(window.closeButton === view.frame.getChild("closeButton"), "nested fullscreen frame close binding");
+        assert(window instanceof Laya.GWidget && !(window instanceof Laya.GWindow) && window.parent === ui.root, "fullscreen page must belong to the native scene uiRoot");
         assert(view.frame.title === "旅行背包", "typed frame binding");
 
         const { width, height } = hostViewport;
@@ -152,17 +155,22 @@ async function runUIExamples() {
             Laya.stage.event(Laya.Event.RESIZE);
             await frame();
             layouts.push({ profile: profile.name, ...checkLayout(window) });
+            // Covered pages still adapt their authored geometry; their data subscriptions stay paused.
+            const statusArea = layoutService.snapshot().topSafeArea;
+            for (const name of ["examplesButton", "rewardButton", "snapshotButton", "replayButton", "inventoryText", "feedbackText"]) {
+                within(rect(status[name]), statusArea, `status ${name}`);
+            }
             const selected = await inspectRow(list, 9);
             click(selected);
             assert(list.selection.index === 9 && view.selectionText.text.includes("010"), `${profile.name}: select after reflow`);
             const popup = await openConfirmation(view);
-            const mid = skeleton(popup.contentPane).getChild("mid");
-            within(rect(mid), ui.layout.snapshot().topSafeArea, `${profile.name}: popup`);
-            assert(popup.contentPane.width === Laya.GRoot.inst.width && popup.contentPane.height === Laya.GRoot.inst.height, "popup root must stay fullscreen");
-            assert(popup.contentPane.frame.parent === mid && popup.contentPane.confirmButton.parent === mid, "popup controls must belong to mid");
-            within(rect(popup.contentPane.confirmButton), rect(mid), "popup confirm button");
-            within(rect(popup.closeButton), rect(mid), "popup close button");
-            click(popup.contentPane.cancelButton);
+            const mid = skeleton(popup).getChild("mid");
+            within(rect(mid), layoutService.snapshot().topSafeArea, `${profile.name}: popup`);
+            assert(popup.width === Laya.GRoot.inst.width && popup.height === Laya.GRoot.inst.height, "popup root must stay fullscreen");
+            assert(popup.frame.parent === mid && popup.confirmButton.parent === mid, "popup controls must belong to mid");
+            within(rect(popup.confirmButton), rect(mid), "popup confirm button");
+            within(rect(closeButtonOf(popup)), rect(mid), "popup close button");
+            click(popup.cancelButton);
             await wait(() => popup.destroyed, "cancel after reflow");
             click(view.resetButton);
             assert(list.selection.index === 0, `${profile.name}: reset after reflow`);
@@ -171,10 +179,10 @@ async function runUIExamples() {
         // The same fullscreen centered window survives every safe-area change, including scale restoration.
         click(view.midExampleButton);
         await wait(() => visible(centeredId), "fullscreen centered example entry");
-        const centered = visible(centeredId), centerPane = centered.contentPane;
+        const centered = visible(centeredId), centerPane = paneOf(centered);
         const centerSafe = skeleton(centerPane), centerMid = centerSafe.getChild("mid");
         const centerFull = centerSafe.getChild("full");
-        assert(!centered.modal && !centered.hasPopupTransition && centerFull.numChildren === 0,
+        assert(!(centered instanceof Laya.GWindow) && centered.parent === ui.root && centerFull.numChildren === 0,
             "centered fullscreen must use mid while preserving its empty full slot");
         const action = centerPane.findChild("actionButton", Laya.GButton);
         const counter = centerPane.findChild("counterText", Laya.GTextField);
@@ -184,7 +192,7 @@ async function runUIExamples() {
             Object.defineProperty(platform, "viewport", { configurable: true, get: () => profile.viewport });
             Laya.stage.event(Laya.Event.RESIZE);
             await frame();
-            const snapshot = ui.layout.snapshot(), s = rect(centerSafe), m = rect(centerMid);
+            const snapshot = layoutService.snapshot(), s = rect(centerSafe), m = rect(centerMid);
             const top = rect(centerSafe.getChild("top")), bottom = rect(centerSafe.getChild("bottom"));
             within(m, snapshot.safeArea, "fullscreen mid");
             assert(Math.abs(m.x + m.width / 2 - s.x - s.width / 2) < 1
@@ -193,19 +201,19 @@ async function runUIExamples() {
             assert(centerPane.width === Laya.GRoot.inst.width && centerPane.height === Laya.GRoot.inst.height
                 && centerPane.scaleX === 1, "fullscreen centered root changed scale or screen coverage");
             within(rect(action), m, "centered action");
-            within(rect(centered.closeButton), m, "centered close button");
+            within(rect(closeButtonOf(centered)), m, "centered close button");
             click(action); clicks++;
             assert(counter.text.endsWith(String(clicks)), "empty full slot blocked centered content input");
             centeredScales.push(centerMid.scaleX);
         }
         assert(Math.abs(centeredScales[0] - centeredScales.at(-1)) < 0.001, "centered scale did not restore");
-        click(centered.closeButton);
+        click(closeButtonOf(centered));
         await wait(() => centered.destroyed, "centered native frame close");
         click(view.midExampleButton);
         await wait(() => visible(centeredId), "centered reopen");
         const reopenedCenter = visible(centeredId);
-        assert(reopenedCenter.contentPane.findChild("counterText", Laya.GTextField).text.endsWith("0"), "centered example retained old state");
-        click(reopenedCenter.closeButton);
+        assert(paneOf(reopenedCenter).findChild("counterText", Laya.GTextField).text.endsWith("0"), "centered example retained old state");
+        click(closeButtonOf(reopenedCenter));
         await wait(() => reopenedCenter.destroyed, "centered reopened close");
 
         const row = await inspectRow(list, 89);
@@ -217,18 +225,18 @@ async function runUIExamples() {
         assert(row.selected && marker.visible && gear.pages.includes(gear.controller.selectedIndex),
             "selected marker must be enabled on the controller's actual page");
         const cancelled = await openConfirmation(view);
-        const cancelledMid = cancelled.contentPane.getChild("safeContent").getChild("mid");
+        const cancelledMid = cancelled.getChild("safeContent").getChild("mid");
         assert(cancelledMid.width === 560 && cancelledMid.height === 390,
             "popup must retain its own authored size");
-        assert(cancelled.closeButton === cancelled.contentPane.frame.getChild("closeButton"), "nested frame close binding");
-        assert(Laya.GRoot.inst.getChildIndex(Laya.GRoot.inst.modalLayer)
-            === Laya.GRoot.inst.getChildIndex(cancelled) - 1, "modal mask order");
-        click(cancelled.contentPane.cancelButton);
+        assert(closeButtonOf(cancelled) === cancelled.frame.getChild("closeButton"), "nested frame close binding");
+        assert(ui.root.getChildIndex(ui.modalLayer)
+            === ui.root.getChildIndex(cancelled) - 1, "modal mask order");
+        click(cancelled.cancelButton);
         await wait(() => cancelled.destroyed, "cancel destruction");
         assert(view.summaryText.text.includes("300"), "cancel must not consume an item");
 
         const confirmed = await openConfirmation(view);
-        const confirmButton = confirmed.contentPane.confirmButton;
+        const confirmButton = confirmed.confirmButton;
         click(confirmButton);
         confirmButton.fireClick();
         await wait(() => confirmed.destroyed, "confirm destruction");
@@ -242,24 +250,24 @@ async function runUIExamples() {
         assert(first.quantityText.text.includes("3") && !first.grayed, "pooled row must reset quantity and disabled state");
 
         const ownedPopup = await openConfirmation(view);
-        const lateButton = ownedPopup.contentPane.confirmButton;
-        click(window.closeButton);
+        const lateButton = ownedPopup.confirmButton;
+        click(closeButtonOf(window));
         assert(!window.destroyed, "modal must block clicks on the underlying window");
         ui.close(inventoryId); // Simulate the owner leaving while a modal is still open.
         lateButton.fireClick();
-        await wait(() => window.destroyed && ownedPopup.destroyed, "owner closes child popup");
-        assert(activeExamples().length === 0 && list.itemPool.count === 0, "destroy must empty native list pool");
+        await wait(() => !window.parent && ownedPopup.destroyed, "owner closes child popup");
+        assert(activeExamples().length === 0 && !window.destroyed, "hidden parent must retain its view and close its child");
 
         for (let cycle = 0; cycle < 8; cycle++) {
             const next = await ui.show(inventoryId, { title: `旅行背包 ${cycle + 1}` });
-            const pane = next.contentPane;
+            const pane = paneOf(next);
             const recycled = await inspectRow(pane.itemList, 99);
             rows.add(recycled);
             assert(pane.summaryText.text.includes("300"), "reopen must not retain consumed data");
             assert(pane.itemList.numChildren < 25, "scrolling must keep display object count bounded");
-            click(next.closeButton);
-            await wait(() => next.destroyed, "close and reopen cycle");
-            assert(pane.itemList.itemPool.count === 0 && activeExamples().length === 0, "cycle leaked managed UI or pooled rows");
+            click(closeButtonOf(next));
+            await wait(() => !next.parent, "close and reopen cycle");
+            assert(next === window && activeExamples().length === 0, "retained cycle created duplicate views");
         }
 
         const pending = ui.show(inventoryId, { title: "已取消的打开请求" }).then(
@@ -269,7 +277,9 @@ async function runUIExamples() {
         assert(await pending, "immediate close must cancel pending open");
         await ui.waitForPendingLoads();
         assert(activeExamples().length === 0, "cancelled open left an orphan window");
-        assert([...rows].every((row) => row.destroyed), "sampled virtual rows survived window destruction");
+        window.destroy();
+        await frame();
+        assert(list.itemPool.count === 0 && [...rows].every((row) => row.destroyed), "native rows survived owner destruction");
         return { passed: true, viewport: `${innerWidth}x${innerHeight}`, layouts, centeredScales, items: 100, renderedRows,
             reopenCycles: 8, confirmation: "cancel / once / owner close", pendingOpen: "cancelled" };
     } finally {
