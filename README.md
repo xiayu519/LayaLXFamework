@@ -35,8 +35,7 @@ LayaLXFamework/
 ├─ Design/Tables/                 Luban Excel 人工源
 ├─ Design/tools/                  固定 Luban 工具
 └─ LayaProject/
-   ├─ assets/bootstrap/framework/ 上游只读启动资源
-   ├─ assets/bootstrap/game/      当前游戏启动资源
+   ├─ assets/bootstrap/           游戏可编辑的启动资源，直接按 scenes/ui/config/tables 分类
    ├─ assets/packages/<feature>/  按功能组织的延迟资源
    ├─ assets/shared/<domain>/     跨功能共享资源
    ├─ src/framework/              公共框架
@@ -57,8 +56,9 @@ LayaLXFamework/
 | `lx.stop()` / `lx.snapshot()` | 停止应用 / 查询运行时诊断 |
 | `lx.ui` | 应用窗口、场景 UI 路由注册、安全区布局、红点和 Tip |
 | `lx.res` | Laya 原生 `Laya.loader` |
-| `lx.scene` | Laya 原生 `Laya.Scene` |
-| `lx.sceneFlow` | 业务场景切换、Loading、准备流程和离场回收 |
+| `lx.scenes` | 按 route 管理原生场景，支持并存、Loading 与离场回收 |
+| `lx.worlds` | 业务世界的注册、初始化与统一撤销；不持有 UI |
+| `lx.data` | 按 typed key 获取应用预先创建的独立账号数据 |
 | `lx.content` | 内容 ID 与资源 URL 目录 |
 | `lx.config` | 普通 JSON 加载、校验和释放 |
 | `lx.tables` | Luban 生成表入口 |
@@ -72,7 +72,15 @@ LayaLXFamework/
 
 应用由 `src/AppEntry.ts` 的原生 `main()` 启动，`CompilerSettings.mainScript` 通过 UUID 引用它；引擎已经完成初始化，入口不再调用 `Laya.init()`。`src/game/bootstrap/createApplication.ts` 负责桥接游戏组合根。应用寿命独立于场景，停机使用 `await lx.stop()`；完整预览应选择 IDE 的启动场景预览。
 
+### World、Scene 与账号数据
+
+应用先准备账号功能数据、公共 UI 和 World 定义，由框架 AppBootstrap 启动公共服务与协议接收。注册只准备描述数据，不加载实例。进入 World 后，通过 id/signal/own 初始化其专属 UI、Scene 和事件；退出时先失效、由 Scene 清理所属 UI，再撤销专属定义。公共注册、账号数据和全局红点更新独立于 World，公共 UI 的实例仍归打开它的 Scene。账号退出时清理数据并使旧连接的 receiver 失效。
+
+`lx.worlds.enter/get/exit/unregister` 按 ID 操作世界；`lx.scenes.register/open/get/close/unregister` 按 route 管理原生 Scene，不同 route 可以并存。没有 world.ui，也不猜当前 Scene；需要哪个场景就取哪个实例。详见 [World 与场景](LayaProject/docs/scene-flow.md)。
+
 ### UI
+
+UI Prefab 和对应 Runtime 统一使用 `UI` 前缀。`assets/bootstrap/ui/` 放游戏可编辑的 `UISceneLoading` 和 `UITip`；示例页面、组件与模板集中在其 `examples/`。启动资源不纳入框架只读同步，应用提供 Tip 资源地址和 Loading 展示实现，目录与复用入口见 [UI 模板索引](LayaProject/docs/ui-templates.md)。
 
 UI 的 owner、host 和 layout 分开决定：owner 管生命周期，host 是实际父节点，layout 管全屏或弹窗适配。场景可以同时拥有页面、HUD 和弹窗，也可以让一个页面拥有子弹窗。
 
@@ -82,33 +90,33 @@ UI 的 owner、host 和 layout 分开决定：owner 管生命周期，host 是�
 | `session.show()` | 当前 UI 展示拥有，沿用场景 `uiRoot`；父关闭会清理子 UI |
 | `lx.ui.show()` | 应用拥有，原生 GWindow 挂 GRoot；用于 Loading、系统窗口等 |
 
-场景 UI 在组合根使用 `registerView({ id, url, viewType, bind })` 注册。当前模板已注册旅行背包，可在 `BaseGameScene` 生命周期内打开：
+公共 UI 在应用组合根注册一次；World 专属 UI 才在 initialize 中 registerView 并把 unregisterView 登记到 world.own。需要依赖注入时增加 bind。当前旅行背包是公共定义，大厅与战斗 Scene 都能使用；大厅 World 的场景是 Lobby.ls / LobbyScene。可在 BaseGameScene 生命周期内打开：
 
-`scene.ui` 始终属于指定的场景实例；获取当前主场景用 `lx.sceneFlow.current`。宿主由 `.ls` 原生导出 `uiRoot`，位置和尺寸用 `scene.ui.setViewport({ x, y, width, height })` 设置，层级可调整 `scene.ui.root.zOrder`；无参数 `setViewport()` 恢复全屏跟随，祖先保持无变换的屏幕坐标空间。
+`scene.ui` 始终属于指定的场景实例；获取指定实例用 `lx.scenes.get(routeOrId)`。宿主由 `.ls` 原生导出 `uiRoot`，位置和尺寸用 `scene.ui.setViewport({ x, y, width, height })` 设置，层级可调整 `scene.ui.root.zOrder`；无参数 `setViewport()` 恢复全屏跟随，祖先保持无变换的屏幕坐标空间。
 
 ```ts
 const inventory = await this.ui.show("lx.examples.inventory", { title: "旅行背包" });
 this.ui.close("lx.examples.inventory", inventory);
 ```
 
-正式业务优先保存注册返回的 typed route，以获得参数检查。窗口固定 `Root/full + safeContent(top/full/mid/bottom)` 完整骨架：拉伸列表放内层 full，固定居中面板放 mid，弹窗只动画 mid；不用的槽位留空保留。节点由 `.lh` 和 IDE Runtime / `.generated.ts` 或原生 `@property` 绑定，不维护另一套 Binder，不手改生成字段。
+正式业务优先保存注册返回的 typed route，以获得参数检查。窗口固定 `Root/full + safeContent(top/full/mid/bottom)` 完整骨架：拉伸列表放内层 full，固定居中面板放 mid，弹窗只动画 mid；不用的槽位留空保留。节点由 `.lh` 和 IDE Runtime / `.generated.ts` 或静态 Script 的原生 `@property` 绑定，不维护另一套 Binder，不手改生成字段。
 
-`bind(view, args, session)` 负责本次展示。下面片段中的 `view` 是带有对应 IDE 字段的业务 Runtime，`model` 与 `changes` 由游戏服务注入：
+界面逻辑静态配置在 .lh 的 Runtime 中；窗口参数在根节点静态 UIViewLifecycle 组件中由 IDE 编辑，涵盖 layout、layer、navigation、modal、closeOnMaskClick、multiplicity、retention。场景路由要求该组件存在且启用，漏配会报错。Runtime 新增 @property 不能当作 IDE 可保存的根节点属性；业务可调值同样使用静态 Script。无 bind 时框架调用 Runtime.onBind；需要依赖时 bind 返回 view.onBind(args, session, ...) 的结果。下面片段位于 Runtime 的 `onBind` 方法内，`model` 与 `changes` 由游戏服务注入：
 
 ```ts
 session.bindData(changes, "changed", () => {
-    view.quantityText.text = String(model.totalQuantity);
+    this.quantityText.text = String(model.totalQuantity);
 });
-session.bindRedDot(view.badge, "inventory", { countText: view.badgeCount });
-view.closeButton.on(Laya.Event.CLICK, view, session.close);
-session.lifetime.defer(() => view.closeButton.off(Laya.Event.CLICK, view, session.close));
+session.bindRedDot(this.badge, "inventory", { countText: this.badgeCount });
+this.closeButton.on(Laya.Event.CLICK, this, session.close);
+session.lifetime.defer(() => this.closeButton.off(Laya.Event.CLICK, this, session.close));
 ```
 
-业务按背包、角色、任务等大功能共享模型，不按 UI 新建数据；一个模型可通知多个 UI，一个 UI 也可订阅多个模型。业务先更新模型再发原生事件。绑定首次同步读快照，后续用原生 `callLater` 合并刷新；页面暂停解除订阅，恢复重读，关闭释放。服务器奖励不因 UI 关闭而丢弃；跨 `await` 的界面回写才检查 `session.token`。
+业务按背包、角色、任务等大功能在应用组合根预先创建模型，DataRegistry 只保存引用，用 `lx.data.get(typedKey)` 查询，不按 UI 或 World 新建账号数据；一个模型可通知多个 UI，一个 UI 也可订阅多个模型。业务先更新模型再发原生事件。绑定首次同步读快照，后续用原生 `callLater` 合并刷新；页面暂停解除订阅，恢复重读，关闭释放。服务器奖励不因 UI 关闭而丢弃；跨 `await` 的界面回写才检查 `session.token`。
 
-会换图的 UI 引用 [DynamicImage.lh](LayaProject/assets/bootstrap/framework/ui/components/DynamicImage.lh)，使用原生 `src` API。关闭会立即取消展示，底层异步 `bind()` 与共享加载仍追踪至结束；原生组件销毁稳定后再执行 GC。动态图集与渲染池的 3.4.1 兼容修复见 [资源生命周期](LayaProject/docs/ui-resource-lifecycle.md)。
+会换图的 UI 引用 [UIDynamicImage.lh](LayaProject/assets/bootstrap/ui/examples/components/UIDynamicImage.lh)，使用原生 `src` API。关闭会立即取消展示，底层异步 `bind()` 与共享加载仍追踪至结束；原生组件销毁稳定后再执行 GC。动态图集与渲染池的 3.4.1 兼容修复见 [资源生命周期](LayaProject/docs/ui-resource-lifecycle.md)。
 
-`navigation: page/overlay`、`modal`、`closeOnMaskClick` 与布局独立配置。场景弹窗使用宿主局部 Mask，应用窗口使用原生 GRoot.modalLayer；`center-popup` 默认启用遮罩和点击空白关闭。singleton 按 owner 隔离，hide 缓存只在 owner 存活期间复用。
+`navigation: page/overlay`、`modal`、`closeOnMaskClick` 与布局独立配置。场景弹窗使用宿主局部 Mask，应用窗口使用原生 GRoot.modalLayer；Popup 模板静态启用遮罩和点击空白关闭；单独修改 layout 不会覆盖其他设置。singleton 按 owner 隔离，hide 缓存只在 owner 存活期间复用。
 
 应用窗口才使用 `register({ create })`、`BaseGameWindow<TArgs>` 和 `lx.ui.show()`。基类提供同名 protected `bindData` / `bindRedDot`，展示清理登记在 `presentation`，实例清理登记在 `lifetime`；`onClosed()` 用于关闭后处理。
 
@@ -122,7 +130,7 @@ lx.ui.tip("金币不足");
 
 详细说明见 [UI 布局与归属](LayaProject/docs/ui-layout.md)、[数据驱动 UI](LayaProject/docs/ui-data-binding.md)、[红点](LayaProject/docs/ui-red-dots.md)和[场景切换](LayaProject/docs/scene-flow.md)。
 
-启动状态页的 **打开旅行背包** 提供全屏拉伸列表、**居中展示** 和确认弹窗。**模拟服务器奖励（6 秒）**、**重新领取补给**、**重送上次补给** 演示关闭后到账、全量快照和旧响应过滤；这里使用模拟消息，尚未连接实际服务器。入口和复测说明见 [可调用 UI 示例](LayaProject/docs/ui-examples.md)。
+登录模拟先写入账号数据，然后进入大厅 World。大厅的 **进入战斗** 打开独立战斗 World，战斗页 **返回大厅**；库存和待到账奖励跨 World 保留。大厅状态页的 **打开旅行背包** 提供全屏拉伸列表、**居中展示** 和确认弹窗。**模拟服务器奖励（6 秒）**、**重新领取补给**、**重送上次补给** 演示关闭后到账、全量快照和旧响应过滤；这里使用模拟消息，尚未连接实际服务器。入口和复测说明见 [可调用 UI 示例](LayaProject/docs/ui-examples.md)。
 
 ### Prefab 对象池
 
@@ -259,7 +267,7 @@ console.log(response.status, response.data);
 
 ### 原生资源、场景、平台与性能
 
-`lx.res` 和 `lx.scene` 保留 LayaAir 原生 API：
+`lx.res` 即 Laya.loader；独立原生场景直接使用 Laya.Scene，托管场景使用 lx.scenes：
 
 ```ts
 const prefab = await lx.res.load(
@@ -267,8 +275,8 @@ const prefab = await lx.res.load(
     { type: Laya.Loader.HIERARCHY },
 );
 
-// 独立原生 Scene 可直接使用 lx.scene；需要框架场景生命周期时，注册后使用：
-await lx.sceneFlow.open(battleSceneRoute, { levelId: 1 });
+// 业务 Scene route 通常在 World 中注册并登记卸载。
+await lx.scenes.open(battleSceneRoute, { levelId: 1 });
 ```
 
 平台信息与渲染快照：

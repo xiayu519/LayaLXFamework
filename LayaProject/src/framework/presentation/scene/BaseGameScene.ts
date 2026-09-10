@@ -49,7 +49,7 @@ export abstract class BaseGameScene<TArgs = void> extends Laya.Scene {
     get ui(): SceneUI {
         if (this.destroyed || this.transitionLeaving && !this.uiValue) throw new Error("Scene UI is no longer available.");
         if (!this.uiValue) {
-            if (!this.uiFactory) throw new Error("Scene UI is not configured; open this scene through lx.sceneFlow.");
+            if (!this.uiFactory) throw new Error("Scene UI is not configured; open this scene through lx.scenes.");
             this.uiValue = this.uiFactory();
         }
         return this.uiValue;

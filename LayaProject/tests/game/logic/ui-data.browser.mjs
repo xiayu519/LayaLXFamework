@@ -28,7 +28,7 @@ async function verifyUIData() {
         } finally { clearTimeout(timer); }
     };
     const frame = () => new Promise(resolve => Laya.timer.frameOnce(1, {}, resolve));
-    const scope = () => lx.sceneFlow.current.ui;
+    const scope = () => lx.scenes.get('examples.lobby').ui;
     const find = (id, visibleOnly = true) => scope().snapshot().views
         .find(entry => entry.routeId === id && (!visibleOnly || entry.visible))?.view;
     const countText = view => view.inventoryBadgeCount.text;
@@ -95,8 +95,7 @@ async function verifyUIData() {
 
         // A second visible Runtime observes the same path without gaining access to the service.
         const observerRoute = lx.ui.registerView({ id: observerId,
-            url: "bootstrap/game/ui/FrameworkStatus.lh", viewType: status.constructor,
-            layout: "fullscreen", navigation: "overlay", modal: false, retention: "destroy",
+            url: "__lx_resource_prefab.lh?ui=1&source=status&navigation=overlay",
             bind(view, _args, session) {
                 view.mouseEnabled = false;
                 view.getChild("full").visible = false;
@@ -166,11 +165,11 @@ async function verifyUIData() {
         assert(await openInventory() === inventory && inventory.selectedItemId === "supply-30"
             && inventory.itemList.itemIndexToChildIndex(29) >= 0, "hidden page lost selection or scroll position");
 
-        const oldScene = lx.sceneFlow.current, oldScope = oldScene.ui;
+        const oldScene = lx.scenes.get('examples.lobby'), oldScope = oldScene.ui;
         const child = await openConfirmation(inventory);
         const oldButton = child.confirmButton, oldMask = oldScope.modalLayer;
         assert(oldMask?.parent === oldScope.root, "scene-local popup mask is missing");
-        await bounded(lx.sceneFlow.open("lx.examples.scene", {
+        await bounded(lx.scenes.open("examples.lobby", {
             status: "READY", detail: "旅行补给站\n补给、奖励与背包随时同步",
         }), "scene replacement");
         assert(oldScene.destroyed && oldScope.root.destroyed && status.destroyed && inventory.destroyed
@@ -193,7 +192,8 @@ async function verifyUIData() {
             accountSurvivesScene: true, oldSceneViewsDestroyed: true, staleChildCancelled: true };
     } finally {
         if (observer && !observer.destroyed) observer.destroy();
-        const currentScope = lx.sceneFlow.current?.ui;
+        await lx.ui.unregisterView(observerId);
+        const currentScope = lx.scenes.get('examples.lobby')?.ui;
         if (currentScope && !currentScope.snapshot().disposed) {
             for (const entry of [...currentScope.snapshot().views]) {
                 if (entry.routeId !== "lx.status" && entry.routeId !== inventoryId) entry.view.destroy();

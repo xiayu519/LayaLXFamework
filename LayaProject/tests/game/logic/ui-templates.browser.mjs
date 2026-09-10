@@ -56,7 +56,7 @@ async function runTemplates() {
     }
     const register = (name, options = {}) => {
         const route = ui.register({
-            id: `lx.template-probe.${name}`, url: "bootstrap/framework/ui/templates/Popup.lh",
+            id: `lx.template-probe.${name}`, url: "bootstrap/ui/examples/templates/UIPopup.lh",
             layer: 3, layout: "center-popup", multiplicity: "singleton", retention: "destroy",
             create: pane => { const view = new ProbeWindow(pane); created.push(view); return view; },
             ...options,
@@ -150,11 +150,11 @@ async function runTemplates() {
         assert(lower.closedCount === 2, "hidden destruction repeated the close hook");
         result.mask.push("retained reopen / close hook once");
 
-        const fullscreenRoute = register("fullscreen", { url: "bootstrap/framework/ui/templates/Fullscreen.lh", layout: "fullscreen", layer: 1 });
+        const fullscreenRoute = register("fullscreen", { url: "bootstrap/ui/examples/templates/UIFullscreen.lh", layout: "fullscreen", layer: 1 });
         const fullscreen = await ready(fullscreenRoute);
         assert(!fullscreen.modal, "fullscreen unexpectedly enabled the mask");
         for (const name of ["VirtualList", "VirtualGrid"]) {
-            const prefab = await Laya.loader.load(`bootstrap/framework/ui/templates/${name}.lh`, Laya.Loader.HIERARCHY);
+            const prefab = await Laya.loader.load(`bootstrap/ui/examples/templates/UI${name}.lh`, Laya.Loader.HIERARCHY);
             const list = prefab.create();
             const content = fullscreen.contentPane.getChild("safeContent").getChild("full");
             content.addChild(list);
@@ -188,7 +188,7 @@ async function runTemplates() {
         await wait(() => fullscreen.destroyed, "fullscreen close");
 
         const loading = await ready(register("loading-shell", {
-            url: "bootstrap/framework/ui/SceneLoading.lh", layout: "fullscreen", layer: 1,
+            url: "bootstrap/ui/UISceneLoading.lh", layout: "fullscreen", layer: 1,
         }));
         const loadingSafe = loading.contentPane.getChild("safeContent");
         assert(loadingSafe.getChild("top").height === 0 && loadingSafe.getChild("bottom").height === 0,
@@ -196,23 +196,6 @@ async function runTemplates() {
         assert(loadingSafe.getChild("full").width === loadingSafe.width, "loading empty full failed to adapt");
         loading.destroy();
 
-        const rewardRoute = register("forward-reward", { url: "bootstrap/game/ui/template-probe/RewardProbe.lh" });
-        const reward = await ui.show(rewardRoute, { bind: (view, token, scope) => {
-            const grid = view.contentPane.findChild("rewardGrid", Laya.GList);
-            grid.itemRenderer = (index, row) => { row.title = `reward-${index}`; row.grayed = false; };
-            grid.setVirtual(); grid.numItems = 100;
-            const cancel = view.contentPane.findChild("cancelButton", Laya.GButton);
-            const close = () => token.commit(() => ui.close(rewardRoute.id));
-            cancel.on(Laya.Event.CLICK, view, close);
-            scope.defer(() => cancel.off(Laya.Event.CLICK, view, close));
-        } });
-        await wait(() => reward.mouseEnabled, "forward reward show");
-        const grid = reward.contentPane.findChild("rewardGrid", Laya.GList);
-        assert(grid.numItems === 100 && grid.numChildren < 40, "forward fixture grid is not virtual");
-        click(reward.contentPane.findChild("cancelButton", Laya.GButton));
-        await wait(() => reward.destroyed, "forward reward cancel");
-        assert(grid.itemPool.count === 0 && reward.closedCount === 1, "forward fixture cleanup");
-        result.forward = "popup + three-column virtual grid + native cancel";
         return result;
     } finally {
         for (const view of created) if (!view.destroyed) view.destroy();

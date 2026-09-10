@@ -7,70 +7,60 @@ import {
     RUNTIME_CONFIG_ID,
     GameReadyService,
 } from "./GameReadyService";
-import {
-    bindFrameworkStatus,
-    type FrameworkStatusArgs,
-} from "../presentation/ui/FrameworkStatusPage";
-import { FrameworkStatusView } from "../presentation/ui/FrameworkStatusView";
-import { FRAMEWORK_DEMO_SCENE } from "../presentation/scenes/FrameworkDemoScene";
 import { GameTablesService } from "../infrastructure/tables/GameTablesService";
 import type { Tables } from "../generated/tables/schema";
-import { registerUIExamples } from "./registerUIExamples";
-import { ExampleInventoryService, EXAMPLE_INVENTORY_RED_DOT } from "../infrastructure/examples/ExampleInventoryService";
+import { registerExampleWorlds } from "./registerExampleWorlds";
+import { ExampleInventoryData, EXAMPLE_INVENTORY_RED_DOT } from "../infrastructure/examples/ExampleInventoryData";
+import { ExampleInventory } from "../domain/ExampleInventory";
+import { EXAMPLE_INVENTORY_DATA } from "../application/ExampleDataKeys";
 import { ExampleDeliveryService } from "../infrastructure/examples/ExampleDeliveryService";
 import type { ExampleInventoryContext, ExampleDeliveryContext } from "../presentation/ui/examples/ExampleInventoryContext";
+import { DefaultSceneLoadingPresenter } from "../presentation/ui/DefaultSceneLoadingPresenter";
+import { registerCommonUI } from "./registerCommonUI";
+import type { AppService } from "../../../framework/application/lifecycle/AppService";
 
-export const FRAMEWORK_STATUS_ROUTE = "lx.status";
 export { RUNTIME_CONFIG_ID };
 
 export type { ApplicationAdapters, ApplicationRuntime };
 export type GameTables = Tables;
 
 export function createGameApplication(adapters: ApplicationAdapters = {}): ApplicationRuntime {
-    // Each application/account gets its own model, delivery owner and native event source.
-    const inventoryService = new ExampleInventoryService();
-    const deliveryService = new ExampleDeliveryService(inventoryService);
-    const inventory: ExampleInventoryContext = { state: inventoryService, commands: inventoryService,
-        changes: inventoryService, changedEvent: ExampleInventoryService.CHANGED, redDotKey: EXAMPLE_INVENTORY_RED_DOT };
+    // Outer account data exists before services start. The second model belongs solely to the mock server.
+    const accountInventory = new ExampleInventoryData(new ExampleInventory());
+    const deliveryService = new ExampleDeliveryService(new ExampleInventory(), accountInventory.createReceiver());
+    const inventory: ExampleInventoryContext = { state: accountInventory, commands: deliveryService,
+        changes: accountInventory, changedEvent: ExampleInventoryData.CHANGED, redDotKey: EXAMPLE_INVENTORY_RED_DOT };
     const delivery: ExampleDeliveryContext = { state: deliveryService, controls: deliveryService,
         changes: deliveryService, changedEvent: ExampleDeliveryService.CHANGED };
     return createRuntime({
+        tipPrefabUrl: "bootstrap/ui/UITip.lh",
+        createSceneLoadingPresenter: ui => new DefaultSceneLoadingPresenter(ui, "bootstrap/ui/UISceneLoading.lh"),
+        data: [{ key: EXAMPLE_INVENTORY_DATA, value: accountInventory }],
         content: [
             {
-                id: FRAMEWORK_STATUS_ROUTE,
-                url: "bootstrap/game/ui/FrameworkStatus.lh",
-                kind: "ui",
-            },
-            {
                 id: RUNTIME_CONFIG_ID,
-                url: "bootstrap/game/config/runtime.json",
+                url: "bootstrap/config/runtime.json",
                 kind: "data",
             },
         ],
-        configureUI(ui, content): void {
-            const examplesRoute = registerUIExamples(ui, inventory, delivery);
-            const statusContent = content.get(FRAMEWORK_STATUS_ROUTE);
-            ui.registerView({
-                id: statusContent.id,
-                url: statusContent.url,
-                layout: "fullscreen",
-                retention: "destroy",
-                viewType: FrameworkStatusView,
-                bind: (view, args: FrameworkStatusArgs, session) => bindFrameworkStatus(view, args, session, examplesRoute, inventory, delivery),
-            });
-        },
-        configureSceneFlow(flow) { flow.register(FRAMEWORK_DEMO_SCENE); },
         createServices(context) {
-            const updateBadge = (): void => context.ui.redDots.set(EXAMPLE_INVENTORY_RED_DOT, inventoryService.totalQuantity);
-            const badgeOwner = {};
+            const inventoryRoute = registerCommonUI(context.ui, inventory, delivery);
+            const worlds = registerExampleWorlds(context, inventory, delivery, inventoryRoute);
+            const updateBadge = (): void => context.ui.redDots.set(inventory.redDotKey, accountInventory.totalQuantity);
+            const inventoryBadges: AppService = {
+                name: "inventory-red-dots",
+                start() {
+                    accountInventory.on(ExampleInventoryData.CHANGED, this, updateBadge);
+                    updateBadge();
+                },
+                stop() { accountInventory.off(ExampleInventoryData.CHANGED, this, updateBadge); },
+            };
             return [
                 new GameTablesService(context.tables),
-                inventoryService,
+                { name: "example-account-data", start() {}, stop() { accountInventory.dispose(); } },
+                inventoryBadges,
                 deliveryService,
-                { name: "example-inventory-red-dots",
-                    start() { inventoryService.on(ExampleInventoryService.CHANGED, badgeOwner, updateBadge); updateBadge(); },
-                    stop() { inventoryService.off(ExampleInventoryService.CHANGED, badgeOwner, updateBadge); } },
-                new GameReadyService(FRAMEWORK_DEMO_SCENE.id),
+                new GameReadyService(context, worlds),
             ];
         },
     }, adapters);

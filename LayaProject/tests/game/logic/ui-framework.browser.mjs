@@ -34,7 +34,7 @@ async function verifySceneOwnership() {
     };
     const args = { status: "READY", detail: "Native scene UI / ownership regression" };
     const popupArgs = { title: "场景弹窗", message: "场景退出时回收", confirmText: "确认", onConfirm() {} };
-    const originalScene = lx.sceneFlow.current;
+    const originalScene = lx.scenes.get('examples.lobby');
     const scope = originalScene.ui;
     const status = scope.snapshot().views.find(item => item.routeId === "lx.status").view;
     const badgeKey = "examples/inventory";
@@ -45,15 +45,14 @@ async function verifySceneOwnership() {
     await wait(() => popup.mouseEnabled, "popup animation did not finish");
     assert(popup.parent === scope.root && scope.snapshot().views.some(item => item.view === popup),
         "scene popup must be mounted inside the scene host");
-    const retained = ui.registerView({ id: "__scene_retained_popup", url: "bootstrap/game/ui/examples/Confirmation.lh",
-        layer: 3, layout: "center-popup", multiplicity: "singleton", retention: "hide",
-        viewType: popup.constructor, bind() {} });
+    const retained = ui.registerView({ id: "__scene_retained_popup",
+        url: "__lx_resource_prefab.lh?ui=1&source=confirmation&multiplicity=singleton&retention=hide", bind() {} });
     const hidden = await scope.show(retained, popupArgs);
     scope.close(retained.id);
     await wait(() => !hidden.parent, "retained popup hide");
     assert(!hidden.destroyed && !hidden.parent, "retained popup should be hidden before scene exit");
-    const retainedView = ui.registerView({ id: "__scene_retained_view", url: "bootstrap/game/ui/FrameworkStatus.lh",
-        viewType: status.constructor, retention: "hide", bind(view) { view.statusText.text = "CACHED"; } });
+    const retainedView = ui.registerView({ id: "__scene_retained_view",
+        url: "__lx_resource_prefab.lh?ui=1&source=status&retention=hide", bind(view) { view.statusText.text = "CACHED"; } });
     const hiddenView = await scope.show(retainedView, undefined);
     scope.close(retainedView.id);
     assert(!hiddenView.destroyed && !hiddenView.parent && status.active, "closing a page must restore its predecessor");
@@ -66,8 +65,7 @@ async function verifySceneOwnership() {
     Laya.stage.addChild(sharedOwner);
     const pendingPrefab = await Laya.loader.load(retainedView.url, Laya.Loader.HIERARCHY);
     let bindCalls = 0, resolveLoad;
-    const lateRoute = ui.registerView({ id: "__scene_late_view", url: "__scene_delayed.lh",
-        viewType: status.constructor, bind() { bindCalls++; } });
+    const lateRoute = ui.registerView({ id: "__scene_late_view", url: "__scene_delayed.lh", bind() { bindCalls++; } });
     const originalLoad = Laya.loader.load;
     Laya.loader.load = function(url, ...rest) {
         if (url === lateRoute.url) return new Promise(resolve => { resolveLoad = resolve; });
@@ -77,7 +75,7 @@ async function verifySceneOwnership() {
     try {
         const pending = scope.show(lateRoute, undefined).then(() => false, () => true);
         lx.ui.redDots.set("examples/inventory", 7);
-        transition = lx.sceneFlow.open("lx.examples.scene", args);
+        transition = lx.scenes.open("examples.lobby", args);
         await wait(() => originalScene.destroyed, "old scene was not destroyed");
         assert(await pending, "scene exit must cancel a pending page immediately");
         assert(status.destroyed && hiddenView.destroyed && popup.destroyed && hidden.destroyed,
@@ -89,10 +87,10 @@ async function verifySceneOwnership() {
             "scene GC destroyed another owner's shared texture");
         assert(ui.listManaged().find(item => item.routeId === "lx.scene-loading").window === loaderWindow
             && !loaderWindow.destroyed, "scene exit destroyed application Loading");
-        const fresh = lx.sceneFlow.current.ui.snapshot().views[0].view;
+        const fresh = lx.scenes.get('examples.lobby').ui.snapshot().views[0].view;
         assert(fresh.inventoryBadge.visible && fresh.inventoryBadgeCount.text === "7", "new scene did not read the current badge value");
         for (let cycle = 0; cycle < 12; cycle++) {
-            const old = lx.sceneFlow.current, oldScope = old.ui;
+            const old = lx.scenes.get('examples.lobby'), oldScope = old.ui;
             if (cycle === 0) {
                 const inventory = await oldScope.show("lx.examples.inventory", { title: "离场清理" });
                 inventory.midExampleButton.fireClick();
@@ -101,7 +99,7 @@ async function verifySceneOwnership() {
                 assert(!inventory.active, "covered fullscreen page must pause native components");
             }
             await oldScope.show("lx.examples.confirm", popupArgs);
-            await lx.sceneFlow.open("lx.examples.scene", args);
+            await lx.scenes.open("examples.lobby", args);
             assert(old.destroyed && oldScope.snapshot().views.length === 0,
                 `scene cycle ${cycle} left a popup owner`);
             await ui.waitForPendingLoads();
@@ -116,6 +114,7 @@ async function verifySceneOwnership() {
         await transition?.catch(() => {});
         sharedOwner.destroy();
         if (!sceneSprite.destroyed) sceneSprite.destroy();
+        await Promise.all([retained, retainedView, lateRoute].map(route => ui.unregisterView(route)));
         await frame();
         Laya.Scene.gc();
         lx.ui.redDots.set("examples/inventory", 300);

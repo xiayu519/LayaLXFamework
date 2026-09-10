@@ -145,7 +145,7 @@ function readManifest(root) {
     }
     const forbidden = [
         "Design/Tables",
-        "LayaProject/assets/bootstrap/game",
+        "LayaProject/assets/bootstrap",
         "LayaProject/assets/packages",
         "LayaProject/assets/shared",
         "LayaProject/src/game",
@@ -154,9 +154,9 @@ function readManifest(root) {
         "LayaProject/settings/HeadlessValidation.json",
         ".framework-lock.json",
     ];
-    for (const entry of manifest.managedPaths) {
+    for (const entry of [...manifest.managedPaths, ...Object.keys(manifest.jsonContracts ?? {})]) {
         const base = entry.endsWith("/**") ? entry.slice(0, -3) : entry;
-        if (forbidden.some((path) => base === path || base.startsWith(`${path}/`))) {
+        if (forbidden.some((path) => base === path || base.startsWith(`${path}/`) || path.startsWith(`${base}/`))) {
             throw new Error(`framework.manifest.json manages downstream-owned path '${entry}'.`);
         }
     }
@@ -272,7 +272,8 @@ async function syncFramework(root, parsed) {
         const oldLock = existsSync(oldLockPath) ? readJson(oldLockPath) : undefined;
         const nextFiles = new Set(sourceFiles);
         for (const entry of oldLock?.files ?? []) {
-            if (!nextFiles.has(entry.path)) {
+            // Released visual assets belong to the game even if an old lock managed them.
+            if (!nextFiles.has(entry.path) && !isGameResource(entry.path)) {
                 const stale = safeResolve(root, entry.path);
                 if (existsSync(stale) && statSync(stale).isFile()) {
                     rmSync(stale);
@@ -329,6 +330,10 @@ function removeDestinationExtras(root, manifest, expectedFiles) {
             }
         }
     }
+}
+
+function isGameResource(path) {
+    return ["bootstrap", "packages", "shared"].some(root => path.startsWith(`LayaProject/assets/${root}/`));
 }
 
 function validateJsonContracts(root, manifest) {

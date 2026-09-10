@@ -2,7 +2,7 @@
 
 > 本文保留 2026-09-10 前一阶段的历史实现与验收基线，其中场景弹窗宿主和红点数字不代表后续改造。现行归属见 [UI 布局约定](ui-layout.md)，共享库存及总量红点见 [数据绑定](ui-data-binding.md)。以下原始记录不回填新结果。
 
-本轮改动保留在工作区，未执行 commit 或 push。原有 FrameworkStatus.lh 修改已保留。
+本轮改动保留在工作区，未执行 commit 或 push。原有 UILobby.lh 修改已保留。
 
 ## 改动摘要
 
@@ -55,10 +55,10 @@ lx.ui.redDots.setMany({ "examples/inventory": 2, "examples/reward": 1 });
 lx.ui.redDots.get("examples"); // 3，子路径自动汇总
 ```
 
-场景切换与原生入口复测：
+以下复查命令已更新为当前 API，表格和后面的数字仍为历史基线：
 
 ```js
-await lx.sceneFlow.open("lx.examples.scene", {
+await lx.scenes.open("examples.lobby", {
     status: "READY", detail: "手动复测场景切换"
 });
 lx.ui.snapshot().scenes.length; // 1
@@ -68,7 +68,7 @@ await window.$_main_(); // 官方发布入口，重新启动
 lx.ready; // true
 ```
 
-命名游戏调用页面使用 `this.ui.show(route, args)`；在示例浏览器控制台可用 `lx.sceneFlow.current.ui.show("lx.examples.inventory", { title: "旅行背包" })`。跨场景系统窗口才直接调用 lx.ui.show。
+命名游戏调用页面使用 `this.ui.show(route, args)`；在示例浏览器控制台可用 `lx.scenes.get("examples.lobby").ui.show("lx.examples.inventory", { title: "旅行背包" })`。跨场景系统窗口才直接调用 lx.ui.show。
 
 ## 自动验证证据
 

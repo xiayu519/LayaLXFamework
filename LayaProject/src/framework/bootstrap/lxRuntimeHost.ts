@@ -69,6 +69,8 @@ function inspectCleanup(runtime: ApplicationRuntime | undefined): CleanupStatus 
             && state.bootstrap.failedStops.length === 0
             && state.bootstrap.lateCleanupErrors === 0
             && state.pendingCleanup.length === 0
+            && state.worlds.pendingLoads === 0 && state.worlds.cleanupFailures === 0 && state.worlds.worlds.length === 0
+            && state.scenes.pendingTransitions === 0 && state.scenes.cleanupFailures === 0 && state.scenes.scenes.length === 0
             && state.ui.nativeLoads === 0
             && state.ui.pendingRequests.length === 0
             && state.ui.managed.length === 0
@@ -81,6 +83,7 @@ function inspectCleanup(runtime: ApplicationRuntime | undefined): CleanupStatus 
 
         const settling = state.bootstrap.pending.length > 0
             || state.pendingCleanup.length > 0
+            || state.worlds.pendingLoads > 0 || state.scenes.pendingTransitions > 0
             || state.ui.nativeLoads > 0
             || state.ui.pendingRequests.length > 0
             || state.pools.some((pool) => pool.pending > 0 || pool.loading);

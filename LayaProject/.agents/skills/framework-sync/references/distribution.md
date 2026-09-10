@@ -7,7 +7,7 @@
 - 无 `.framework-lock.json`，`npm run check:framework-integrity` 校验 manifest 和共享 JSON 契约。
 - 完整验证通过并提交后才创建不可变 SemVer Tag。
 - 日常已提交改动无需发布 Tag；需要开发联调时由下游显式同步 channel snapshot，lock 固定当时的 commit。
-- framework、公共资产、工具、测试和工作流通过 manifest 发布；game、游戏启动资源、Tables、游戏设置与游戏记忆不纳入 managed paths。
+- framework 代码、工具、测试和工作流通过 manifest 发布；game、全部 bootstrap 启动资源、功能资源、Tables、游戏设置与游戏记忆不纳入 managed paths。Startup/Tip/Loading 随完整项目模板提供，由游戏维护；同步不得覆盖。旧 lock 退出管理的运行时资产保留，目录和引用由游戏迁移，不能按过期文件删除。
 
 ## 下游
 

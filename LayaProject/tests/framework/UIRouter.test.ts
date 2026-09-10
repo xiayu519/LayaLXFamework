@@ -102,6 +102,7 @@ class FakeRoot {
 const loaderLoad = vi.fn();
 const root = new FakeRoot();
 vi.stubGlobal("Laya", {
+    Script: class {}, regClass: () => () => {}, property: () => () => {},
     GWidget: FakeGWidget,
     GWindow: FakeGWindow,
     GRoot: { inst: root },

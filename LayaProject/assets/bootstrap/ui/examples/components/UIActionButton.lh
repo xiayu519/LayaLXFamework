@@ -1,0 +1,112 @@
+{
+  "_$ver": 1,
+  "_$id": "examplebutton",
+  "_$type": "GButton",
+  "name": "UIActionButton",
+  "x": 0,
+  "y": 0,
+  "width": 220,
+  "height": 62,
+  "background": {
+    "_$type": "DrawRoundRectCmd",
+    "fillColor": "#2456aa",
+    "lineColor": "#4a7fe0",
+    "lineWidth": 1,
+    "lt": 12,
+    "rt": 12,
+    "lb": 12,
+    "rb": 12
+  },
+  "titleWidget": {
+    "_$ref": "buttonlabel"
+  },
+  "title": "确定",
+  "controllers": {
+    "_$type": "Record",
+    "button": {
+      "_$type": "Controller",
+      "pages": [
+        "up",
+        "down",
+        "over",
+        "selectedOver"
+      ]
+    }
+  },
+  "_$child": [
+    {
+      "_$id": "buttonhighlight",
+      "_$type": "GWidget",
+      "name": "highlight",
+      "width": 220,
+      "height": 62,
+      "background": {
+        "_$type": "DrawRoundRectCmd",
+        "fillColor": "#326ac4",
+        "lineColor": "#80aaff",
+        "lineWidth": 1,
+        "lt": 12,
+        "rt": 12,
+        "lb": 12,
+        "rb": 12
+      },
+      "relations": [
+        {
+          "_$type": "Relation",
+          "target": {
+            "_$ref": "examplebutton"
+          },
+          "data": [
+            1,
+            0,
+            2,
+            0
+          ]
+        }
+      ],
+      "gears": [
+        {
+          "_$type": "GearDisplay",
+          "controller": {
+            "_$ref": "examplebutton",
+            "_$ctrl": "button"
+          },
+          "pages": [
+            1,
+            2,
+            3
+          ]
+        }
+      ]
+    },
+    {
+      "_$id": "buttonlabel",
+      "_$type": "GTextField",
+      "name": "label",
+      "x": 8,
+      "y": 0,
+      "width": 204,
+      "height": 62,
+      "text": "确定",
+      "fontSize": 22,
+      "color": "#e2e8f0",
+      "valign": "middle",
+      "align": "center",
+      "bold": true,
+      "relations": [
+        {
+          "_$type": "Relation",
+          "target": {
+            "_$ref": "examplebutton"
+          },
+          "data": [
+            1,
+            0,
+            2,
+            0
+          ]
+        }
+      ]
+    }
+  ]
+}

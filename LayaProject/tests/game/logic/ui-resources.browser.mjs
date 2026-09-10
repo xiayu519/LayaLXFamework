@@ -12,8 +12,8 @@ async function verifyUIResources() {
         while (!predicate()) { assert(performance.now() < end, message); await delay(10); }
     };
     const collect = async () => { await wait(() => !Laya.loader.loading, "loader did not settle"); await frame(); Laya.Scene.gc(); await frame(); await frame(); await delay(80); };
-    const createItem = async () => (await Laya.loader.load("bootstrap/game/ui/examples/InventoryItem.lh", Laya.Loader.HIERARCHY)).create();
-    const createList = async () => (await Laya.loader.load("bootstrap/game/ui/examples/Inventory.lh", Laya.Loader.HIERARCHY)).create();
+    const createItem = async () => (await Laya.loader.load("bootstrap/ui/examples/components/UIInventoryItem.lh", Laya.Loader.HIERARCHY)).create();
+    const createList = async () => (await Laya.loader.load("bootstrap/ui/examples/UIInventory.lh", Laya.Loader.HIERARCHY)).create();
     const owned = new Set();
     const own = node => { owned.add(node); return node; };
     const dispose = node => { if (!node.destroyed) node.destroy(); owned.delete(node); };
@@ -29,7 +29,7 @@ async function verifyUIResources() {
         // Already displayed images, shared owners, nested destruction, button icons and nine-grid commands.
         for (const mode of ["plain", "button", "nine-grid", "animation"]) {
             const asset = await atlases(mode), row = own(await createItem()), image = row.itemImage;
-            assert(image instanceof Laya.GLoader && image.constructor !== Laya.GLoader, "DynamicImage Runtime not assigned");
+            assert(image instanceof Laya.GLoader && image.constructor !== Laya.GLoader, "UIDynamicImage Runtime not assigned");
             Laya.stage.addChild(row);
             const keeper = own(new Laya.Sprite()); keeper.graphics.drawTexture(asset.ta, 0, 0, 1, 1);
             Laya.stage.addChild(keeper);
@@ -135,10 +135,10 @@ async function verifyUIResources() {
         results.push("late-atlas-destruction");
 
         // Close during an async binder, after its native prefab has already been created.
-        const bindingScope = lx.sceneFlow.current.ui;
+        const bindingScope = lx.scenes.get('examples.lobby').ui;
         let entered = false, wrote = false, cleaned = 0, loadedAtlas;
-        const bindingRoute = lx.ui.registerView({ id: "__ui_resource_binding", url: "__lx_resource_prefab.lh?case=binder",
-            viewType: Laya.GWidget, async bind(view, args, session) {
+        const bindingRoute = lx.ui.registerView({ id: "__ui_resource_binding", url: "__lx_resource_prefab.lh?case=binder&ui=1",
+            async bind(view, args, session) {
                 session.lifetime.defer(() => { cleaned++; });
                 entered = true;
                 loadedAtlas = await Laya.loader.load("__lx_resource_b.atlas?case=late-bind&slow=1", Laya.Loader.ATLAS);
@@ -156,17 +156,17 @@ async function verifyUIResources() {
         results.push("close-during-async-binding");
 
         // Keep the application alive while destroying a scene with a pending prefab UI and pool acquisition.
-        const old = lx.sceneFlow.current, scope = old.ui;
+        const old = lx.scenes.get('examples.lobby'), scope = old.ui;
         const scenePoolId = "__ui_resource_scene_pool";
         let lateCreates = 0;
         lx.pool.register({ id: scenePoolId, url: "__lx_resource_prefab.lh?case=scene-pool&slow=1", maxIdle: 0,
             create(prefab) { lateCreates++; return prefab.create(); } });
         const acquisition = lx.pool.acquire(scenePoolId, { signal: old.signal }).then(() => false, () => true);
         const lateRoute = lx.ui.registerView({ id: "__ui_resource_late_view",
-            url: "__lx_resource_prefab.lh?case=scene-view&slow=1", viewType: Laya.GWidget,
+            url: "__lx_resource_prefab.lh?case=scene-view&slow=1&ui=1",
             bind() { throw new Error("cancelled UI must never bind"); } });
         const opening = scope.show(lateRoute, undefined).then(() => false, () => true);
-        const next = await lx.sceneFlow.open("lx.examples.scene", { status: "READY", detail: "Async resource regression" });
+        const next = await lx.scenes.open("examples.lobby", { status: "READY", detail: "Async resource regression" });
         assert(old.signal.aborted && old.destroyed && next !== old, "scene lifetime did not cancel");
         assert(await opening && await acquisition && lateCreates === 0, "late scene work created an instance");
         await lx.pool.waitForPendingLoads(); await collect();
@@ -175,5 +175,7 @@ async function verifyUIResources() {
         return { passed: true, cases: results, listCycles: 6, listRefreshes: 144 };
     } finally {
         for (const node of owned) if (!node.destroyed) node.destroy();
+        await lx.ui.unregisterView("__ui_resource_binding");
+        await lx.ui.unregisterView("__ui_resource_late_view");
     }
 }

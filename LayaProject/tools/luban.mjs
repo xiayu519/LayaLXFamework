@@ -127,15 +127,21 @@ function replaceGeneratedDirectory(source, destination) {
     if (!destinationRoot.startsWith(`${projectRoot}${sep}`)) {
         throw new Error(`Generated destination escaped the project: ${destinationRoot}`);
     }
+    const files = listFiles(source);
+    // Capture native asset identities before replacing the generated directory.
+    const metadata = new Map(files.map(file => {
+        const target = join(destinationRoot, relative(source, file));
+        return [file, metadataFor(target)];
+    }));
     rmSync(destinationRoot, { recursive: true, force: true });
     mkdirSync(destinationRoot, { recursive: true });
-    for (const file of listFiles(source)) {
+    for (const file of files) {
         const local = relative(source, file);
         const target = join(destinationRoot, local);
         mkdirSync(dirname(target), { recursive: true });
         const content = readFileSync(file);
         writeFileSync(target, local.endsWith(".ts") ? normalizeLineEndings(content) : content);
-        writeFileSync(`${target}.meta`, metadataFor(target));
+        writeFileSync(`${target}.meta`, metadata.get(file));
     }
 }
 
@@ -201,6 +207,14 @@ function listFiles(root) {
 }
 
 function metadataFor(path) {
+    if (existsSync(`${path}.meta`)) {
+        const content = readFileSync(`${path}.meta`);
+        const meta = JSON.parse(content.toString("utf8"));
+        if (typeof meta.uuid !== "string" || !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(meta.uuid)) {
+            throw new Error(`Invalid generated asset UUID: ${relative(projectRoot, path)}.meta`);
+        }
+        return content;
+    }
     const identity = relative(projectRoot, path).split(sep).join("/");
     const bytes = Buffer.from(createHash("sha256").update(`LXFamework:${identity}`).digest().subarray(0, 16));
     bytes[6] = (bytes[6] & 0x0f) | 0x40;

@@ -1,0 +1,33 @@
+{
+  "_$ver": 1,
+  "_$id": "listroot",
+  "_$type": "GList",
+  "name": "UIVirtualList",
+  "width": 592,
+  "height": 576,
+  "_$child": [
+    {
+      "_$id": "listtemplate",
+      "_$prefab": "e2308cf9-fff8-4451-a3ff-c55459b1b3c8",
+      "name": "ListItem",
+      "width": 592,
+      "height": 88
+    }
+  ],
+  "layout": {
+    "type": 1,
+    "rowGap": 8,
+    "stretchX": 1
+  },
+  "scroller": {
+    "_$type": "Scroller",
+    "direction": 0,
+    "barDisplay": 5
+  },
+  "_templateNode": {
+    "_$ref": "listtemplate",
+    "_$tmpl": "itemTemplate"
+  },
+  "_initItemNum": 6,
+  "_isDemo": true
+}

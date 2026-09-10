@@ -1,4 +1,7 @@
 import { TablesRegistry } from "../application/config/TablesRegistry";
+import { DataRegistry, type DataEntry } from "../application/data/DataRegistry";
+import { WorldRegistry } from "../application/world/WorldRegistry";
+import { SceneRegistry } from "../presentation/scene/SceneRegistry";
 import { AudioService, type AudioSettings } from "../infrastructure/audio/AudioService";
 import { ContentCatalog, type ContentEntry } from "../infrastructure/content/ContentCatalog";
 import { JsonConfigService } from "../infrastructure/config/JsonConfigService";
@@ -20,9 +23,7 @@ import { RedDotStore } from "../presentation/ui/RedDotStore";
 import { RedDotBinding } from "../presentation/ui/RedDotBinding";
 import { TipQueue } from "../presentation/ui/TipQueue";
 import { UILayoutService } from "../presentation/ui/UILayoutService";
-import { DefaultSceneLoadingPresenter } from "../presentation/scene/DefaultSceneLoadingPresenter";
 import {
-    SceneFlow,
     type SceneLoadingPresenter,
 } from "../presentation/scene/SceneFlow";
 import { AppBootstrap, type AppService, type BootstrapOptions } from "./AppBootstrap";
@@ -41,7 +42,9 @@ export interface RuntimeContext {
     readonly pool: PrefabPoolService;
     readonly performance: RenderPerformance;
     readonly ui: UIRouter;
-    readonly sceneFlow: SceneFlow;
+    readonly scenes: SceneRegistry;
+    readonly worlds: WorldRegistry;
+    readonly data: DataRegistry;
     readonly platform: PlatformService;
     readonly purchase: PurchasePlatform;
     readonly http: HttpTransport;
@@ -57,7 +60,8 @@ export interface ApplicationRuntime extends RuntimeContext {
 export interface RuntimeSnapshot {
     readonly bootstrap: ReturnType<AppBootstrap["snapshot"]>;
     readonly ui: ReturnType<UIRouter["snapshot"]>;
-    readonly scenes: ReturnType<SceneFlow["snapshot"]>;
+    readonly scenes: ReturnType<SceneRegistry["snapshot"]>;
+    readonly worlds: ReturnType<WorldRegistry["snapshot"]>;
     readonly pools: ReturnType<PrefabPoolService["snapshot"]>;
     readonly config: ReturnType<JsonConfigService["snapshot"]>;
     readonly pendingCleanup: readonly string[];
@@ -71,11 +75,14 @@ export interface ApplicationAdapters {
 }
 
 export interface ApplicationDefinition {
+    /** Game-owned Tip prefab; keep its native messageText binding when customizing. */
+    readonly tipPrefabUrl: string;
     readonly lifecycle?: BootstrapOptions & { readonly pendingLoadTimeoutMs?: number };
     readonly content?: readonly ContentEntry[];
+    readonly data?: readonly DataEntry[];
     configureUI?(ui: UIRouter, content: ContentCatalog): void;
     createSceneLoadingPresenter?(ui: UIRouter, content: ContentCatalog): SceneLoadingPresenter;
-    configureSceneFlow?(sceneFlow: SceneFlow, content: ContentCatalog): void;
+    configureScenes?(scenes: SceneRegistry, content: ContentCatalog): void;
     createServices?(context: RuntimeContext): readonly AppService[];
 }
 
@@ -110,6 +117,8 @@ export function createRuntime(
         throw new Error("pendingLoadTimeoutMs must be positive and less than stopTimeoutMs.");
     }
     const tables = new TablesRegistry();
+    const data = new DataRegistry(definition.data);
+    const worlds = new WorldRegistry();
     const content = new ContentCatalog(definition.content ?? []);
     const config = new JsonConfigService(content);
     const audio = new AudioService();
@@ -120,12 +129,11 @@ export function createRuntime(
     const purchase = adapters.purchase ?? new UnsupportedPurchasePlatform();
     const http = adapters.http ?? new LayaHttpTransport();
     const uiLayout = new UILayoutService(platform);
-    const tips = new TipQueue(pool, "bootstrap/framework/ui/Tip.lh", {}, uiLayout);
+    const tips = new TipQueue(pool, definition.tipPrefabUrl, {}, uiLayout);
     const redDots = new RedDotStore();
     const ui = new UIRouter(tips, uiLayout, { redDots });
-    const sceneLoadingPresenter = definition.createSceneLoadingPresenter?.(ui, content)
-        ?? new DefaultSceneLoadingPresenter(ui);
-    const sceneFlow = new SceneFlow({ loadingPresenter: sceneLoadingPresenter,
+    const sceneLoadingPresenter = definition.createSceneLoadingPresenter?.(ui, content);
+    const scenes = new SceneRegistry({ loadingPresenter: sceneLoadingPresenter,
         configureScene(scene) {
             scene.configureUI(() => {
                 const root = scene.uiRoot;
@@ -138,7 +146,7 @@ export function createRuntime(
     });
 
     definition.configureUI?.(ui, content);
-    definition.configureSceneFlow?.(sceneFlow, content);
+    definition.configureScenes?.(scenes, content);
 
     const context: RuntimeContext = {
         tables,
@@ -149,7 +157,9 @@ export function createRuntime(
         pool,
         performance,
         ui,
-        sceneFlow,
+        scenes,
+        worlds,
+        data,
         platform,
         purchase,
         http,
@@ -170,7 +180,11 @@ export function createRuntime(
             const errors: unknown[] = [];
             const deadline = Date.now() + pendingLoadTimeoutMs;
             let safeToCollect = true;
-            if (!await collectCleanup(errors, () => sceneFlow.dispose())) safeToCollect = false;
+            // Invalidate coordinators and native scene owners before waiting on underlying loads.
+            const worldCleanup = worlds.dispose();
+            const sceneCleanup = scenes.dispose();
+            void worldCleanup.catch(() => {});
+            void sceneCleanup.catch(() => {});
             await collectCleanup(errors, () => ui.dispose());
             await collectCleanup(errors, () => pool.dispose());
             if (!await collectCleanup(errors, () => audio.dispose())) safeToCollect = false;
@@ -178,7 +192,8 @@ export function createRuntime(
             if (RedDotBinding.defaultStore === redDots) RedDotBinding.setDefaultStore(undefined);
             await collectCleanup(errors, () => redDots.dispose());
             const waits = [
-                ["scene-flow", () => sceneFlow.waitForPendingLoads()],
+                ["worlds", async () => { await worldCleanup; await worlds.waitForPendingLoads(); }],
+                ["scenes", async () => { await sceneCleanup; await scenes.waitForPendingLoads(); }],
                 ["ui", () => ui.waitForPendingLoads()],
                 ["pool", () => pool.waitForPendingLoads()],
                 ["config", () => config.waitForPendingLoads()],
@@ -232,7 +247,7 @@ export function createRuntime(
         bootstrap,
         snapshot(): RuntimeSnapshot {
             return Object.freeze({ bootstrap: bootstrap.snapshot(), ui: ui.snapshot(),
-                scenes: sceneFlow.snapshot(), pools: pool.snapshot(), config: config.snapshot(),
+                scenes: scenes.snapshot(), worlds: worlds.snapshot(), pools: pool.snapshot(), config: config.snapshot(),
                 pendingCleanup: [...pendingCleanup], gc });
         },
         async start(): Promise<void> {

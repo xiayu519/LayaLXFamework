@@ -7,7 +7,7 @@
 | 上游管理 | 下游管理 |
 | --- | --- |
 | `src/framework/**`、`src/AppEntry.ts` 及其 `.meta` | `src/game/**`（含 IDE 生成的 Runtime 字段） |
-| `assets/bootstrap/framework/**` | `assets/bootstrap/game/**`、`assets/packages/**`、`assets/shared/**` |
+| 通用资源加载与 UI 生命周期代码 | `assets/bootstrap/**`、`assets/packages/**`、`assets/shared/**`，包括 Startup、Tip、Loading |
 | 根 `.agents/**`、`.codex/**`、`AGENTS.md` | `src/game/<game-id>/AGENTS.md`、`.agents/**`、`.codex/memory/**` |
 | `tools/**`、`tests/framework/**`、`tests/workflow/**` | `tests/game/**`、游戏专属工具 |
 | `Design/tools/**`、`Design/genBin.*` | `Design/Tables/**` |
@@ -15,6 +15,10 @@
 `package.json`、`LayaProject.laya`、`PlayerSettings.json`、`CompilerSettings.json`、`ResourceLayout.json` 和 `tsconfig.json` 归下游维护，但 manifest 会校验框架依赖的最小 JSON 字段；下游可添加游戏字段，不能删除或改写公共契约。`CompilerSettings.mainScript` 必须引用 `AppEntry.ts.meta` 的 UUID，其余编译选项保留。`PlayerSettings.json` 的公共契约只约束框架所需模块、ui2 插件和 Spine 版本，不包含 `resolution`；同步会保留每个项目自己选择的 `designWidth`、`designHeight`、`scaleMode` 和 `screenMode`。
 
 ## 启动扩展点
+
+启动资源采用 `bootstrap/<type>`，不再区分 framework/game。默认资产随完整项目模板提供，后续由游戏维护，框架同步不会复制覆盖；Loading 的具体 Runtime、IDE 生成字段和展示实现也在 `src/game/logic/presentation/ui/`。应用显式传入 `tipPrefabUrl`，按需提供 `createSceneLoadingPresenter`；不提供 Loading 时框架照常管理场景，不额外创建默认界面。
+
+旧项目迁移到 ResourceLayout version 2 时，在自己的同步分支合并启动资源目录并保留 `.meta` UUID，更新资源 URL、动态图集 prefix、Tables 输出位置，删除 `bootstrapScopes`。同步会保留旧 lock 曾管理的启动资源并解除其锁定，不自动删除或猜测移动游戏文件；迁移后由游戏确认资源和 Runtime 引用。已退役的框架代码、工具等仍按原同步规则清理。
 
 ```text
 Laya.init() -> src/AppEntry.ts main()

@@ -4,7 +4,7 @@ import { parseGameProject } from "../../tools/game-project.mjs";
 const luban = {
     runtimeSupport: "src/game/logic/generated/luban/ByteBuf.ts",
     codeDestination: "src/game/logic/generated/tables",
-    dataDestination: "assets/bootstrap/game/tables",
+    dataDestination: "assets/bootstrap/tables",
 };
 
 describe("game project configuration", () => {

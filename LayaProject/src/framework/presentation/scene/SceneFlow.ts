@@ -48,6 +48,7 @@ interface SceneRecord {
 type UnknownRoute = SceneRoute<unknown>;
 type UnknownScene = BaseGameScene<unknown>;
 
+/** @internal Single-route transition implementation owned by SceneRegistry. */
 export class SceneFlow {
     private readonly routes = new Map<string, UnknownRoute>();
     private readonly pending = new Set<Promise<unknown>>();
@@ -350,7 +351,10 @@ export class SceneFlow {
         await scene.waitForUI();
         await this.waitForFrame();
         // Runtime shutdown owns collection once disposal starts, including a late native UI load.
-        if (this.stateValue !== "disposed" && !this.cleanupFailures.length) Laya.Scene.gc();
+        if (this.stateValue !== "disposed" && !this.cleanupFailures.length) {
+            if (this.options.collectGarbage) this.options.collectGarbage();
+            else Laya.Scene.gc();
+        }
     }
 
     private completeSceneLoading(requestId: number, scene: UnknownScene): void {

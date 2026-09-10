@@ -7,19 +7,19 @@
   },
   "runtimeConfig": {
     "id": "lx.runtime-config",
-    "url": "bootstrap/game/config/runtime.json",
+    "url": "bootstrap/config/runtime.json",
     "property": "framework",
     "expected": "LXFamework"
   },
   "tables": {
-    "url": "bootstrap/game/tables/tbtableappconfig.bin",
+    "url": "bootstrap/tables/tbtableappconfig.bin",
     "table": "TbTableAppConfig",
     "key": 1,
     "property": "value",
     "expected": "LXFamework"
   },
   "uiProbe": {
-    "prefabUrl": "bootstrap/game/ui/FrameworkStatus.lh",
+    "prefabUrl": "bootstrap/ui/examples/UILobby.lh",
     "baseRouteId": "lx.status",
     "args": {
       "status": "PROBE",

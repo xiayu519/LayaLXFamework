@@ -5,7 +5,7 @@ export default function uiExamplesProbe() {
 
 async function runUIExamples() {
     const { lx, Laya } = globalThis;
-    const ui = lx.sceneFlow.current.ui;
+    const ui = lx.scenes.get('examples.lobby').ui;
     const layoutService = lx.ui.layout;
     const inventoryId = "lx.examples.inventory";
     const confirmId = "lx.examples.confirm";

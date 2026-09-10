@@ -1,175 +1,110 @@
-# SceneFlow 使用
+# World 与场景
 
-`lx.sceneFlow` 是业务场景切换事务入口，`lx.scene` 仍保持为原生 `Laya.Scene`。框架默认显示常驻 Loading，先回收旧业务场景，再统一加载场景层级、附加资源并完成新场景初始化，从而控制切换期间的峰值内存。
+`lx.worlds` 协调业务世界的初始化和卸载；`lx.scenes` 持有原生场景实例；每个 `BaseGameScene` 持有自己的 `scene.ui`。World 保存注册撤销和清理回调，不保存 UI 实例、不创建 UI 宿主，也没有 `world.ui`。
 
-## 注册
+## 注册与进入 World
 
-在应用组合处把场景加入内容目录并注册 route；原生 `AppEntry.main()` 启动应用，场景切换不会停止应用：
+应用组合根准备公共 UI 与 World 定义，框架 AppBootstrap 启动公共服务；注册仅准备描述数据，不等于加载。进入 World 时才初始化其专属 UI、Scene 和事件，退出只清理自身内容。账号数据与协议接收不依赖 World，登录数据可以在任何界面打开前落地。以下为专属内容的组合根片段：`context` 为 `RuntimeContext`，`battleScene` 与 `battleHud` 是游戏已声明的场景和 UI 路由，包含各自的资源地址及所需 bind；场景 Runtime 负责打开对应的 HUD。
 
 ```ts
-import type { SceneRoute } from "../../framework/presentation/scene/SceneFlow";
-
-export interface BattleSceneArgs {
-    readonly levelId: number;
-    readonly heroSkin: string;
-    readonly manualLoading?: boolean;
-}
-
-export const BATTLE_SCENE_ROUTE: SceneRoute<BattleSceneArgs> = {
+context.worlds.register({
     id: "battle",
-    url: "game/scenes/Battle.ls",
-};
+    async initialize(world) {
+        const hud = context.ui.registerView(battleHud);
+        world.own(() => context.ui.unregisterView(hud));
 
-createRuntime({
-    content: [
-        { id: BATTLE_SCENE_ROUTE.id, url: BATTLE_SCENE_ROUTE.url, kind: "scene" },
-    ],
-    configureSceneFlow(sceneFlow): void {
-        sceneFlow.register(BATTLE_SCENE_ROUTE);
+        const scene = context.scenes.register(battleScene);
+        world.own(() => context.scenes.unregister(scene));
+
+        // 先登记撤销，再开始异步工作；原始 Promise 必须返回/等待。
+        await context.scenes.open(scene, { levelId: 1 }, { signal: world.signal });
     },
 });
+await context.worlds.enter("battle");
 ```
 
-保留 `register()` 返回的 route 可获得 `args` 编译期检查。若重新创建对象后再调用 `open(route, ...)`，它不是已注册的同一个 route；应保存并使用 `register()` 的返回值，或按 route id 调用。
+`WorldContext` 只有 `id`、`signal` 和 `own(cleanup)`。初始化自己的内容时使用原生 on/off、timer 或各模块注册 API，并立即登记撤销动作。回调逆序执行：先停止最后注册的副作用，再卸载场景，最后撤销专属 UI 定义。公共定义不交给 world.own；公共 UI 的实例仍由打开它的 Scene 或父窗口清理。两个 World 先退出再进入时，可以重新使用同一 Prefab；复用资源不等于共用实例。
 
-## 场景脚本
+`enter(id)` 合并同一 World 的并发初始化；`get(id)` 只返回已完成初始化的活动 World 上下文。不同 World 可以共存，不隐含“当前 World”。`exit(id)` 取消初始化、运行已登记的清理，并等待原始初始化和晚到清理完成；晚到 own 会立即进入清理。初始化失败执行同样的补偿；清理失败保留诊断并阻止该条目重新进入。
 
-`.ls` 根节点 Runtime 继承 `BaseGameScene`。字段交给 IDE 生成或使用原生属性引用，不在构造函数访问尚未反序列化的节点。层级自身引用的图片、Prefab、Spine 等由 Laya `HIERARCHY` 加载统计进 `scene` 阶段；这里只声明运行时才能决定的附加资源：
+`exit` 保留 World 定义，允许正常退出后重新 enter；`unregister` 在退出后撤销定义。普通切换流程可写为：
 
 ```ts
-import {
-    BaseGameScene,
-    type ScenePhaseContext,
-    type SceneResourceRequest,
-} from "../../framework/presentation/scene/BaseGameScene";
-
-export class BattleScene extends BaseGameScene<BattleSceneArgs> {
-    protected override describeResources(args: BattleSceneArgs): readonly SceneResourceRequest[] {
-        return [
-            { url: `game/skins/${args.heroSkin}.lh`, type: Laya.Loader.HIERARCHY },
-            { url: `game/levels/${args.levelId}.json`, type: Laya.Loader.JSON },
-        ];
-    }
-
-    protected override async onPrepare(context: ScenePhaseContext<BattleSceneArgs>): Promise<void> {
-        context.reportProgress(0.25);
-        // 解析已加载的数据、创建战斗模型；异步步骤应检查 context.signal。
-        context.reportProgress(1);
-    }
-
-    protected override async onWaitUntilReady(
-        context: ScenePhaseContext<BattleSceneArgs>,
-    ): Promise<void> {
-        // 可在这里等待对象池预热、首屏角色创建等；Loading 仍覆盖新场景。
-        await this.warmBattlePools(context.signal);
-        context.reportProgress(1);
-
-        // 只有调用 open() 时设置 autoCloseLoading: false 才需要主动完成。
-        if (context.args.manualLoading) this.completeTransitionLoading();
-    }
-
-    protected override onTransitionPause(): void {
-        // 暂停输入、Timer、Tween 等可见副作用。
-    }
-
-    protected override onTransitionResume(): void {
-        // 仅在旧场景尚未进入销毁前，切换被取消或失败时恢复。
-    }
-
-    protected override async onTransitionLeaving(): Promise<void> {
-        // Loading 已显示；停止输入、Timer、Tween，归还 active 对象并排空场景池。
-        await this.releaseBattleObjects();
-        lx.pool.drain("battle-unit");
-    }
-
-    private async warmBattlePools(_signal: AbortSignal): Promise<void> {
-        // 示例占位：这里实现当前项目的对象池预热。
-    }
-
-    private async releaseBattleObjects(): Promise<void> {
-        // 示例占位：先把 active 实例逐个 lx.pool.release()，再允许 drain()。
-    }
-}
+await lx.worlds.exit("lobby");
+await lx.worlds.enter("battle");
 ```
 
-`describeResources()` 的返回值只参与加载，不代表独占所有权，也不会被逐项强制卸载。节点和显示命令销毁、异步回写失效并稳定一帧后，由 `Laya.Scene.gc()` 按真实引用回收；禁止调用私有引用 API。
+顺序由游戏导航业务决定；示例把并发点击合并在应用组合处。不要在将退出的 UI 内持有整段切换任务，也不要在初始化里调用并等待自身 exit。示例见 [registerExampleWorlds.ts](../src/game/logic/bootstrap/registerExampleWorlds.ts)。
 
-## 打开与进度
+## 多场景与显式归属
+
+每个 Scene route 管理一个当前实例；不同 route 可以同时存在。重新 open 同一 route 只替换该 route 的实例，不关闭其他 route。内部 `SceneFlow` 复用加载、失效和回收事务；公共入口为 `lx.scenes`。
 
 ```ts
-await lx.sceneFlow.open(BATTLE_SCENE_ROUTE, {
-    levelId: 12,
-    heroSkin: "knight",
-    manualLoading: false,
-}, {
-    // 两项都默认 true，通常无需填写。
-    showLoading: true,
-    autoCloseLoading: true,
-    signal: abortController.signal,
-    onProgress(progress) {
-        console.log(progress.phase, progress.scene, progress.resources, progress.overall);
-    },
-});
+// SceneRoute 从 framework/presentation/scene/SceneFlow 以 import type 引入。
+const battle: SceneRoute<BattleArgs> = { id: "battle.scene", url: "game/scenes/Battle.ls" };
+
+lx.scenes.register(battle);
+const scene = await lx.scenes.open(battle, { levelId: 1 });
+lx.scenes.get(battle);         // 已就绪的实例；加载、卸载期间可能为 undefined。
+lx.scenes.get("battle.scene");
+await lx.scenes.close(battle); // 卸载实例和待完成加载，保留定义。
+await lx.scenes.unregister(battle); // 撤销定义；通常由 World 的 own 调用。
 ```
 
-默认情况下，成功返回时旧场景早已销毁并完成一次场景级 GC，新场景已经提交，Loading 显示过 `100%` 并在下一帧隐藏。`onPrepare()` 或 `onWaitUntilReady()` 返回的 Promise 都属于切换事务，最常见的对象池预热只要在其中 `await`，无需手动管理 Loading。
+保存 register 返回的 route，或使用原注册对象，才能保留参数类型与注册身份。旧注册对象不能卸载后来同 ID 的新注册。字符串入口没有相同的参数类型检查。
 
-确实需要场景自己结束 Loading 时这样调用：
+没有全局 current 场景猜测。`scene.ui` 始终属于左侧的实例；需要哪个场景，就通过对应 route 或 ID 获取。普通独立 Scene 直接使用 `Laya.Scene`，不需要额外原生别名。
 
-```ts
-await lx.sceneFlow.open(BATTLE_SCENE_ROUTE, {
-    levelId: 12,
-    heroSkin: "knight",
-    manualLoading: true,
-}, {
-    autoCloseLoading: false,
-});
-```
+## 场景脚本与 UI 宿主
 
-上例的 `completeTransitionLoading()` 即使在 `onWaitUntilReady()` 内较早调用，也只记录完成请求；框架仍会先提交场景并报告 `ready: 100%`，随后才真正关闭。若场景选择在 `open()` 返回后的其他业务时机调用也可以；一旦新切换开始或该场景销毁，旧完成回调自动失效。
-
-Loading 显示或旧场景暂停阶段失败时，旧场景尚在，框架会恢复旧场景并隐藏 Loading。一旦开始最终销毁旧场景，就不再提供回滚：新层级、附加资源或初始化失败会使 Promise reject、销毁新场景半成品，并保留显示“加载失败，请重试”的 Loading；再次调用 `open()` 会复用该 Loading 进入重试或兜底场景。错误可从 `lx.snapshot().scenes.lastError` 诊断。
-
-## UI 与摄像机
-
-`scene.ui` 始终属于左侧这个场景实例，不会自动转到当前场景。需要当前场景时显式读取 `lx.sceneFlow.current`，切换中它可能为空。SceneFlow 编排一个主业务场景槽位，不自动管理任意并存原生 Scene 的业务寿命。
+.ls 根节点 Runtime 继承 `BaseGameScene<TArgs>`。在 IDE 内为场景中的 GWidget 命名 uiRoot，并勾选 Export Var（源资产 _$var:true）；它与 Area2D 并列，处于屏幕坐标空间，不受战斗摄像机影响。第一次使用 scene.ui 时连接该宿主；缺少或错误引用会明确报错，不按节点名字猜测。
 
 ```ts
-const scene = lx.sceneFlow.current;
+const scene = lx.scenes.get("battle.scene");
 if (scene) {
-    scene.ui.setViewport({ x: 20, y: 30, width: 680, height: 1100 });
-    scene.ui.root.zOrder = 20;
-    // 恢复全屏跟随：scene.ui.setViewport();
+    scene.ui.setViewport({ x: 40, y: 60, width: 640, height: 1000 });
+    scene.ui.root.zOrder = 10;
+    scene.ui.setViewport(); // 恢复全屏跟随。
 }
 ```
 
-setViewport 使用 Stage 逻辑坐标，安全区裁剪/转换为宿主局部坐标；窗口和 mask 跟随宿主，zOrder 不被布局覆盖。祖先须为无位移/缩放/旋转的屏幕空间节点，根的位置由 setViewport 设置。直接改 root.x/y 会在下一次布局重设；世界摄像机节点不适合作为宿主。
+坐标采用 Laya Stage 逻辑单位；宿主祖先保持无变换的屏幕坐标空间。宿主不重复扣安全区，安全区只应用在窗口骨架的 safeContent 内。全屏页面、HUD、场景独立弹窗都归该宿主；跨场景 Loading 等应用窗口进入原生 GRoot。
 
-场景异步借用可用 `await lx.pool.acquire(id, { signal: this.signal })`。返回后先检查场景是否仍有效，已失效则立即归还；有效时登记 `own(() => lx.pool.release(id,node))` 再挂载。this.signal 在最终离场和直接 destroy 时取消，可逆 pause/resume 不取消；它与准备阶段 context.signal 的范围不同。参见 [异步资源生命周期](ui-resource-lifecycle.md)。
+场景在 onPrepare(context) 内可通过 `this.ui.show(route, context.args, { signal: context.signal })` 打开 UI，也可在 onWaitUntilReady(context) 等待首屏展示。根 Runtime、节点导出和静态 UIViewLifecycle 来自 .lh，注册只声明 id/url，需要额外依赖注入时增加 bind。场景销毁清理可见、隐藏缓存、父展示子 UI 和待加载，再等待异步收尾。详见 [UI 布局与归属](ui-layout.md)。
 
+## 加载事务与附加资源
 
-需要 UI 的场景在 `.ls` 中声明 GWidget，原生导出变量 uiRoot（`_$var: true`），或在首次访问 ui 前把其他原生导出节点赋给 this.uiRoot。默认用场景直接子节点，铺满 Stage 并允许空白穿透；也可放在无变换的屏幕空间父节点下。框架验证宿主属于该场景，不凭名字猜节点，不自动生成宿主。`SceneFlow` 在准备阶段之前接入场景 UI，业务通过 `this.ui` 使用；没有 UI 的场景不创建上下文。不要在场景构造函数访问 this.ui，也不在每个场景手写一个管理器。
+每个 route 的打开顺序为：显示 Loading，清理该 route 的旧场景，等待原生销毁稳定，在安全边界执行 Laya.Scene.gc，加载 .ls 与其依赖，加载 describeResources(args) 的附加资源，执行 onPrepare，使用原生 open(false, args) 打开，等待 onWaitUntilReady，提交实例并报告 ready。
 
-```text
-BattleScene
-├─ Area2D
-│  ├─ Camera2D
-│  └─ 战斗世界
-└─ uiRoot (GWidget)
-   ├─ HUD / 页面 (原生 GWidget Runtime)
-   ├─ 场景或父展示拥有的弹窗 (原生 GWidget Runtime)
-   └─ 宿主局部 Mask（动态排在最高模态窗口正下方）
+不调用全局 closeAll。有其他场景正在切换或清理失败时，局部回收边界避免提前执行全局 GC；应用停机统一等待所有 owner 稳定。先退出大厅 World 再进入战斗 World，才能在加载战斗前回收大厅；两个 World 并存是显式选择，不能同时宣称其内存已经回收。
 
-GRoot
-└─ 应用拥有的 Loading / 系统窗口 (原生 GWindow)
+describeResources 只声明由参数、配置或关卡数据动态选择、且必须在显示前就绪的附加资源。.ls/.lh 已声明的依赖不重复列出；它也不是逐项卸载清单。资源从 onPrepare 起消费，不在构造或反序列化期间假设动态资源已就绪。
+
+```ts
+protected override describeResources(args: BattleArgs) {
+    return [{ url: "game/levels/" + args.levelId + ".json", type: Laya.Loader.JSON }];
+}
+
+protected override async onPrepare(context: ScenePhaseContext<BattleArgs>) {
+    await this.ui.show("battle.hud", context.args, { signal: context.signal });
+}
 ```
 
-场景页面、HUD 和弹窗统一在组合处 `ui.registerView({ id, url, viewType, bind })` 注册，viewType 是 `.lh` 的 GWidget Runtime，layout 支持 fullscreen/safe-screen/center-popup。场景调用 `await this.ui.show(route,args,{signal:context.signal})`。`bind(view,args,session)` 内直接使用 IDE 生成字段；session.close() 关闭本次展示，session.lifetime 登记展示期清理，session.token 防止异步表现回写旧页面。
+生命周期钩子 onTransitionPause/onTransitionResume/onTransitionLeaving 用于离场副作用；同步清理用场景 own，待加载资源使用 context.signal 或 scene.signal。旧场景进入最终释放后不承诺回滚；新场景失败会销毁半成品并保留 Loading 失败状态，可再次 open 重试或进入兜底场景。
 
-owner、host、layout 独立：场景弹窗也挂 uiRoot。`session.show()` 打开的子 UI 归当前展示，父关闭自动清理其可见、隐藏缓存和待加载；`session.ui.show()` 打开的独立 UI 归场景，父关闭不影响它。singleton 按 owner 隔离，hide 只在 owner 存活期间复用。场景离场取消请求、结束订阅并销毁全部所属 UI，不能只靠销毁 uiRoot 清理已脱离显示树的缓存。
+连续打开同 route、World 退出或外部取消会使旧请求失效。框架结束调用方等待后，仍追踪不可取消的原生加载和 UI bind Promise，晚到结果不能覆盖新实例。close/unregister 等待这部分工作；不能以显示树消失作为资源已全部释放的证据。
 
-`session.bindData` / `bindRedDot` 管理展示期订阅，暂停时解除、恢复时读取最新模型快照。服务器同步和业务结果属于服务/模型，窗口离开不能阻止它们落地，见 [数据绑定](ui-data-binding.md)。其他 Timer、Tween 和业务对象仍由 `own()` 或离场钩子清理。
+## Loading 与诊断
 
-Loading 固定在 `UILayer.System`，应用级网络提示等可直接使用 `lx.ui`。这些 UI 不随业务场景离场；应用停机调用 `await lx.stop()`。2D 摄像机只作用于 Area2D 中的世界，HUD 放同级 uiRoot，不需要 UICamera，也不为每个场景创建 GRoot。
+showLoading 和 autoCloseLoading 默认 true。示例应用通过 createSceneLoadingPresenter 提供 UILayer.System 的单例 GWindow；具体 Prefab、Runtime 和展示实现均归游戏。没有提供 presenter 时框架不创建 Loading，场景流程仍可运行。多个场景请求共用一个展示，关闭某个场景的 Loading 不影响其他仍在进行的请求。
 
-如需品牌化 Loading，可在 `createSceneLoadingPresenter(ui, content)` 返回自己的 `SceneLoadingPresenter`。它仍应使用 `UILayer.System`，并让 `show/update/fail/hide` 可承受连续请求和晚到完成。
+框架报告 cleanup/scene/resources/prepare/switch/ready 阶段与总进度。`autoCloseLoading:false` 时由该次场景调用 completeTransitionLoading；它至少等待 ready 后生效，旧实例的请求不能关闭新请求的 Loading。具体展示可通过应用 createSceneLoadingPresenter 配置。
+
+`lx.scenes.snapshot()` 查看已注册 route、已加载实例、待完成切换和清理失败；`lx.worlds.snapshot()` 查看定义、初始化、待清理与失败。`lx.snapshot()` 汇总这些状态及 UI、池和配置。失败保持可观察，不用强制 reset 跳过未完成卸载。
+
+## 当前示例与验证范围
+
+启动时模拟登录先填充账号库存，然后进入 examples.lobby；大厅场景为 Lobby.ls，主页为 lx.status。点击“进入战斗”退出大厅 World 并进入 examples.battle，场景为 Battle.ls，页面为 lx.examples.battle；战斗页返回大厅。补给数据由外层账号持有，切换不清空库存或尚未到账的奖励。
+
+相关验证应覆盖 World 并发初始化/取消/逆序清理、同 route 替换、不同 route 并存、场景 UI 归属、未完成加载与错误诊断。单纯生命周期修改不附带分辨率矩阵；只有宿主、布局或节点几何改变时验证受影响尺寸。自动验证的本轮结果以交付报告为准，本文不把命令列表视为通过证据。

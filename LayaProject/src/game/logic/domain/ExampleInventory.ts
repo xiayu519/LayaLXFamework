@@ -20,8 +20,8 @@ export type InventoryApplyResult = "applied" | "stale" | "invalid" | "base-misma
 
 /** One account's example state. UI selection and scrolling never enter this model. */
 export class ExampleInventory {
-    private entries: readonly ExampleItem[] = Object.freeze(createExampleItems());
-    private revision = 1;
+    private entries: readonly ExampleItem[] = Object.freeze([]);
+    private revision = 0;
 
     get items(): readonly ExampleItem[] { return this.entries; }
     get version(): number { return this.revision; }
@@ -63,17 +63,10 @@ export class ExampleInventory {
         return "applied";
     }
 
-    use(id: string): boolean {
-        const item = this.entries.find(entry => entry.id === id);
-        if (!item || item.quantity === 0) return false;
-        return this.applyPatch({ version: this.revision + 1, baseVersion: this.revision,
-            upserts: [{ ...item, quantity: item.quantity - 1 }], removedIds: [] }) === "applied";
-    }
-
-    reset(): void {
-        if (this.applySnapshot({ version: this.revision + 1, items: createExampleItems() }) !== "applied") {
-            throw new Error("Example inventory revision is exhausted.");
-        }
+    /** Logout/account replacement only. Server snapshots supply inventory contents and versions. */
+    clear(): void {
+        this.entries = Object.freeze([]);
+        this.revision = 0;
     }
 }
 

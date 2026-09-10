@@ -23,7 +23,9 @@ afterEach(() => {
 function createRuntime(bootstrap = new AppBootstrap([]), pendingCleanup: string[] = []): ApplicationRuntime {
     const runtime = {
         ui: { id: "ui" },
-        sceneFlow: { id: "scene-flow" },
+        scenes: { id: "scenes" },
+        worlds: { id: "worlds" },
+        data: { id: "data" },
         content: { id: "content" },
         config: { id: "config" },
         tables: { id: "tables" },
@@ -39,8 +41,9 @@ function createRuntime(bootstrap = new AppBootstrap([]), pendingCleanup: string[
             bootstrap: bootstrap.snapshot(), pendingCleanup, gc: "not-requested",
             pools: [], config: [],
             scenes: {
-                state: "idle", registeredRoutes: [], requestVersion: 0, pendingTransitions: 0,
+                disposed: true, registeredRoutes: [], pendingTransitions: 0, cleanupFailures: 0, scenes: [],
             },
+            worlds: { registered: [], worlds: [], pendingLoads: 0, cleanupFailures: 0 },
             ui: { loading: {}, pendingRequests: [], nativeLoads: 0, managed: [], visible: [], cleanupFailures: 0, scenes: [],
                 tips: { queued: 0, active: 0, shown: 0, dropped: 0 } },
         }),
@@ -72,16 +75,19 @@ describe("lx", () => {
         expect(lx.ready).toBe(false);
     });
 
-    it("exposes framework services and exact Laya loader/scene entry points", async () => {
+    it("exposes explicit managers and data while keeping the native loader alias", async () => {
         const runtime = createRuntime();
         await runtime.start();
         try {
             expect(globalThis.lx).toBe(lx);
             expect(lx.ready).toBe(true);
             expect(lx.ui).toBe(runtime.ui);
-            expect(lx.sceneFlow).toBe(runtime.sceneFlow);
+            expect(lx.scenes).toBe(runtime.scenes);
+            expect(lx.worlds).toBe(runtime.worlds);
+            expect(lx.data).toBe(runtime.data);
             expect(lx.res).toBe(loader);
-            expect(lx.scene).toBe(FakeScene);
+            expect("scene" in lx).toBe(false);
+            expect("sceneFlow" in lx).toBe(false);
             expect(lx.audio).toBe(runtime.audio);
             expect(lx.config).toBe(runtime.config);
             expect(lx.tables).toBe(runtime.tables);

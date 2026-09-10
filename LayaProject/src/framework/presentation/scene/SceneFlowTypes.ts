@@ -42,6 +42,8 @@ export interface SceneFlowOptions {
     readonly configureScene?: (scene: import("./BaseGameScene").BaseGameScene<unknown>) => void;
     readonly loadingPresenter?: SceneLoadingPresenter;
     readonly waitForFrame?: () => Promise<void>;
+    /** @internal SceneRegistry defers global collection while sibling scene owners are unsettled. */
+    readonly collectGarbage?: () => void;
 }
 
 export interface SceneFlowSnapshot {

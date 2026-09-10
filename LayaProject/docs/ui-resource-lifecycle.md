@@ -1,10 +1,12 @@
 # UI、异步加载与资源释放
 
+界面脚本和 UIViewLifecycle 静态声明在预制体中。Runtime.onBind 负责展示行为；自定义路由 bind 必须返回它的 Promise，默认调用同样由框架追踪；这不会改变底层异步追踪。场景 UI 根节点的 UIViewLifecycle 连接原生启用/禁用/销毁，缺失或禁用时拒绝展示，不以动态挂载补救。
+
 取消展示、销毁实例、回收资源是三个步骤。界面关闭先让 token 失效并清理订阅/子 UI，再销毁节点或按策略缓存；共享原生加载继续执行，失效调用方不再创建实例或写回视图。功能切换、场景退出、停机时等待底层任务和原生组件销毁稳定，再由 `Laya.Scene.gc()` 按引用回收。
 
 ## 已修正的失败边界
 
-- 场景 `UIViewRoute.bind()` 和应用 `BaseGameWindow.onBind()` 的真实 Promise 都纳入清理等待；`show()` 取消会立即结束调用方等待，但不会把还没结束的 binder 当作已完成。异步 bind 内必须 await/return 属于展示的工作；脱离返回 Promise 的任务不会凭空被框架追踪。
+- 场景默认 Runtime.onBind / 自定义 `UIViewRoute.bind()` 和应用 `BaseGameWindow.onBind()` 的真实 Promise 都纳入清理等待；`show()` 取消会立即结束调用方等待，但不会把还没结束的 binder 当作已完成。异步 bind 内必须 await/return 属于展示的工作；脱离返回 Promise 的任务不会凭空被框架追踪。
 - `scene.signal` 覆盖该场景实例寿命，最终离场/直接 destroy 时取消，可逆 pause/resume 不取消。准备阶段的 `context.signal` 属于切换事务，不能代替场景整个寿命。
 - `lx.pool.acquire(id,{signal})` 取消单个借用者，释放其 pending 容量；同 URL 的其他借用者继续使用同一原生加载。取消后或 pool.dispose 后晚到的 Prefab 不创建实例。借到对象后仍由调用方归还。
 - `retention: "hide"` 保存原生视图实例，关闭仍释放展示绑定、子窗口与动态行图片。`scene.ui.releaseCached(routeId?)` 在功能卸载点销毁已关闭的缓存，不影响可见或正在绑定的页面。
@@ -14,9 +16,9 @@
 
 ## 动态图片与列表
 
-固定图片继续用原生资产引用。运行时会换图的 UI 使用 [DynamicImage.lh](../assets/bootstrap/framework/ui/components/DynamicImage.lh)，Runtime 是继承原生 GLoader 的 [DynamicImage](../src/framework/presentation/ui/DynamicImage.ts)。API 仍为 `image.src = url`，不额外创建纹理 lease、下载器或资源管理器。
+固定图片继续用原生资产引用。运行时会换图的 UI 使用 [UIDynamicImage.lh](../assets/bootstrap/ui/examples/components/UIDynamicImage.lh)，Runtime 是继承原生 GLoader 的 [UIDynamicImage](../src/framework/presentation/ui/UIDynamicImage.ts)。API 仍为 `image.src = url`，不额外创建纹理 lease、下载器或资源管理器。
 
-嵌套图片引用这个组件 Prefab；不要在任意普通子 GLoader 上手填 `_$runtime`，3.4.1 IDE 保存可能丢弃这种写法。当前 `InventoryItem.lh` 在容器下引用该组件并原生导出 `itemImage`。GButton 动态 icon 把 iconWidget 指向它。GList 继续用自身 WidgetPool，虚拟/循环列表不套另一个 PrefabPool。
+嵌套图片引用这个组件 Prefab；不要在任意普通子 GLoader 上手填 `_$runtime`，3.4.1 IDE 保存可能丢弃这种写法。当前 `UIInventoryItem.lh` 在容器下引用该组件并原生导出 `itemImage`。GButton 动态 icon 把 iconWidget 指向它。GList 继续用自身 WidgetPool，虚拟/循环列表不套另一个 PrefabPool。
 
 itemRenderer 每次完整刷新稳定 ID、文字、图片与状态；行换身份先解绑旧模型/红点订阅，再建立新绑定。图片路径若依赖异步查询，还要检查行身份和请求版本；GLoader 的请求 ID 只保护已经交给 `src` 的加载，不能识别业务上较早返回的 URL 查询。
 
@@ -26,7 +28,7 @@ itemRenderer 每次完整刷新稳定 ID、文字、图片与状态；行换身�
 
 源码与真实已绘制图片交替测试发现两处引擎行为：
 
-1. `ImageRenderer` 直接换纹理时自行调整引用，`DrawTextureCmd.texture` setter 又调整一次。DynamicImage 在不同 URL 间先清空旧 src，让原生命令回收后再设置新 src，避免重复增减。相同 URL 不重复加载，晚到防护仍由 GLoader 承担。
+1. `ImageRenderer` 直接换纹理时自行调整引用，`DrawTextureCmd.texture` setter 又调整一次。UIDynamicImage 在不同 URL 间先清空旧 src，让原生命令回收后再设置新 src，避免重复增减。相同 URL 不重复加载，晚到防护仍由 GLoader 承担。
 2. Web 渲染单元池 recover 后保留 ShaderData 纹理及 owner 引用，导致 AtlasResource 已销毁但底层 bitmap 仍存活。`LayaGraphicsCleanup` 只在 `LayaEnv.version === "3.4.1"` 且存在对应 Web 后端导出时安装修复，用原生 ShaderData.setTexture(null) 平衡引用并清空已归还单元的 owner 字段；继续使用原生池的分配、容量与复用。服务首先启动、最后停止，并恢复自己安装的方法。
 
 第二项是已验证缺陷所需的局部兼容例外，涉及引擎导出但未列入 d.ts 的内部池；接口收敛在一个文件，不修改 SDK、不改私有引用计数。升级引擎时必须重新审核，其他版本自动跳过。Native 等后端未验证，不把 Web 结果推广到所有平台。

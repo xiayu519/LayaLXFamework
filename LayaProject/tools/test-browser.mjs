@@ -392,7 +392,7 @@ async function runEngineLifecycleProbes(cdp) {
                 const snapshot = globalThis.lx.ui.snapshot().tips;
                 const root = globalThis.Laya.GRoot.inst;
                 const view = Array.from({ length: root.numChildren }, (_, index) => root.getChildAt(index))
-                    .find((node) => node.name === "LXTip");
+                    .find((node) => node.name === "UITip");
                 return snapshot.active === 1
                     && snapshot.queued === 1
                     && view?.getChildByName?.("messageText")?.text === "Headless tip one";
@@ -400,7 +400,7 @@ async function runEngineLifecycleProbes(cdp) {
             const firstTip = globalThis.lx.ui.snapshot().tips;
             const tipRoot = globalThis.Laya.GRoot.inst;
             const firstTipView = Array.from({ length: tipRoot.numChildren }, (_, index) => tipRoot.getChildAt(index))
-                .find((node) => node.name === "LXTip");
+                .find((node) => node.name === "UITip");
             const firstTipQueued = firstTip.active === 1
                 && firstTip.queued === 1
                 && firstTipView?.getChildByName?.("messageText")?.text === "Headless tip one";
@@ -435,7 +435,7 @@ async function runEngineLifecycleProbes(cdp) {
                 "the reused tip to finish",
             );
 
-            const sceneUI = globalThis.lx.sceneFlow.current?.ui;
+            const sceneUI = globalThis.lx.scenes.get("examples.lobby")?.ui;
             const statusInfo = sceneUI?.snapshot().views
                 .find((entry) => entry.routeId === validation.uiProbe.baseRouteId);
             const loadingInfo = globalThis.lx.ui.snapshot().managed
@@ -704,7 +704,7 @@ async function waitForRuntime(cdp, timeoutMs) {
                     }
                     const ui = globalThis.lx.ui.snapshot();
                     const expectedRoute = validation.uiProbe?.baseRouteId;
-                    const sceneUI = globalThis.lx.sceneFlow.current?.ui;
+                    const sceneUI = globalThis.lx.scenes.get("examples.lobby")?.ui;
                     const statusView = sceneUI?.snapshot().views
                         .find((entry) => entry.routeId === expectedRoute);
                     ownershipReady = (!expectedRoute
@@ -715,7 +715,10 @@ async function waitForRuntime(cdp, timeoutMs) {
                             && ui.scenes.some((scene) => scene.views.some((entry) => entry.view === statusView.view))
                             && !ui.managed.some((entry) => entry.routeId === expectedRoute)))
                         && globalThis.lx.res === globalThis.Laya.loader
-                        && globalThis.lx.scene === globalThis.Laya.Scene;
+                        && typeof globalThis.lx.scenes.get === "function"
+                        && typeof globalThis.lx.worlds.enter === "function"
+                        && typeof globalThis.lx.data.get === "function"
+                        && !("scene" in globalThis.lx);
                 }
                 return {
                     ready,

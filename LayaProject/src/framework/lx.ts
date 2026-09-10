@@ -19,8 +19,16 @@ class LxFacade {
         return requireLxRuntime().ui;
     }
 
-    get sceneFlow(): ApplicationRuntime["sceneFlow"] {
-        return requireLxRuntime().sceneFlow;
+    get scenes(): ApplicationRuntime["scenes"] {
+        return requireLxRuntime().scenes;
+    }
+
+    get worlds(): ApplicationRuntime["worlds"] {
+        return requireLxRuntime().worlds;
+    }
+
+    get data(): ApplicationRuntime["data"] {
+        return requireLxRuntime().data;
     }
 
     get res(): typeof Laya.loader {
@@ -54,11 +62,6 @@ class LxFacade {
 
     get performance(): ApplicationRuntime["performance"] {
         return requireLxRuntime().performance;
-    }
-
-    get scene(): typeof Laya.Scene {
-        requireLxRuntime();
-        return Laya.Scene;
     }
 
     get net(): ApplicationRuntime["http"] {

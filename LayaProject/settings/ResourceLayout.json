@@ -1,14 +1,10 @@
 {
-  "version": 1,
+  "version": 2,
   "roots": {
     "bootstrap": "bootstrap",
     "packages": "packages",
     "shared": "shared",
     "library": "library"
-  },
-  "bootstrapScopes": {
-    "framework": "framework",
-    "game": "game"
   },
   "assetTypes": [
     "scenes",
@@ -29,8 +25,8 @@
     "levels",
     "tables"
   ],
-  "startupScene": "bootstrap/framework/scenes/Startup.ls",
-  "startupUI": "bootstrap/game/ui/FrameworkStatus.lh",
-  "tipUI": "bootstrap/framework/ui/Tip.lh",
-  "generatedTables": "bootstrap/game/tables"
+  "startupScene": "bootstrap/scenes/Startup.ls",
+  "startupUI": "bootstrap/ui/examples/UILobby.lh",
+  "tipUI": "bootstrap/ui/UITip.lh",
+  "generatedTables": "bootstrap/tables"
 }

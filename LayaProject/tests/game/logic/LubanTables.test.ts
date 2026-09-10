@@ -7,7 +7,7 @@ import ByteBuf from "../../../src/game/logic/generated/luban/ByteBuf";
 
 describe("Luban tables", () => {
     it("parses the committed binary through the browser-safe ByteBuf", () => {
-        const file = readFileSync(resolve("assets/bootstrap/game/tables/tbtableappconfig.bin"));
+        const file = readFileSync(resolve("assets/bootstrap/tables/tbtableappconfig.bin"));
         const bytes = new Uint8Array(file.buffer, file.byteOffset, file.byteLength);
         const tables = new Tables((name) => {
             expect(name).toBe("tbtableappconfig");

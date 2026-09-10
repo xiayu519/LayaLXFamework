@@ -3,7 +3,7 @@ export async function runFrameworkProbes(validation) {
     const { lx, Laya } = globalThis;
     const ui = lx.ui;
     const root = Laya.GRoot.inst;
-    const base = lx.sceneFlow.current?.ui.snapshot().views.find((entry) => entry.routeId === validation.uiProbe.baseRouteId);
+    const base = lx.scenes.get('examples.lobby')?.ui.snapshot().views.find((entry) => entry.routeId === validation.uiProbe.baseRouteId);
     const loading = ui.snapshot().managed.find(entry => entry.routeId === "lx.scene-loading");
     if (!base || !loading) throw new Error("Framework probe requires a native scene page and loading window.");
     const WindowBase = Object.getPrototypeOf(loading.window.constructor);

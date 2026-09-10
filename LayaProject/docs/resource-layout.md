@@ -4,14 +4,13 @@
 
 ```text
 assets/
-  bootstrap/                     首次可交互前必需资源
-    framework/                   上游只读框架启动资源
-      scenes/Startup.ls
-      ui/Tip.lh
-    game/                        下游游戏启动资源
-      ui/*.lh
-      config/*.json
-      tables/*.bin
+  bootstrap/                     游戏维护的启动资源，按类型直接组织
+    scenes/Startup.ls
+    ui/UISceneLoading.lh
+    ui/UITip.lh
+    ui/examples/                 示例页面、components 与 templates
+    config/*.json
+    tables/*.bin
   packages/<feature>/            可延迟加载的完整业务功能
     scenes/  ui/  prefabs/
     spine/<name>/                .lh、.skel/.json、.atlas、纹理同目录
@@ -26,7 +25,8 @@ assets/
 
 ## 放置规则
 
-- 框架启动 Scene 和公共 Tip 放入 `bootstrap/framework`；游戏 Loading、启动错误兜底、首个业务 UI、配置和 Tables 放入 `bootstrap/game`。下游不得修改前者。
+- `bootstrap` 不表示框架归属，也不再划分 framework/game。Startup、Loading、Tip、首个业务 UI、配置和 Tables 均由游戏维护；默认资源随项目模板提供，框架同步不覆盖这些文件。
+- `src/framework` 保留通用流程；应用组合根通过 `ApplicationDefinition.tipPrefabUrl` 选择提示 Prefab，通过已有 `createSceneLoadingPresenter` 提供 Loading。示例的 Loading Runtime、原生生成绑定与展示实现位于 `src/game/logic/presentation/ui/`，修改界面不需要编辑框架文件。
 - JSON 按用途放进 `config/data/maps/levels`；扩展名不决定目录。Luban 二进制只进入 `tables`，与 JSON 分开。
 - 新业务 UI 放入 `assets/packages/<feature>/ui/<Name>.lh`；业务 Scene 放入 `scenes/<Name>.ls`；普通 Prefab 放入 `prefabs/<Name>.lh`。
 - Spine Prefab 与骨骼、图集、纹理放入同一 `spine/<name>/`，不得拆到全局类型目录。
@@ -37,7 +37,7 @@ assets/
 
 ## Laya 构建配置
 
-`settings/ResourceLayout.json` 是目录契约。`BuildSettings.alwaysIncluded` 只收集字符串动态加载的 `bootstrap`；功能目录由 `enableSubpackages` 与 `subpackages` 配置，每个已存在的 `packages/<feature>` 或 `shared/<domain>` 必须使用：
+`settings/ResourceLayout.json` version 2 是目录契约，取消 `bootstrapScopes`。`BuildSettings.alwaysIncluded` 收集整个 `bootstrap`，保证字符串动态加载的资源入包；它不表示运行时预加载。当前示例未启用分包；功能目录由 `enableSubpackages` 与 `subpackages` 配置，每个已存在的 `packages/<feature>` 或 `shared/<domain>` 必须使用：
 
 ```json
 {
@@ -47,7 +47,7 @@ assets/
 }
 ```
 
-启动流程只等待 `bootstrap`。用户首次可交互后可低并发预取最可能进入的功能；低频功能在进入前调用 `await Laya.loader.loadPackage("packages/<feature>")`。资源退出仍按实际复用率、内存预算和 `lx.res` 所有权释放，不因分包改变 Loader 生命周期。
+启动流程按需加载实际启动依赖，不遍历预加载整个 `bootstrap`。示例工程把演示内容放在启动目录；真实游戏应删去不使用的示例，将后续功能放入延迟包。用户首次可交互后可低并发预取最可能进入的功能；低频功能在进入前调用 `await Laya.loader.loadPackage("packages/<feature>")`。资源退出仍按实际复用率、内存预算和 `lx.res` 所有权释放，不因分包改变 Loader 生命周期。
 
 具体小游戏平台的主包、单分包、总包和远程包限制必须以当次发布的官方规则为准，通过 `npm run analyze:packages -- --build-root <发布目录> --main-limit-bytes <值> --subpackage-limit-bytes <值>` 验证，不在框架中写死易变化的限制。
 

@@ -8,13 +8,16 @@
 
 `src/framework/` 是 2–3 人共享层，不依赖 `src/game/`；`src/game/logic/` 是不可删除、可被具体游戏调用的业务逻辑脚本库，不代表一个游戏。用户命名后的具体游戏位于 `src/game/<game-id>/`，可依赖 logic；logic 不得反向依赖具体游戏，具体游戏之间也不得互相依赖。`src/AppEntry.ts` 导出原生 `main()`，调用下游所有的 `src/game/bootstrap/createApplication.ts`。在尚未接入命名游戏时，该桥接入口委托给 `src/game/logic/bootstrap/createGameApplication.ts` 保持模板可运行；具体游戏开始后由其显式接管组合，不使用 DI 容器。
 
+资源归游戏维护：`assets/bootstrap/` 下直接放 `scenes/`、`ui/`、`config/`、`tables/` 等类型目录，没有 framework/game 资源归属层。应用组合根提供 `tipPrefabUrl` 与可选 `createSceneLoadingPresenter`；具体 Loading Runtime 和原生生成字段也在 game。框架同步只更新通用能力，不覆盖启动界面，详见 [资源布局](resource-layout.md) 与 [发行边界](framework-distribution.md)。
+
 ## Laya 原生边界
 
 | 领域 | 直接使用 | 项目扩展 |
 | --- | --- | --- |
 | 事件/时间/动画 | Event、`Laya.timer`、Tween | `LifetimeScope` 仅聚合异构清理；不建立新 Timer |
 | 资源 | `Laya.loader`、Resource 引用计数、`Scene.gc()` | `ContentCatalog` 映射 ID/URL；`lx.config` 增加 JSON 校验和显式释放 |
-| 场景 | `Laya.Scene.open/close/destroy/gc` | `SceneFlow` 编排低峰值切换、失败保护与场景级回收；`BaseGameScene` 声明动态附加资源和切换钩子 |
+| 场景 | `Laya.Scene.open/close/destroy/gc` | `SceneRegistry` 持有各 route 原生实例；内部 `SceneFlow` 处理切换，`BaseGameScene` 持有场景 UI |
+| World / 账号数据 | 普通对象、AbortSignal、原生事件 | `WorldRegistry` 协调注册与撤销；`DataRegistry` 引用应用预先创建的功能数据 |
 | UI | ui2 `GRoot/GWindow/GWidget/GLoader`、IDE Runtime/属性引用 | 独立的 owner/host/layout、参数路由和展示期数据订阅 |
 | 红点 | `EventDispatcher`、Script 生命周期、IDE 引用 | 路径计数聚合与 `RedDotBinding`，业务自行决定亮灭 |
 | 对象池 | `Laya.Pool` | Prefab 异步创建、容量、所有权和 reset 钩子 |
@@ -23,39 +26,39 @@
 | 存储/网络 | LocalStorage、HttpRequest | schema 迁移与稳定错误契约 |
 | 配表 | `Loader.BUFFER` | Luban 生成的业务 Tables 安装到 `lx.tables` |
 
-`lx.res` 返回准确的 `Laya.loader`，`lx.scene` 返回准确的 `Laya.Scene`；需要完整切换事务时使用 `lx.sceneFlow`，应用停机使用 `await lx.stop()`。`lx` 不暴露整个 runtime，也不提供 `lx.spine` 之类的平行入口。
+`lx.res` 返回原生 Laya.loader；普通原生场景直接使用 Laya.Scene。托管场景使用 `lx.scenes`，业务初始化协调使用 `lx.worlds`，独立账号数据通过 `lx.data.get(key)` 读取，应用停机使用 `await lx.stop()`。不暴露整个 runtime 或额外原生 Scene 转发入口。
 
-## 场景切换
+## World、Scene 与账号数据
 
-业务场景根节点继承 `BaseGameScene<TArgs>`，在应用组合的 `configureSceneFlow` 中注册 typed route，经 `lx.sceneFlow.open(route, args, options)` 打开，完整示例见 [scene-flow.md](scene-flow.md)。`showLoading` 与 `autoCloseLoading` 均默认 `true`；默认 Loading 是 `UILayer.System` 上 `retention: "hide"` 的单例 ui2 `.lh`，由应用管理。2D 战斗摄像机放在业务场景的 `Area2D` 内，场景页面、HUD 和弹窗都放其同级 `uiRoot`；应用 Loading 使用 `GRoot`，不建立 Unity 风格的 `UICamera`。
+公共 UI 和 World 定义在应用组合根准备，公共服务由框架 AppBootstrap 启停；注册不加载实例。World 进入时仅初始化自己的 UI/Scene 定义、事件和业务模块，用 WorldContext.own(cleanup) 保存逆序撤销，不操作公共注册。World 只提供 id/signal/own，没有 world.ui、不保存 Scene/UI 实例。退出先失效、清理自身，再等待原始初始化和晚到清理；失败保留诊断。账号数据和全局红点更新始终独立于 World。一个 World 可协调多个 Scene，不同 World 可以独立进入和退出。
 
-切换顺序固定为：显示 Loading、暂停并最终清理旧场景、等待一帧并执行 `Laya.Scene.gc()`、加载 `.ls` 层级及其依赖、加载 `describeResources(args)` 返回的运行时附加资源、执行 `onPrepare`、打开新场景、等待 `onWaitUntilReady`、提交新场景、报告 `ready: 100%`，再等待一帧按策略隐藏 Loading。这样加载新场景时旧场景节点和无引用资源已退出，避免两套业务场景同时占用峰值内存。框架以 `cleanup/scene/resources/prepare/switch/ready` 六阶段输出单调总进度；`scene` 和 `resources` 也保留独立进度。
+`lx.scenes.register/open/get/close/unregister` 管理每个 route 的实例。不同 route 并存，重开同 route 只替换自身实例；不猜“当前场景”、不调用全局 closeAll。场景根 Runtime 继承 BaseGameScene，通过 .ls 原生引用的 uiRoot 持有 SceneUI。2D 摄像机放 Area2D，页面/HUD/弹窗放其同级 uiRoot；只有应用 Loading 等进入 GRoot。
 
-`describeResources` 不是卸载清单：`.ls/.lh` 已声明的依赖不应重复列出，只声明由参数、配置或关卡数据动态选择且必须在显示前就绪的资源；这些资源应从 `onPrepare` 起消费，不在构造或反序列化期间假设其已加载。离场副作用通过 `onTransitionPause/onTransitionResume/onTransitionLeaving` 管理，同步 owner 清理通过 `own()` 登记。旧场景进入最终释放后不再承诺回滚；此后新场景失败会销毁半成品并让 Loading 保持失败状态，下一次 `open()` 可直接重试或进入兜底场景。连续切换或外部 `AbortSignal` 会使旧请求失效，晚到结果不得覆盖新请求或隐藏新请求的 Loading。
+同 route 的内部 SceneFlow 依次处理旧实例回收、层级与动态附加资源、onPrepare、open(false)、onWaitUntilReady 和 Loading。describeResources 仅列运行时必需的动态资源，不重复层级依赖，也不充当卸载清单。关闭或取消后仍等待原生加载和 UI bind 收尾；同级场景切换未稳定时避免提前全局 GC。完整用法及失败边界见 [场景与 World](scene-flow.md)。
 
-`SceneFlow` 使用 `open(false)`，只替换自身记录的业务场景，不调用 `closeAll()`，避免干扰其他独立 Scene；应用启动不依赖任何场景存活。`autoCloseLoading: false` 时，当前场景只能通过请求绑定的 `completeTransitionLoading()` 请求关闭；框架至少等到 `ready: 100%` 后才执行，旧场景或旧异步任务的调用自动失效。`retention: "hide"` 仅允许在所属场景存活期间复用；离场时必须销毁隐藏缓存和可见实例，并等待不可取消的原生加载收尾。
+账号数据按背包、角色、任务等大功能在组合根预先创建，DataRegistry 只保存引用；登录协议可在任何 UI/World 创建前写入。数据不认识 route 或消费它的界面列表。查询、命令、协议接收分别注入，先落模型再发原生事件；World 切换保留账号数据，退出账号使旧 receiver 的代次失效。模拟服务的权威模型也在外层单独创建，不在服务或 UI 内偷偷 new 一份账号状态。
 
 ## UI 生命周期
 
-owner 决定生命周期，host 决定实际父节点，layout 决定适配。应用 `lx.ui` 使用原生 GRoot/GWindow；场景 `.ls` 直接声明 `uiRoot: GWidget`，`BaseGameScene.ui` 按需创建 SceneUI。场景的所有布局（含 center-popup）用 `registerView({ id, url, viewType, bind })` 注册原生 GWidget Runtime，经 `this.ui.show(route,args)` 挂 uiRoot。不为场景另建 GRoot，也不改原生默认实例。
+owner 决定生命周期，host 决定实际父节点，layout 决定适配。应用 `lx.ui` 使用原生 GRoot/GWindow；场景 `.ls` 直接声明 `uiRoot: GWidget`，`BaseGameScene.ui` 按需创建 SceneUI。场景的所有布局（含 center-popup）用 `registerView({ id, url, bind? })` 注册原生 GWidget Runtime，经 `this.ui.show(route,args)` 挂 uiRoot。不为场景另建 GRoot，也不改原生默认实例。
 
 `session.show()` 打开的子 UI 归当前展示，父关闭自动销毁子窗口、隐藏缓存和待加载；`session.ui.show()` 打开的独立 UI 归场景，父页面关闭不影响它。singleton 按 owner 隔离，hide 只在 owner 存活期间复用。`navigation:page/overlay` 独立决定页面覆盖；页面暂停使用原生 active=false 并暂停数据订阅，恢复同一实例时重新读取快照。
 
-UIViewRoute 支持 layer、layout、navigation、modal、closeOnMaskClick、multiplicity、retention 与 onClosed(view,args)。center-popup 默认启用模态和空白点击关闭；场景用 uiRoot 内的局部 Sprite 遮罩，应用用原生 GRoot.modalLayer，都放在最高可见模态窗口正下方。排序读取真实宿主节点顺序；内部 top/full/mid/bottom 不代替窗口层级。应用关闭钩子使用 BaseGameWindow.onClosed()，均不假定关闭后节点仍可用。
+场景窗口的 layer、layout、navigation、modal、closeOnMaskClick、multiplicity、retention 在 Prefab 根节点的 UIViewLifecycle 静态组件中配置；UIViewRoute 只保留 id/url、可选 bind 与 onClosed(view,args)。Popup 模板预置模态和空白点击关闭；场景用 uiRoot 内的局部 Sprite 遮罩，应用用原生 GRoot.modalLayer，都放在最高可见模态窗口正下方。排序读取真实宿主节点顺序；内部 top/full/mid/bottom 不代替窗口层级。应用关闭钩子使用 BaseGameWindow.onClosed()，均不假定关闭后节点仍可用。
 
-UI route 显式声明 layout：fullscreen、safe-screen 或 center-popup，不用 layer 推断新 UIViewRoute 的布局。窗口固定 Root 下 full、safeContent；safeContent 下依次为 top、full、mid、bottom。节点始终保留，空 top/bottom 高度为 0，空容器不拦截输入。center-popup 只对 mid 播放缩放开合动画，全屏布局不播放；关闭/销毁取消旧 Tween，并隔离晚到回调。UILayoutService 以运行时逻辑尺寸为边界换算平台坐标，项目可自由选择设计分辨率；完整约定见 [ui-layout.md](ui-layout.md)。
+场景 UIViewLifecycle 显式选择 fullscreen 或 center-popup，不用 layer 推断布局。应用 GWindow 的 UIRoute 保留独立配置，并支持 safe-screen。窗口固定 Root 下 full、safeContent；safeContent 下依次为 top、full、mid、bottom。节点始终保留，空 top/bottom 高度为 0，空容器不拦截输入。center-popup 只对 mid 播放缩放开合动画，全屏布局不播放；关闭/销毁取消旧 Tween，并隔离晚到回调。UILayoutService 以运行时逻辑尺寸为边界换算平台坐标，项目可自由选择设计分辨率；完整约定见 [ui-layout.md](ui-layout.md)。
 
 `register/registerView` 返回保留参数类型的 route，`show(route,args,{signal})` 检查参数；字符串入口不具有同等类型保证。原生 `bind(view,args,session)` 提供展示期 lifetime/token、子窗口 show 和数据/红点绑定。同步赋值直接执行，跨 await 的表现回写检查 token；业务结果先落独立模型，不因 UI 离开丢失。取消只结束框架等待，不可取消的原生加载继续被追踪，晚到完成不能重新显示已离场 UI。
 
 ```text
 Laya.loader.load(.lh, HIERARCHY)
   -> Prefab.create() + 原生 Runtime/属性引用完成反序列化
-  -> 场景 UIViewRoute: bind(view, args, session) -> Scene.uiRoot（含弹窗）
+  -> 场景 UIViewRoute: 注入依赖 -> Runtime.onBind(args, session, ...) -> Scene.uiRoot（含弹窗）
   -> 应用 UIRoute: BaseGameWindow -> 原生 GRoot
   -> Hide 结束展示；owner 结束销毁其所有实例和缓存
 ```
 
-固定节点、布局和交互组件必须来自 `.ls/.lh`。复杂界面优先 IDE Runtime + `.generated.ts`，少量引用使用原生 `@property`；不手改生成文件、不维护平行 Binder、不在构造函数访问未反序列化的引用。两个 full 保持节点名，但不得导出成同一 Runtime 中的同名字段；可用 backgroundFull/contentFull 属性引用分别指向它们。会换图的 UI 复用 DynamicImage.lh 组件并设置 src；其 Runtime 修复 3.4.1 已显示图片替换的重复引用问题，仍由原生 GLoader 拒绝过期加载。Web 渲染单元池的纹理/owner 暂留由限定版本的 LayaGraphicsCleanup 修复，详见 [资源生命周期](ui-resource-lifecycle.md)。
+固定节点、布局和脚本必须来自 `.ls/.lh`。界面 Runtime 集中保存交互、刷新和局部状态；可编辑参数放静态 Script 组件。路由可注入依赖并调用、返回其 onBind；未提供 bind 时直接调用静态 Runtime.onBind(args,session)，无需导入具体 Runtime 构造类。窗口模板预置静态 UIViewLifecycle，SceneUI 要求该组件存在且启用，不再动态 addComponent；原生禁用/销毁继续触发展示清理。复杂界面优先 IDE Runtime + `.generated.ts`，少量引用可放在静态 Script 的原生 `@property` 中；不手改生成文件、不维护平行 Binder、不在构造函数访问未反序列化的引用。两个 full 保持节点名，但不得导出成同一 Runtime 中的同名字段；可用 backgroundFull/contentFull 属性引用分别指向它们。会换图的 UI 复用 UIDynamicImage.lh 组件并设置 src；其 Runtime 修复 3.4.1 已显示图片替换的重复引用问题，仍由原生 GLoader 拒绝过期加载。Web 渲染单元池的纹理/owner 暂留由限定版本的 LayaGraphicsCleanup 修复，详见 [资源生命周期](ui-resource-lifecycle.md)。
 
 业务模型与协议 snapshot/patch 入口独立于 UI；domain/application 保持纯净，Laya EventDispatcher 适配留在 infrastructure/presentation。数据先落再 event，`session.bindData` 首次同步读快照，后续通过原生 callLater 合并，暂停/关闭解除订阅，恢复重读；应用 BaseGameWindow 提供同名 protected 方法。具体示例见 [数据绑定](ui-data-binding.md)。
 
@@ -65,13 +68,13 @@ Laya.loader.load(.lh, HIERARCHY)
 
 原生 destroy 可能先设置 destroyed 再因用户回调抛错，此时 destroyed 不等于完整清理。UI 保留 cleanup-failed 条目和 `cleanupDiagnostics()`，后续 dispose 继续报告，不因第二次调用无事可做就误放行 GC。
 
-公共提示通过 `lx.ui.tip(message)` 进入 `UILayer.Toast`。第一条立即显示，后续按 FIFO 每 500ms 出队；固定 `Tip.lh` 实例由 `PrefabPoolService` 复用，动画直接使用 `Laya.Tween`。回池会停止 Tween、移除父节点并复位文字、透明度、缩放和可见性；UI 停机清队列、Timer、活动实例与晚到 acquire。
+公共提示通过 `lx.ui.tip(message)` 进入 `UILayer.Toast`。第一条立即显示，后续按 FIFO 每 500ms 出队；固定 `UITip.lh` 实例由 `PrefabPoolService` 复用，动画直接使用 `Laya.Tween`。回池会停止 Tween、移除父节点并复位文字、透明度、缩放和可见性；UI 停机清队列、Timer、活动实例与晚到 acquire。
 
 ## JSON 与 Tables
 
 `lx.config` 只处理通用 JSON 文档，适用于外部游戏数据、地图/关卡编辑器输出和业务配置。它通过 `ContentCatalog` 的 `data` ID 调用原生 `Loader.JSON`，可在消费边界提供校验器，并支持并发合并、查询、显式释放和晚到结果失效。
 
-`lx.tables` 只保存 Luban TypeScript-bin 生成的 `Tables`。人工源位于 `Design/Tables`；具体生成位置由下游 `settings/GameProject.json` 指定，模板默认把可调用的表逻辑生成到 `src/game/logic/generated/tables`，数据输出到 `assets/bootstrap/game/tables`。命名游戏需要独立表代码时再显式调整配置。两条数据链没有依赖关系。
+`lx.tables` 只保存 Luban TypeScript-bin 生成的 `Tables`。人工源位于 `Design/Tables`；具体生成位置由下游 `settings/GameProject.json` 指定，模板默认把可调用的表逻辑生成到 `src/game/logic/generated/tables`，数据输出到 `assets/bootstrap/tables`。命名游戏需要独立表代码时再显式调整配置。两条数据链没有依赖关系。
 
 ## 资源与释放
 
@@ -103,9 +106,9 @@ Laya.loader.load(.lh, HIERARCHY)
 
 `CompilerSettings.mainScript` 通过 `AppEntry.ts.meta` UUID 指向 `main()`；引擎已先完成 `Laya.init()`。入口合并并发启动、传播失败并回滚，正常停机后可创建新应用。`Startup.ls` 仅是可选启动展示资产，不拥有应用；`await lx.stop()` 独立停止所有服务。IDE 当前场景预览绕过 main，需要完整应用服务时使用启动场景预览。
 
-`AppBootstrap` 顺序启动并逆序停止，失败服务自身也参与补偿。`AppServiceContext.signal` 提供协作式取消，stop 必须幂等并可处理半启动状态。默认每个 start 30s、stop 10s，可经 `definition.lifecycle` 配置；这不是整个运行时总耗时上限。超时结束调用方等待但继续记录真实 Promise，晚到 startup 另行补偿。`lx.snapshot()` / `runtime.snapshot()` 聚合启停阶段、pending、失败服务、UI/Pool/Config 和 GC 状态，解绑后用持有的 runtime 查询。
+`AppBootstrap` 顺序启动并逆序停止，失败服务自身也参与补偿。`AppServiceContext.signal` 提供协作式取消，stop 必须幂等并可处理半启动状态。默认每个 start 30s、stop 10s，可经 `definition.lifecycle` 配置；这不是整个运行时总耗时上限。超时结束调用方等待但继续记录真实 Promise，晚到 startup 另行补偿。`lx.snapshot()` / `runtime.snapshot()` 聚合启停阶段、pending、失败服务、World/Scene/UI/Pool/Config 和 GC 状态，解绑后用持有的 runtime 查询。
 
-业务服务先停；共享清理先分别使 UI、pool、audio、config 失效，再并行等待原生加载，默认等待最多 5s（必须小于 stop deadline），之后重试 owner 清理，并等待原生组件的延迟销毁帧。异步 bind 的真实 Promise 与原生加载一同被追踪，取消调用方等待不代表底层工作已完成。未稳定、异常未恢复或仍有启停操作时明确跳过 GC 并报告失败，不伪称清理成功。旧 runtime 解绑后不可再经 lx 访问；内部 quarantine 阻止在其真实任务/补偿尚未稳定或清理失败时绑定新 runtime，防止旧代晚到误操作新代。clean runtime 不进入 quarantine；仍在收尾的 runtime 以 `25ms..1s` 退避复查，证实清理完成后主动解除强引用，无需等待下一次 bind。不可恢复错误继续 fail-closed，需重建进程/页面，不提供强制 reset 绕过。
+业务服务先停；共享清理先发起 World/Scene 卸载，再使 UI、pool、audio、config 失效，再并行等待原生加载，默认等待最多 5s（必须小于 stop deadline），之后重试 owner 清理，并等待原生组件的延迟销毁帧。异步 bind 的真实 Promise 与原生加载一同被追踪，取消调用方等待不代表底层工作已完成。未稳定、异常未恢复或仍有启停操作时明确跳过 GC 并报告失败，不伪称清理成功。旧 runtime 解绑后不可再经 lx 访问；内部 quarantine 阻止在其真实任务/补偿尚未稳定或清理失败时绑定新 runtime，防止旧代晚到误操作新代。clean runtime 不进入 quarantine；仍在收尾的 runtime 以 `25ms..1s` 退避复查，证实清理完成后主动解除强引用，无需等待下一次 bind。不可恢复错误继续 fail-closed，需重建进程/页面，不提供强制 reset 绕过。
 
 ## 验证证据
 

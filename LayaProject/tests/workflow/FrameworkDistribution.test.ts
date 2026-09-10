@@ -21,6 +21,46 @@ afterEach(() => {
 });
 
 describe("framework distribution", () => {
+    it.each(["LayaProject/assets/bootstrap/**", "LayaProject/assets/bootstrap/ui/UITip.lh", "LayaProject/assets/**"])(
+        "rejects ownership of game resources through %s", managed => {
+            const source = fixture("lx-framework-asset-contract-");
+            writeJson(join(source, "framework.manifest.json"), {
+                schemaVersion: 1, name: "LayaLXFamework", version: "1.0.0",
+                repository: "https://example.invalid/LayaLXFamework.git", managedPaths: [managed],
+            });
+            expect(() => run("manifest", "--destination", source)).toThrow(/downstream-owned path/);
+        },
+    );
+
+    it("preserves editable bootstrap assets, including files released from an old lock", () => {
+        const source = fixture("lx-framework-assets-source-");
+        const destination = fixture("lx-framework-assets-consumer-");
+        writeJson(join(source, "framework.manifest.json"), {
+            schemaVersion: 1, name: "LayaLXFamework", version: "1.0.0",
+            repository: "https://example.invalid/LayaLXFamework.git", managedPaths: ["framework.manifest.json"],
+        });
+        const resource = "LayaProject/assets/bootstrap/ui/UITip.lh";
+        write(join(source, resource), "upstream starter skin\n");
+        write(join(destination, resource), "game custom skin\n");
+        const legacy = "LayaProject/assets/bootstrap/framework/ui/Tip.lh";
+        write(join(destination, legacy), "legacy game skin\n");
+        // Emulate a previous release's ownership record; the next sync must relinquish it without deletion.
+        writeJson(join(destination, ".framework-lock.json"), { files: [{ path: legacy }] });
+        git(source, "init");
+        git(source, "config", "user.name", "Framework Test");
+        git(source, "config", "user.email", "framework-test@example.invalid");
+        git(source, "add", ".");
+        git(source, "commit", "-m", "test: publish game-owned bootstrap contract");
+        git(source, "tag", "v1.0.0");
+        run("sync", "--source", source, "--destination", destination, "--ref", "v1.0.0");
+        expect(readFileSync(join(destination, resource), "utf8")).toBe("game custom skin\n");
+        expect(readFileSync(join(destination, legacy), "utf8")).toBe("legacy game skin\n");
+        const lock = JSON.parse(readFileSync(join(destination, ".framework-lock.json"), "utf8"));
+        expect(lock.files.some((entry: { path: string }) => entry.path.includes("/assets/"))).toBe(false);
+        write(join(destination, resource), "game revised skin\n");
+        expect(run("check", "--destination", destination)).toContain("Framework integrity OK");
+    }, distributionTestTimeoutMs);
+
     it("locks managed files, rejects downstream patches and restores through sync", () => {
         const source = fixture("lx-framework-source-");
         const destination = fixture("lx-framework-consumer-");

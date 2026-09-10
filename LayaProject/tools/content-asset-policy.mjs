@@ -52,7 +52,7 @@ export function validateContentAssetProject(projectRoot) {
         }
         const local = portable(relative(assetsRoot, path));
         const extension = extname(path).toLowerCase();
-        const location = locateAsset(local, layout.roots, layout.bootstrapScopes);
+        const location = locateAsset(local, layout.roots);
         if (!location) {
             continue;
         }
@@ -317,17 +317,13 @@ function atlasPageBasename(value) {
     return value.split(/[\\/]/).pop();
 }
 
-function locateAsset(local, roots, bootstrapScopes) {
+function locateAsset(local, roots) {
     const segments = local.split("/");
     if (segments[0] === roots.bootstrap) {
-        if (![bootstrapScopes?.framework, bootstrapScopes?.game].includes(segments[1])) {
-            return undefined;
-        }
         return {
             zone: "bootstrap",
-            scope: segments[1],
-            type: segments[2],
-            relativeSegments: segments.slice(3),
+            type: segments[1],
+            relativeSegments: segments.slice(2),
         };
     }
     if (segments[0] === roots.packages || segments[0] === roots.shared) {

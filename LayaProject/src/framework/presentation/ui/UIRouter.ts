@@ -12,6 +12,7 @@ import { destroyManagedWindow, getWindowCleanupDiagnostic,
 import { UILayoutService, type UIWindowLayout } from "./UILayoutService";
 import { SceneUI } from "./SceneUI";
 import type { UIViewRoute } from "./UIViewRoute";
+import { UIViewRegistry } from "./UIViewRegistry";
 import type { RedDotStore } from "./RedDotStore";
 import {
     compareVisibleWindows,
@@ -85,7 +86,7 @@ interface UIRouterOptions {
 
 export class UIRouter implements WindowLifecycleObserver {
     private readonly routes = new Map<string, UnknownRoute>();
-    private readonly viewRoutes = new Map<string, UIViewRoute<unknown>>();
+    private readonly viewRoutes = new UIViewRegistry();
     private readonly scenes = new Set<SceneUI>();
     private readonly singletonWindows = new Map<string, UnknownWindow>();
     private readonly multipleWindows = new Map<string, Set<UnknownWindow>>();
@@ -116,15 +117,17 @@ export class UIRouter implements WindowLifecycleObserver {
     /** @internal Optional in isolated hosts which do not use badges. */
     get bindingStore(): RedDotStore | undefined { return this.options.redDots; }
 
-    registerView<TArgs, TView extends Laya.GWidget>(route: UIViewRoute<TArgs, TView>): UIViewRoute<TArgs, TView> {
+    registerView<TArgs, TView extends Laya.GWidget = Laya.GWidget>(route: UIViewRoute<TArgs, TView>): UIViewRoute<TArgs, TView> {
         this.requireActive();
-        if (!route.id || !route.url || !route.viewType) throw new Error("UI view id, url and Runtime type are required.");
-        if (route.multiplicity === "multiple" && route.retention === "hide") {
-            throw new Error(`UI route '${route.id}' cannot combine multiplicity 'multiple' with retention 'hide'.`);
-        }
+        if (!route.id || !route.url) throw new Error("UI view id and url are required.");
         if (this.routes.has(route.id) || this.viewRoutes.has(route.id)) throw new Error(`Duplicate UI route '${route.id}'.`);
-        this.viewRoutes.set(route.id, route as unknown as UIViewRoute<unknown>);
+        this.viewRoutes.set(route);
         return route;
+    }
+
+    /** Block new opens immediately, then destroy this route's instances and drain their underlying work. */
+    unregisterView<TArgs, TView extends Laya.GWidget>(route: string | UIViewRoute<TArgs, TView>): Promise<void> {
+        return this.viewRoutes.unregister(route, this.scenes);
     }
 
     /** @internal BaseGameScene owns the returned scope and destroys it before its native children. */

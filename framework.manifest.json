@@ -16,7 +16,6 @@
     "LayaProject/.codex/config.toml",
     "LayaProject/.codex/memory/**",
     "LayaProject/AGENTS.md",
-    "LayaProject/assets/bootstrap/framework/**",
     "LayaProject/docs/**",
     "LayaProject/engine/types/**",
     "LayaProject/settings/AssetImportPolicy.json",
@@ -82,16 +81,12 @@
       }
     },
     "LayaProject/settings/ResourceLayout.json": {
-      "version": 1,
+      "version": 2,
       "roots": {
         "bootstrap": "bootstrap",
         "packages": "packages",
         "shared": "shared",
         "library": "library"
-      },
-      "bootstrapScopes": {
-        "framework": "framework",
-        "game": "game"
       },
       "assetTypes": [
         "scenes",

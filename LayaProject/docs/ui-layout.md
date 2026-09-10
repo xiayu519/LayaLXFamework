@@ -53,50 +53,43 @@ owner 决定谁关闭和回收 UI，host 决定实际父节点，layout 决定�
 
 父展示关闭时，`session.show()` 打开的子 UI 连同隐藏缓存和待加载请求一起销毁；`session.ui.show()` 打开的独立窗口仍归场景。场景离场清理全部所属 UI。singleton 按 owner 隔离，retention:hide 只在 owner 存活期间复用；multiple 只允许 destroy。
 
-## Route 布局策略
+## Prefab 配置与轻量注册
+
+界面逻辑放在 .lh 根节点静态 Runtime 脚本中。根节点必须静态挂载并启用 UIViewLifecycle；在 IDE 的该组件属性面板选择固定参数，注册代码不再重复这些参数。
+
+| UIViewLifecycle 属性 | 用途 |
+| --- | --- |
+| layout | fullscreen 或 center-popup；不按 layer 猜测 |
+| layer | Background / Screen / HUD / Popup / Guide / Toast / System |
+| navigation | page 参与覆盖与恢复，overlay 保留下面页面 |
+| modal | 是否请求所属宿主的公共遮罩 |
+| closeOnMaskClick | 有遮罩时能否点击空白关闭 |
+| multiplicity | singleton 按 owner 隔离；multiple 允许多实例 |
+| retention | destroy 关闭销毁；hide 在 owner 存活期间缓存。multiple 只能 destroy |
+
+Fullscreen 模板默认 Screen/page、非模态、singleton/destroy；Popup 模板默认 Popup/overlay、modal:true、closeOnMaskClick:true、singleton/destroy。确认框示例使用 multiple/destroy，旅行背包使用 singleton/hide。配置在原生反序列化后校验，漏挂、禁用或非法组合会报错。
 
 ```ts
-const battleHudRoute: UIViewRoute<BattleHudArgs, BattleHudView> = {
+const battleHudRoute: UIViewRoute<BattleHudArgs> = {
     id: "battle-hud",
     url: "game/ui/BattleHud.lh",
-    layer: UILayer.HUD,
-    layout: "fullscreen",
-    navigation: "overlay",
-    retention: "destroy",
-    viewType: BattleHudView, // .lh 的原生 Runtime，节点字段由 IDE 生成。
-    bind(view, args, session) {
-        view.healthText.text = String(args.health);
-        view.exitButton.on(Laya.Event.CLICK, view, session.close);
-        session.lifetime.defer(() => view.exitButton.offAllCaller(view));
-    },
+    // 默认调用 .lh 中已静态配置的 Runtime.onBind(args, session)。
 };
 
 const resultRoute: UIViewRoute<ResultArgs, ResultView> = {
     id: "battle-result",
     url: "game/ui/BattleResult.lh",
-    layer: UILayer.Popup,
-    layout: "center-popup",
-    navigation: "overlay",
-    modal: true,
-    closeOnMaskClick: true,
-    multiplicity: "multiple",
-    retention: "destroy",
-    viewType: ResultView,
-    bind(view, args, session) {
-        view.closeButton.on(Laya.Event.CLICK, view, session.close);
-        session.lifetime.defer(() => view.closeButton.offAllCaller(view));
-    },
+    // ResultView 只需 import type；额外依赖由组合根注入。
+    bind: (view, args, session) => view.onBind(args, session, rewards),
     onClosed(_view, args) {
-        // 只做关闭后的业务处理；节点可能已经销毁。
+        // 只处理关闭后的业务；节点可能已经销毁。
     },
 };
 ```
 
-- `fullscreen`：原生页面或窗口 Pane 铺满屏幕，并处理上述约定节点。
-- `safe-screen`：整个 Pane 限制在避开平台顶部占用后的安全区内，适合不需要满屏背景的工具页。
-- `center-popup`：场景 Runtime 根节点或应用窗口 Pane 仍铺满屏幕，safeContent 铺满安全区；只让 mid 保留设计尺寸，在避开平台顶部占用后的安全区居中，空间不足时等比缩小，只有 mid 参与开合动画。UIViewRoute 显式声明布局，不根据 layer 推断适配策略。
+fullscreen 铺满屏幕并适配完整骨架。center-popup 的根与 safeContent 仍拉伸，mid 保留设计尺寸并在避开平台顶部占用后的安全区居中；空间不足等比缩小，只对 mid 播放开合动画。导航、模态和布局各自独立：场景内弹窗仍属于场景，fullscreen 也可以用 overlay。
 
-`navigation: "page"` 参与页面覆盖和返回恢复，`"overlay"` 保留下面页面；`modal` 单独控制输入遮挡。因此 center-popup 不等于场景外窗口，fullscreen 也不必加入页面栈。UIViewRoute 同时支持 layer、layout、navigation、modal、closeOnMaskClick、multiplicity、retention 和 onClosed。
+应用级 GWindow 继续由 UIRoute/register 配置和创建，用于 Loading 等跨场景窗口；其 safe-screen 将整个 Pane 限制在安全区。它与场景原生 GWidget 的 UIViewRoute 是两个明确用途，不能把应用创建器复制到普通场景 UI。
 
 特殊界面可以读取 `lx.ui.layout.snapshot()` 获得 `viewport`、`safeArea` 和 `topSafeArea`；一般业务只需遵循槽位约定。布局和动画不改变宿主，Root/full/safeContent 与宿主遮罩不参与 mid 缩放。关闭、销毁、重复打开和 resize 需要取消或更新旧 Tween，阻止旧回调修改新展示。应用 GWindow 使用原生动画扩展点；场景 UIViewRoute 由 SceneUI 管理原生 GWidget 的展示。
 
@@ -106,7 +99,7 @@ const resultRoute: UIViewRoute<ResultArgs, ResultView> = {
 
 ## 通用 Mask 与关闭后处理
 
-center-popup 默认 modal:true、closeOnMaskClick:true。场景使用宿主 uiRoot 内的局部 Sprite 遮罩，应用复用原生 GRoot.modalLayer；都紧邻最高可见模态窗口下方：全屏、A、Mask、B，关闭 B 后恢复为全屏、Mask、A。场景 Sprite 只承担遮罩绘制和输入拦截，跟随宿主 resize，不需要 Runtime 控件引用。点击只关闭最上层可交互模态窗口，不能越过上方非模态窗口关闭下层；场景 Mask 不迁移到全局 GRoot。
+Popup 骨架在 UIViewLifecycle 中预置 modal:true、closeOnMaskClick:true；仅修改 layout 不会隐式覆盖其他属性。场景使用宿主 uiRoot 内的局部 Sprite 遮罩，应用复用原生 GRoot.modalLayer；都紧邻最高可见模态窗口下方：全屏、A、Mask、B，关闭 B 后恢复为全屏、Mask、A。场景 Sprite 只承担遮罩绘制和输入拦截，跟随宿主 resize，不需要 Runtime 控件引用。点击只关闭最上层可交互模态窗口，不能越过上方非模态窗口关闭下层；场景 Mask 不迁移到全局 GRoot。
 
 closeOnMaskClick:false 保留遮挡但不允许点空白关闭。modal:false 不为本窗口请求遮罩，可在 full 内放自定义全屏按钮，通过 session.close() 关闭；应用窗口才使用 lx.ui.close，仍保留下层模态窗口的遮罩。Root 和 safeContent 的透明区域透传到 Mask，mid 吸收内部空白点击；full 内自定义按钮需要覆盖整个 full 并设置原生 Size Relation。
 
@@ -114,6 +107,6 @@ closeOnMaskClick:false 保留遮挡但不允许点空白关闭。modal:false 不
 
 ## 当前公共界面
 
-`SceneLoading.lh` 和 `FrameworkStatus.lh` 使用完整骨架，内容填入 mid，top/full/bottom 留空；背景覆盖屏幕，卡片保持安全区居中。Loading 使用 GRoot，FrameworkStatus 是场景内原生页面。Fullscreen/Popup 模板、Inventory、FullscreenMid、Confirmation 和 RewardProbe 同样保留全部节点。按钮、列表项、PanelChrome 和池化 Tip 是组合组件，按各自职责嵌入或由对应服务呈现。
+`UISceneLoading.lh` 和 `UILobby.lh` 使用完整骨架，内容填入 mid，top/full/bottom 留空；背景覆盖屏幕，卡片保持安全区居中。Loading 使用 GRoot，UILobby 是场景内原生页面。UIFullscreen/UIPopup 模板、UIInventory、UIFullscreenMid、UIBattle 和 UIConfirmation 同样保留全部节点。按钮、列表项、UIPanelChrome 和池化 UITip 是组合组件，按各自职责嵌入或由对应服务呈现。
 
 [旅行背包示例](ui-examples.md) 保留 `safeContent(top / full / mid / bottom)`，mid 留空：顶部标题和汇总、上下拉伸的虚拟列表、底部选择信息和操作按钮。`node tests/game/logic/ui-examples-resolutions.mjs` 在当前构建上检查多种浏览器分辨率及模拟安全区，包含固定行高、字号和重排后的实际鼠标操作。

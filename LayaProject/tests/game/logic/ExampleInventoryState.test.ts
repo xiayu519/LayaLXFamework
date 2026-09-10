@@ -1,19 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { ExampleInventory } from "../../../src/game/logic/domain/ExampleInventory";
+import { ExampleInventory, createExampleItems } from "../../../src/game/logic/domain/ExampleInventory";
 
 const item = { id: "new-item", name: "新补给", quantity: 9 };
 
 describe("account inventory snapshots and patches", () => {
     it("rebuilds from a full server snapshot and does not retain removed entries", () => {
-        const inventory = new ExampleInventory();
+        const inventory = seeded();
         expect(inventory.applySnapshot({ version: 10, items: [item] })).toBe("applied");
         expect(inventory.snapshot()).toEqual({ version: 10, items: [item] });
         expect(inventory.totalQuantity).toBe(9);
-        expect(inventory.use("supply-1")).toBe(false);
+        expect(inventory.items.some(entry => entry.id === "supply-1")).toBe(false);
     });
 
     it("ignores duplicate or out-of-order snapshots without replacing the current array", () => {
-        const inventory = new ExampleInventory();
+        const inventory = seeded();
         inventory.applySnapshot({ version: 10, items: [item] });
         const current = inventory.items;
         for (const version of [10, 9, 1]) {
@@ -34,7 +34,7 @@ describe("account inventory snapshots and patches", () => {
         { version: 2, items: [{ ...item, id: "" }] },
         { version: 2, items: [{ ...item, name: "  " }] },
     ])("rejects malformed snapshots atomically: %j", payload => {
-        const inventory = new ExampleInventory();
+        const inventory = seeded();
         const before = inventory.snapshot();
         expect(inventory.applySnapshot(payload)).toBe("invalid");
         expect(inventory.items).toBe(before.items);
@@ -42,7 +42,7 @@ describe("account inventory snapshots and patches", () => {
     });
 
     it("applies add/change/remove together, retaining unchanged item identity and order", () => {
-        const inventory = new ExampleInventory();
+        const inventory = seeded();
         const before = inventory.items;
         expect(inventory.applyPatch({ version: 2, baseVersion: 1,
             upserts: [{ ...before[1], quantity: 7 }, item], removedIds: [before[0].id] })).toBe("applied");
@@ -54,7 +54,7 @@ describe("account inventory snapshots and patches", () => {
     });
 
     it("requires a patch's exact base, ignores repeat delivery and recovers through a snapshot", () => {
-        const inventory = new ExampleInventory();
+        const inventory = seeded();
         const patch = { version: 5, baseVersion: 4, upserts: [item], removedIds: [] };
         expect(inventory.applyPatch(patch)).toBe("base-mismatch");
         expect(inventory.totalQuantity).toBe(300);
@@ -65,7 +65,7 @@ describe("account inventory snapshots and patches", () => {
     });
 
     it("rejects invalid/conflicting patches before any writes", () => {
-        const inventory = new ExampleInventory();
+        const inventory = seeded();
         const before = inventory.items;
         for (const patch of [
             { version: 2, baseVersion: 1, upserts: [item, item], removedIds: [] },
@@ -81,7 +81,7 @@ describe("account inventory snapshots and patches", () => {
     });
 
     it("owns immutable copies of accepted data and strips unrelated response fields", () => {
-        const inventory = new ExampleInventory();
+        const inventory = seeded();
         const external = { ...item, extra: { mutable: true } };
         inventory.applySnapshot({ version: 2, items: [external] });
         external.quantity = 0;
@@ -94,15 +94,24 @@ describe("account inventory snapshots and patches", () => {
     });
 
     it("accepts an empty snapshot and keeps explicitly reset state isolated per account", () => {
-        const first = new ExampleInventory();
-        const second = new ExampleInventory();
+        const first = seeded();
+        const second = seeded();
         first.applySnapshot({ version: 20, items: [] });
         expect(first.items).toHaveLength(0);
-        expect(first.use("supply-1")).toBe(false);
-        first.reset();
+        expect(first.items.some(entry => entry.id === "supply-1")).toBe(false);
+        first.clear();
+        expect(first.version).toBe(0);
+        expect(first.totalQuantity).toBe(0);
+        first.applySnapshot({ version: 21, items: createExampleItems() });
         expect(first.version).toBe(21);
         expect(first.totalQuantity).toBe(300);
         expect(second.version).toBe(1);
         expect(second.items).not.toBe(first.items);
     });
 });
+
+function seeded(): ExampleInventory {
+    const model = new ExampleInventory();
+    model.applySnapshot({ version: 1, items: createExampleItems() });
+    return model;
+}

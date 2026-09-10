@@ -10,16 +10,18 @@
 
 ## 拼装与绑定
 
+- UI Prefab 文件名、根节点名及对应 Runtime 类名使用 UI 前缀。启动 UI 资产由游戏维护，放 assets/bootstrap/ui；示例、可复制模板和组件放其 examples/templates/components 对应目录，不另设临时资产分类。移动保留 UUID，复制新 UI 才分配新 UUID；具体归属见资源布局文档。
+
 - 功能选型同时判断是否需要拉伸。全屏列表放 safeContent/full，填满 top 下沿至 bottom 上沿，宽度跟随安全区；改变列表视口，保留行高、字号和 scale=1，不能整体缩放列表适配短屏。固定尺寸居中内容才用 mid。弹窗列表仍属于动画 mid，在 mid 内用 Relation 拉伸。
 - Root/full 覆盖屏幕背景，safeContent/full 填充安全区内上下栏之间的剩余空间，同名节点靠父级确定职责。两个 full 不能导出为同一 Runtime 的同名字段；需要引用时使用 backgroundFull/contentFull 原生属性引用或独立 Runtime 作用域。full 与 mid 都保留。宽高关联使用原生 RelationType.Size；源资产分别声明 Width=1、Height=2，不猜枚举值。
 - 全屏与弹窗的节点及顺序完全相同：Root 下 full、safeContent；safeContent 下 top、full、mid、bottom。全部在 .lh 声明，不裁剪、不由运行时补建。空 top/bottom 高度为 0，空容器使用 mouseThrough 避免拦截输入；填入内容时设置所需设计高度与关系。safeContent 适配安全区，top 避开胶囊，bottom 贴安全区底部。弹窗全部面板内容放 mid，并在避开胶囊的安全区域内居中；全屏 mid 保持安全区中心并避让上下区域。
-- 场景使用 uiRoot 内的局部 Sprite 遮罩，应用复用 GRoot.modalLayer，均放在最高模态窗口正下方。center-popup 默认 modal: true、closeOnMaskClick: true；禁用点击关闭只设置后者为 false。modal: false 可由 full 内全屏按钮自定义关闭，但不能移除其他窗口的遮罩。透明 Root/safeContent 穿透到 Mask，mid 内点击不触发 Mask；不要重复叠加暗色背景，也不为每个场景创建 GRoot。
+- 场景使用 uiRoot 内的局部 Sprite 遮罩，应用复用 GRoot.modalLayer，均放在最高模态窗口正下方。Popup 模板静态设置 modal: true、closeOnMaskClick: true；单独切换 layout 不覆盖其他属性；禁用点击关闭只设置后者为 false。modal: false 可由 full 内全屏按钮自定义关闭，但不能移除其他窗口的遮罩。透明 Root/safeContent 穿透到 Mask，mid 内点击不触发 Mask；不要重复叠加暗色背景，也不为每个场景创建 GRoot。
 - 先选骨架，再按数据形态选纵向列表或网格。模板复制到当前业务资产目录时生成新 UUID，保留本资产内部引用；引用视觉 Prefab 时复用其 UUID，不复制脚本注册 ID 或业务 route ID。
 - 按示意图使用已有散图拼装独立节点，分别处理底板、图标、文字和按钮；清点缺少的素材及来源。固定内容保留在 .lh，尺寸关系用原生 Relation，安全区换算交给布局服务。
 - GList 的 itemRenderer 完整刷新复用状态，先 setVirtual 再设置 numItems；模板含 Scroller 和 itemTemplate。按稳定业务 ID 更新数据，不保存某个显示行作为长期数据身份。
-- 节点引用优先 Runtime + IDE 生成字段，少量引用用 @property；生成文件不手改，不额外建立 Binder。构造期间不能访问尚未反序列化的引用；Native Runtime 可继承符合该根节点类型的业务基类，不为使用生成代码强行增加转发层。
-- 场景所有布局注册 UIViewRoute，bind(view,args,session) 直接使用原生字段；navigation:page/overlay 决定是否覆盖页面，modal 决定输入遮挡。展示事件归 session.lifetime，关闭调用 session.close()；子窗口用 session.show，独立场景窗口用 session.ui.show。应用窗口保留 BaseGameWindow 的 presentation/onClosed；嵌套 frame.closeButton 需显式绑定。
-- 模型和服务器 snapshot/patch 入口独立于 UI，数据先落模型再发原生事件。session.bindData 读快照并合并表现刷新；session.bindRedDot 或 RedDotBinding 展示业务计数，列表复用先解除旧身份。原生引用与模型订阅分开，详见 [数据绑定](../../../../docs/ui-data-binding.md)。异步业务结果不依赖 UI token，只有表现回写检查 token；换图组件引用 DynamicImage.lh 并使用 src，动态行换身份先解除旧订阅，异步 URL 查询也检查身份/token。图集、图片、Prefab 在 bind 中 await/return，关闭取消展示但继续追踪底层加载。
+- 节点引用优先 Runtime + IDE 生成字段，少量引用用静态 Script 的 @property；生成文件不手改，不额外建立 Binder。构造期间不能访问尚未反序列化的引用；Native Runtime 可继承符合该根节点类型的业务基类，不为使用生成代码强行增加转发层。
+- 窗口根静态挂载启用 UIViewLifecycle，在 IDE 配置 layout/layer/navigation/modal/closeOnMaskClick/multiplicity/retention。场景注册 UIViewRoute 只提供 id/url 和可选 bind/onClosed；未提供 bind 默认执行静态 Runtime.onBind，需要依赖时 bind 调用并返回它。Runtime 负责逻辑及原生导出字段，可编辑参数放静态 Script，不把 Runtime 新增属性当作 IDE 可保存字段。navigation:page/overlay 决定是否覆盖页面，modal 决定输入遮挡。展示事件归 session.lifetime，关闭调用 session.close()；子窗口用 session.show，独立场景窗口用 session.ui.show。应用窗口保留 BaseGameWindow 的 presentation/onClosed；嵌套 frame.closeButton 需显式绑定。
+- 模型和服务器 snapshot/patch 入口独立于 UI，数据先落模型再发原生事件。session.bindData 读快照并合并表现刷新；session.bindRedDot 或 RedDotBinding 展示业务计数，列表复用先解除旧身份。原生引用与模型订阅分开，详见 [数据绑定](../../../../docs/ui-data-binding.md)。异步业务结果不依赖 UI token，只有表现回写检查 token；换图组件引用 UIDynamicImage.lh 并使用 src，动态行换身份先解除旧订阅，异步 URL 查询也检查身份/token。图集、图片、Prefab 在 bind 中 await/return，关闭取消展示但继续追踪底层加载。
 
 关闭使用 session.close()、所属 scene.ui 或显式绑定的 closeButton；应用窗口才使用 lx.ui.close。场景 UIViewRoute.onClosed(view,args) 与应用 BaseGameWindow.onClosed() 处理实际展示关闭后的业务；节点可能已销毁，钩子不替代框架清理。父展示关闭销毁其子 UI，场景离场销毁所有所属 UI，均包含 retention:hide 缓存和待完成加载；singleton 按 owner 隔离，multiple 只允许 destroy。
 

@@ -1,0 +1,204 @@
+{
+  "_$ver": 1,
+  "_$id": "battleroot",
+  "_$runtime": "res://45f82095-49f2-472b-8f89-b15d660b9b06",
+  "_$type": "GWidget",
+  "name": "UIBattle",
+  "width": 720,
+  "height": 1280,
+  "mouseThrough": true,
+  "_$comp": [
+    {
+      "_$type": "b7b4888d-8eea-4d9a-884b-c1c722ff72c8",
+      "scriptPath": "../src/framework/presentation/ui/UIViewLifecycle.ts",
+      "layout": "fullscreen",
+      "layer": 1,
+      "navigation": "page",
+      "modal": false,
+      "closeOnMaskClick": true,
+      "multiplicity": "singleton",
+      "retention": "destroy"
+    }
+  ],
+  "_$child": [
+    {
+      "_$id": "battlebackground",
+      "_$type": "GWidget",
+      "name": "full",
+      "width": 720,
+      "height": 1280,
+      "mouseThrough": true,
+      "background": {
+        "_$type": "DrawRectCmd",
+        "fillColor": "#081222"
+      }
+    },
+    {
+      "_$id": "battlesafe",
+      "_$type": "GWidget",
+      "name": "safeContent",
+      "width": 720,
+      "height": 1280,
+      "mouseThrough": true,
+      "_$child": [
+        {
+          "_$id": "battletop",
+          "_$type": "GWidget",
+          "name": "top",
+          "width": 720,
+          "height": 128,
+          "mouseThrough": true,
+          "_$child": [
+            {
+              "_$id": "battletoptext",
+              "_$type": "GTextField",
+              "name": "topText",
+              "x": 32,
+              "y": 32,
+              "width": 656,
+              "height": 64,
+              "mouseThrough": true,
+              "relations": [
+                {
+                  "_$type": "Relation",
+                  "target": {
+                    "_$ref": "battletop"
+                  },
+                  "data": [
+                    1,
+                    0
+                  ]
+                }
+              ],
+              "text": "战斗 World",
+              "fontSize": 28,
+              "color": "#e2e8f0",
+              "align": "center",
+              "valign": "middle",
+              "letterSpacing": 0
+            }
+          ]
+        },
+        {
+          "_$id": "battlefull",
+          "_$type": "GWidget",
+          "name": "full",
+          "y": 128,
+          "width": 720,
+          "height": 1056,
+          "mouseThrough": true
+        },
+        {
+          "_$id": "battlecontent",
+          "_$type": "GWidget",
+          "name": "mid",
+          "x": 40,
+          "y": 300,
+          "width": 640,
+          "height": 680,
+          "mouseThrough": true,
+          "_$child": [
+            {
+              "_$id": "battleframe",
+              "_$prefab": "b8e7a102-1934-4120-918c-7de8d8daba02",
+              "_$var": true,
+              "name": "frame",
+              "active": true,
+              "x": 0,
+              "y": 0,
+              "width": 640,
+              "height": 680,
+              "visible": true,
+              "title": "全屏中央面板"
+            },
+            {
+              "_$id": "battlehint",
+              "_$type": "GTextField",
+              "name": "hintText",
+              "x": 32,
+              "y": 148,
+              "width": 576,
+              "height": 56,
+              "mouseThrough": true,
+              "text": "这里读取登录时建立的同一份账号数据",
+              "fontSize": 22,
+              "color": "#94a3b8",
+              "align": "center",
+              "valign": "middle",
+              "letterSpacing": 0
+            },
+            {
+              "_$id": "battlecounter",
+              "_$var": true,
+              "_$type": "GTextField",
+              "name": "counterText",
+              "x": 32,
+              "y": 244,
+              "width": 576,
+              "height": 160,
+              "mouseThrough": true,
+              "text": "当前计数：0",
+              "fontSize": 26,
+              "color": "#7dd3fc",
+              "align": "center",
+              "valign": "middle",
+              "letterSpacing": 0
+            },
+            {
+              "_$id": "battleaction",
+              "_$prefab": "b8e7a101-1934-4120-918c-7de8d8daba01",
+              "_$var": true,
+              "name": "actionButton",
+              "active": true,
+              "x": 180,
+              "y": 448,
+              "width": 280,
+              "height": 62,
+              "visible": true,
+              "title": "返回大厅"
+            }
+          ]
+        },
+        {
+          "_$id": "battlebottom",
+          "_$type": "GWidget",
+          "name": "bottom",
+          "y": 1184,
+          "width": 720,
+          "height": 96,
+          "mouseThrough": true,
+          "_$child": [
+            {
+              "_$id": "battlebottomtext",
+              "_$type": "GTextField",
+              "name": "bottomText",
+              "x": 32,
+              "y": 20,
+              "width": 656,
+              "height": 56,
+              "mouseThrough": true,
+              "relations": [
+                {
+                  "_$type": "Relation",
+                  "target": {
+                    "_$ref": "battlebottom"
+                  },
+                  "data": [
+                    1,
+                    0
+                  ]
+                }
+              ],
+              "text": "返回大厅后背包数量保留",
+              "fontSize": 20,
+              "color": "#94a3b8",
+              "align": "center",
+              "valign": "middle",
+              "letterSpacing": 0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

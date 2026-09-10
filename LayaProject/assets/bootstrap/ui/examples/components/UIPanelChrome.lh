@@ -1,0 +1,98 @@
+{
+  "_$ver": 1,
+  "_$id": "exampleframe",
+  "_$type": "GLabel",
+  "name": "UIPanelChrome",
+  "x": 0,
+  "y": 0,
+  "width": 640,
+  "height": 1060,
+  "background": {
+    "_$type": "DrawRoundRectCmd",
+    "fillColor": "#121f32",
+    "lineColor": "#33465f",
+    "lineWidth": 1,
+    "lt": 24,
+    "rt": 24,
+    "lb": 24,
+    "rb": 24
+  },
+  "titleWidget": {
+    "_$ref": "frametitle"
+  },
+  "_$child": [
+    {
+      "_$id": "frametitle",
+      "_$type": "GTextField",
+      "name": "titleText",
+      "x": 28,
+      "y": 26,
+      "width": 484,
+      "height": 54,
+      "text": "旅行背包",
+      "fontSize": 30,
+      "color": "#e2e8f0",
+      "valign": "middle",
+      "bold": true,
+      "relations": [
+        {
+          "_$type": "Relation",
+          "target": {
+            "_$ref": "exampleframe"
+          },
+          "data": [
+            1,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "_$id": "frameclose",
+      "_$prefab": "b8e7a101-1934-4120-918c-7de8d8daba01",
+      "name": "closeButton",
+      "x": 552,
+      "y": 24,
+      "width": 60,
+      "height": 58,
+      "title": "×",
+      "relations": [
+        {
+          "_$type": "Relation",
+          "target": {
+            "_$ref": "exampleframe"
+          },
+          "data": [
+            9,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "_$id": "framedivider",
+      "_$type": "GWidget",
+      "name": "divider",
+      "x": 28,
+      "y": 104,
+      "width": 584,
+      "height": 1,
+      "background": {
+        "_$type": "DrawRectCmd",
+        "fillColor": "#2a3b52"
+      },
+      "relations": [
+        {
+          "_$type": "Relation",
+          "target": {
+            "_$ref": "exampleframe"
+          },
+          "data": [
+            1,
+            0
+          ]
+        }
+      ]
+    }
+  ]
+}

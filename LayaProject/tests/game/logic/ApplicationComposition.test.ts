@@ -21,6 +21,9 @@ class FakeEventDispatcher {
 class FakeGWidget extends FakeEventDispatcher {
     readonly components: { onDestroy?(): void }[] = [];
     addComponent<T extends { onDestroy?(): void }>(type: new () => T): T { const instance = new type(); this.components.push(instance); return instance; }
+    getComponent<T extends { onDestroy?(): void }>(type: new () => T): T | null {
+        return this.components.find(component => component instanceof type) as T ?? null;
+    }
     destroyed = false;
     active = true;
     get activeInHierarchy(): boolean { return this.active && (!this.parent || this.parent.activeInHierarchy); }
@@ -116,13 +119,15 @@ class FakeScene extends FakeGWidget {
 }
 const root = new FakeRoot();
 const clearRes = vi.fn();
-const tableBytes = readFileSync(resolve("assets/bootstrap/game/tables/tbtableappconfig.bin"));
-const runtimeConfig = JSON.parse(readFileSync(resolve("assets/bootstrap/game/config/runtime.json"), "utf8"));
+const tableBytes = readFileSync(resolve("assets/bootstrap/tables/tbtableappconfig.bin"));
+const runtimeConfig = JSON.parse(readFileSync(resolve("assets/bootstrap/config/runtime.json"), "utf8"));
 vi.stubGlobal("Laya", {
     regClass: () => () => {},
     property: () => () => {},
-    Script: class {},
+    Script: class { enabled = true; },
     Sprite: FakeGWidget,
+    Node: FakeGWidget,
+    Tween: { killAll: vi.fn() },
     EventDispatcher: FakeEventDispatcher,
     Event: { CLICK: "click" },
     GButton: FakeGWidget,
@@ -135,33 +140,38 @@ vi.stubGlobal("Laya", {
     Loader: { HIERARCHY: "HIERARCHY", BUFFER: "arraybuffer", JSON: "json" },
     loader: {
         load: vi.fn(async (url: string) => {
-            if (url === "bootstrap/game/tables/tbtableappconfig.bin") {
+            if (url === "bootstrap/tables/tbtableappconfig.bin") {
                 return {
                     data: tableBytes.buffer.slice(tableBytes.byteOffset, tableBytes.byteOffset + tableBytes.byteLength),
                 };
             }
-            if (url === "bootstrap/game/config/runtime.json") {
+            if (url === "bootstrap/config/runtime.json") {
                 return new FakeTextResource(runtimeConfig);
             }
-            if (url === "bootstrap/game/ui/FrameworkStatus.lh") {
-                const { FrameworkStatusView } = await import("../../../src/game/logic/presentation/ui/FrameworkStatusView");
-                return new FakePrefab(() => Object.assign(new FrameworkStatusView(), {
-                    statusText: new FakeTextField(), detailText: new FakeTextField(), examplesButton: new FakeGWidget(),
+            if (url === "bootstrap/ui/examples/UILobby.lh") {
+                const { UILobby } = await import("../../../src/game/logic/presentation/ui/examples/UILobby");
+                const { UIViewLifecycle } = await import("../../../src/framework/presentation/ui/UIViewLifecycle");
+                return new FakePrefab(() => {
+                    const view = new UILobby();
+                    view.addComponent(UIViewLifecycle); // Simulates the authored prefab component.
+                    return Object.assign(view, {
+                    statusText: new FakeTextField(), detailText: new FakeTextField(), examplesButton: new FakeGWidget(), battleButton: new FakeGWidget(),
                     inventoryText: new FakeTextField(), feedbackText: new FakeTextField(), rewardButton: new FakeGWidget(),
                     snapshotButton: new FakeGWidget(), replayButton: new FakeGWidget(), inventoryBadge: new FakeGWidget(), inventoryBadgeCount: new FakeTextField(),
-                }));
+                    });
+                });
             }
-            if (url === "bootstrap/game/scenes/FrameworkDemo.ls") {
-                const { FrameworkDemoScene } = await import("../../../src/game/logic/presentation/scenes/FrameworkDemoScene");
+            if (url === "bootstrap/scenes/Lobby.ls") {
+                const { LobbyScene } = await import("../../../src/game/logic/presentation/scenes/LobbyScene");
                 return new FakePrefab(() => {
-                    const scene = new FrameworkDemoScene();
+                    const scene = new LobbyScene();
                     scene.uiRoot = scene.addChild(Object.assign(new FakeGWidget(), { name: "uiRoot" }) as unknown as Laya.GWidget);
                     return scene;
                 });
             }
-            if (url === "bootstrap/framework/ui/SceneLoading.lh") {
-                const { SceneLoadingView } = await import("../../../src/framework/presentation/scene/SceneLoadingView");
-                return new FakePrefab(() => Object.assign(new SceneLoadingView(), {
+            if (url === "bootstrap/ui/UISceneLoading.lh") {
+                const { UISceneLoading } = await import("../../../src/game/logic/presentation/ui/UISceneLoading");
+                return new FakePrefab(() => Object.assign(new UISceneLoading(), {
                     phaseText: new FakeTextField(), sceneProgressText: new FakeTextField(),
                     resourceProgressText: new FakeTextField(), percentText: new FakeTextField(), progressFill: new FakeGWidget(),
                 }));
@@ -210,6 +220,37 @@ beforeEach(async () => {
 afterAll(() => vi.unstubAllGlobals());
 
 describe("createApplication", () => {
+    it("prepares common routes without loading and keeps account updates alive without any World", async () => {
+        const { EXAMPLE_INVENTORY_DATA } = await import("../../../src/game/logic/application/ExampleDataKeys");
+        const { ExampleInventoryData } = await import("../../../src/game/logic/infrastructure/examples/ExampleInventoryData");
+        const loadsBefore = vi.mocked(Laya.loader.load).mock.calls.length;
+        const application = createApplication();
+        const account = application.data.get(EXAMPLE_INVENTORY_DATA);
+        if (!(account instanceof ExampleInventoryData)) throw new Error("Account data composition changed.");
+        expect(application.scenes.snapshot().registeredRoutes).toEqual([]);
+        expect(application.worlds.snapshot().worlds).toEqual([]);
+        expect(() => application.ui.registerView({ id: "lx.examples.confirm", url: "unused.lh" })).toThrow("Duplicate UI route");
+        expect(vi.mocked(Laya.loader.load).mock.calls).toHaveLength(loadsBefore);
+        await application.start();
+        try {
+            const previous = application.scenes.get("examples.lobby")!;
+            await application.worlds.exit("examples.lobby");
+            expect(previous.destroyed).toBe(true);
+            expect(application.scenes.snapshot().registeredRoutes).toEqual([]);
+            expect(application.worlds.snapshot().worlds).toEqual([]);
+            expect(account.createReceiver().applySnapshot({ version: account.version + 1,
+                items: [{ id: "supplies", name: "Supplies", quantity: 9 }] })).toBe("applied");
+            expect(application.ui.redDots.get("examples/inventory")).toBe(9);
+            expect(() => application.ui.registerView({ id: "lx.examples.confirm", url: "unused.lh" })).toThrow("Duplicate UI route");
+            await application.worlds.enter("examples.lobby");
+            expect(application.data.get(EXAMPLE_INVENTORY_DATA)).toBe(account);
+            expect(account.totalQuantity).toBe(9);
+            expect(application.ui.redDots.get("examples/inventory")).toBe(9);
+        } finally { await application.stop(); }
+        expect(() => application.ui.registerView({ id: "after-stop", url: "unused.lh" })).toThrow(/disposed/);
+        expect(application.ui.redDots.disposed).toBe(true);
+    });
+
     it("injects platform boundaries and leaves saved settings unchanged at shutdown", async () => {
         storage.clear();
         const platform: PlatformService = {
@@ -228,15 +269,24 @@ describe("createApplication", () => {
         };
         const http = { request: vi.fn() } as unknown as HttpTransport;
         const application = createApplication({ platform, purchase, http });
+        const { EXAMPLE_INVENTORY_DATA } = await import("../../../src/game/logic/application/ExampleDataKeys");
+        const account = application.data.get(EXAMPLE_INVENTORY_DATA);
+        expect(account.totalQuantity).toBe(0);
+        expect(application.worlds.get("examples.lobby")).toBeUndefined();
+        expect(application.scenes.snapshot().registeredRoutes).toEqual([]);
 
         expect(application.platform).toBe(platform);
         expect(application.purchase).toBe(purchase);
         expect(application.http).toBe(http);
         await application.start();
         expect(lx.ready).toBe(true);
+        expect(account.totalQuantity).toBe(300);
+        expect(lx.data.get(EXAMPLE_INVENTORY_DATA)).toBe(account);
+        expect(lx.worlds.get("examples.lobby")?.id).toBe("examples.lobby");
+        expect("ui" in lx.worlds.get("examples.lobby")!).toBe(false);
         expect(lx.tables.ready).toBe(true);
         expect(lx.config.ready).toBe(true);
-        const scene = lx.sceneFlow.current!;
+        const scene = lx.scenes.get("examples.lobby")!;
         const status = scene.ui.snapshot().views.find(view => view.routeId === "lx.status")!;
         expect(status.view.parent).toBe(scene.getChildByName("uiRoot"));
         expect(root.children).not.toContain(status.view);
@@ -256,6 +306,9 @@ describe("createApplication", () => {
         expect(lx.ready).toBe(false);
         expect(application.tables.ready).toBe(false);
         expect(application.config.ready).toBe(false);
+        expect(account.totalQuantity).toBe(0);
+        expect(application.worlds.snapshot().worlds).toEqual([]);
+        expect(application.scenes.snapshot().registeredRoutes).toEqual([]);
         expect(scene.destroyed).toBe(true);
         expect(status.view.destroyed).toBe(true);
         expect(application.ui.redDots.disposed).toBe(true);
@@ -266,10 +319,28 @@ describe("createApplication", () => {
             musicVolume: 0.25,
             soundVolume: 0.5,
         });
-        expect(sceneGc).toHaveBeenCalledOnce();
-        expect(clearRes).toHaveBeenCalledWith("bootstrap/game/tables/tbtableappconfig.bin");
-        expect(clearRes).toHaveBeenCalledWith("bootstrap/game/config/runtime.json");
+        expect(sceneGc).toHaveBeenCalled();
+        expect(clearRes).toHaveBeenCalledWith("bootstrap/tables/tbtableappconfig.bin");
+        expect(clearRes).toHaveBeenCalledWith("bootstrap/config/runtime.json");
         expect(platform.stop).toHaveBeenCalledOnce();
+    });
+
+    it("rolls back application badge subscriptions when startup fails before entering a World", async () => {
+        const { GameReadyService } = await import("../../../src/game/logic/bootstrap/GameReadyService");
+        const { EXAMPLE_INVENTORY_DATA } = await import("../../../src/game/logic/application/ExampleDataKeys");
+        const { ExampleInventoryData } = await import("../../../src/game/logic/infrastructure/examples/ExampleInventoryData");
+        const application = createApplication();
+        const account = application.data.get(EXAMPLE_INVENTORY_DATA);
+        if (!(account instanceof ExampleInventoryData)) throw new Error("Account data composition changed.");
+        const unsubscribe = vi.spyOn(account, "off");
+        const start = vi.spyOn(GameReadyService.prototype, "start").mockRejectedValueOnce(new Error("login failed"));
+        try {
+            await expect(application.start()).rejects.toThrow("login failed");
+            expect(unsubscribe).toHaveBeenCalledWith(ExampleInventoryData.CHANGED, expect.any(Object), expect.any(Function));
+            expect(application.worlds.snapshot().worlds).toEqual([]);
+            expect(application.ui.redDots.disposed).toBe(true);
+            expect(account.totalQuantity).toBe(0);
+        } finally { start.mockRestore(); unsubscribe.mockRestore(); }
     });
 
     it("removes the lx binding when runtime startup fails", async () => {
@@ -292,10 +363,23 @@ describe("createApplication", () => {
         expect(RedDotBinding.defaultStore).toBeUndefined();
     });
 
+    it("loads the application-selected Tip prefab without requiring the starter asset path", async () => {
+        const runtime = createRuntime({ tipPrefabUrl: "bootstrap/ui/CustomTip.lh" });
+        await runtime.start();
+        try {
+            const node = new FakeGWidget();
+            vi.mocked(Laya.loader.load).mockResolvedValueOnce(new FakePrefab(() => node));
+            const tip = await runtime.pool.acquire("lx.ui.tip");
+            expect(tip).toBe(node);
+            expect(vi.mocked(Laya.loader.load).mock.lastCall?.[0]).toBe("bootstrap/ui/CustomTip.lh");
+            runtime.pool.release("lx.ui.tip", tip);
+        } finally { await runtime.stop(); }
+    });
+
     it("stops game services before the shared Laya resource collection boundary", async () => {
         const events: string[] = [];
         sceneGc.mockImplementationOnce(() => { events.push("gc"); });
-        const runtime = createRuntime({
+        const runtime = createRuntime({ tipPrefabUrl: "test-tip.lh",
             createServices() {
                 return [{
                     name: "game-owner",
@@ -311,7 +395,7 @@ describe("createApplication", () => {
     });
 
     it("waits for native component destruction before requesting GC", async () => {
-        const runtime = createRuntime({});
+        const runtime = createRuntime({ tipPrefabUrl: "test-tip.lh",});
         await runtime.start();
         let finishFrame: (() => void) | undefined;
         const timer = vi.spyOn(Laya.timer, "frameOnce").mockImplementation((_delay, caller, method) => {
@@ -327,7 +411,7 @@ describe("createApplication", () => {
     });
 
     it("skips GC and clears its pending frame if rendering remains suspended", async () => {
-        const runtime = createRuntime({ lifecycle: { pendingLoadTimeoutMs: 20, stopTimeoutMs: 100 } });
+        const runtime = createRuntime({ tipPrefabUrl: "test-tip.lh", lifecycle: { pendingLoadTimeoutMs: 20, stopTimeoutMs: 100 } });
         await runtime.start();
         const timer = vi.spyOn(Laya.timer, "frameOnce").mockImplementation(() => {});
         try {
@@ -338,7 +422,7 @@ describe("createApplication", () => {
     });
 
     it("continues every runtime cleanup step after an earlier failure", async () => {
-        const runtime = createRuntime({});
+        const runtime = createRuntime({ tipPrefabUrl: "test-tip.lh",});
         const events: string[] = [];
         vi.spyOn(runtime.ui, "dispose")
             .mockImplementationOnce(() => { events.push("ui"); throw new Error("ui cleanup failed"); })
@@ -364,7 +448,7 @@ describe("createApplication", () => {
     });
 
     it("stops owners before bounded waiting and skips GC while a load is unresolved", async () => {
-        const runtime = createRuntime({ lifecycle: { pendingLoadTimeoutMs: 20, stopTimeoutMs: 100 } });
+        const runtime = createRuntime({ tipPrefabUrl: "test-tip.lh", lifecycle: { pendingLoadTimeoutMs: 20, stopTimeoutMs: 100 } });
         const audioStop = vi.spyOn(runtime.audio, "dispose");
         vi.spyOn(runtime.ui, "waitForPendingLoads").mockReturnValue(new Promise<void>(() => {}));
         await runtime.start();
@@ -390,17 +474,16 @@ describe("createApplication", () => {
                 await releaseGate;
             }
         }
-        const runtime = createRuntime({ configureSceneFlow(flow) {
+        const runtime = createRuntime({ tipPrefabUrl: "test-tip.lh", configureScenes(flow) {
             flow.register({ id: "source", url: "source.ls" });
-            flow.register({ id: "target", url: "target.ls" });
         } });
         await runtime.start();
         vi.mocked(Laya.loader.load).mockResolvedValueOnce(new FakePrefab(() => new BrokenScene()));
-        await runtime.sceneFlow.open("source", undefined, { showLoading: false });
-        const switching = runtime.sceneFlow.open("target", undefined, { showLoading: false }).catch(error => error);
+        await runtime.scenes.open("source", undefined, { showLoading: false });
+        const switching = runtime.scenes.open("source", undefined, { showLoading: false }).catch(error => error);
         await leaving;
         const stopping = runtime.stop().then(() => undefined, error => error);
-        await vi.waitFor(() => expect(runtime.sceneFlow.snapshot().state).toBe("disposed"));
+        await vi.waitFor(() => expect(runtime.scenes.snapshot().disposed).toBe(true));
         release();
         await switching;
         expect(await stopping).toBeInstanceOf(Error);

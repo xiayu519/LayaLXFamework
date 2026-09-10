@@ -30,7 +30,7 @@ lx.config.release("map.level-001");
 Design/Tables/*.xlsx
   -> npm run tables:generate
   -> src/game/<game-id>/generated/tables/schema.ts
-  -> assets/bootstrap/game/tables/*.bin
+  -> assets/bootstrap/tables/*.bin
   -> GameTablesService
   -> lx.tables
 ```

@@ -6,7 +6,7 @@ class FakeGWidget {
     alpha = 1;
     destroyed = false;
     height = 84;
-    name = "LXTip";
+    name = "UITip";
     parent: FakeRoot | undefined;
     scaleX = 1;
     scaleY = 1;
@@ -128,7 +128,7 @@ afterEach(() => {
 describe("TipQueue", () => {
     it("shows the first tip immediately and dequeues the rest every 500 ms", async () => {
         const pool = createPool();
-        const tips = new TipQueue(pool as never, "bootstrap/framework/ui/Tip.lh");
+        const tips = new TipQueue(pool as never, "bootstrap/ui/UITip.lh");
 
         tips.show("first");
         tips.show("second");
@@ -154,7 +154,7 @@ describe("TipQueue", () => {
 
     it("keeps repeated messages and cleans timer, tween and active views", async () => {
         const pool = createPool();
-        const tips = new TipQueue(pool as never, "bootstrap/framework/ui/Tip.lh");
+        const tips = new TipQueue(pool as never, "bootstrap/ui/UITip.lh");
 
         tips.show("same");
         tips.show("same");
@@ -170,7 +170,7 @@ describe("TipQueue", () => {
 
     it("starts the cadence after an asynchronous first presentation is visible", async () => {
         const pool = createPool(600);
-        const tips = new TipQueue(pool as never, "bootstrap/framework/ui/Tip.lh");
+        const tips = new TipQueue(pool as never, "bootstrap/ui/UITip.lh");
 
         tips.show("first");
         tips.show("second");
@@ -192,7 +192,7 @@ describe("TipQueue", () => {
                 topSafeArea: { x: 110, y: 50, width: 500, height: 1000 },
             }),
         };
-        const tips = new TipQueue(pool as never, "bootstrap/framework/ui/Tip.lh", {}, layout as never);
+        const tips = new TipQueue(pool as never, "bootstrap/ui/UITip.lh", {}, layout as never);
 
         tips.show("safe-area tip");
         await vi.advanceTimersByTimeAsync(0);

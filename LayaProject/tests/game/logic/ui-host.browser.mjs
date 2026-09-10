@@ -3,7 +3,7 @@ export default function uiHostProbe() { return `(${verifyUIHost.toString()})()`;
 async function verifyUIHost() {
     const { lx, Laya } = globalThis;
     const assert = (value, message) => { if (!value) throw new Error(`UI host: ${message}`); };
-    const scene = lx.sceneFlow.current, scope = scene.ui, root = scope.root;
+    const scene = lx.scenes.get('examples.lobby'), scope = scene.ui, root = scope.root;
     assert(scene.uiRoot === root && root.parent === scene, "native Runtime export did not bind the scene host");
     const previousOrder = root.zOrder;
     let popup;

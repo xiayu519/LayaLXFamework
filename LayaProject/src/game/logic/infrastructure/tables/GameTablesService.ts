@@ -3,7 +3,7 @@ import type { TablesRegistry } from "../../../../framework/application/config/Ta
 import ByteBuf from "../../generated/luban/ByteBuf";
 import { Tables } from "../../generated/tables/schema";
 
-const TABLES_ROOT = "bootstrap/game/tables";
+const TABLES_ROOT = "bootstrap/tables";
 
 export class GameTablesService implements AppService {
     readonly name = "game-tables";

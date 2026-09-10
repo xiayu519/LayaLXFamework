@@ -25,7 +25,7 @@ afterEach(() => {
 describe("content asset policy", () => {
     it("accepts the production sprite texture profile", () => {
         const root = createProjectFixture();
-        const image = join(root, "assets", "bootstrap", "game", "images", "icon.png");
+        const image = join(root, "assets", "bootstrap", "images", "icon.png");
         writePngHeader(image, 128, 64);
         writeJson(`${image}.meta`, {
             uuid: "image-uuid",
@@ -41,7 +41,7 @@ describe("content asset policy", () => {
 
     it("rejects expensive or incompatible sprite import settings", () => {
         const root = createProjectFixture();
-        const image = join(root, "assets", "bootstrap", "game", "images", "icon.png");
+        const image = join(root, "assets", "bootstrap", "images", "icon.png");
         writePngHeader(image, 128, 64);
         writeJson(`${image}.meta`, {
             uuid: "image-uuid",
@@ -67,7 +67,7 @@ describe("content asset policy", () => {
 
     it("accepts a co-located binary Spine 3.8 package with straight-alpha page textures", () => {
         const root = createProjectFixture();
-        const spineRoot = join(root, "assets", "bootstrap", "game", "spine", "hero");
+        const spineRoot = join(root, "assets", "bootstrap", "spine", "hero");
         writeSpinePackage(spineRoot, { format: "skel" });
 
         const result = validateContentAssetProject(root);
@@ -77,7 +77,7 @@ describe("content asset policy", () => {
     });
 
     it.each([
-        ["bootstrap game", ["bootstrap", "game"]],
+        ["bootstrap", ["bootstrap"]],
         ["feature package", ["packages", "battle"]],
         ["shared package", ["shared", "characters"]],
     ])("accepts matching Spine JSON from a valid %s spine directory", (_label, segments) => {
@@ -160,7 +160,7 @@ describe("content asset policy", () => {
 
     it("enforces classified audio encoding limits", () => {
         const root = createProjectFixture();
-        const audioRoot = join(root, "assets", "bootstrap", "game", "audio", "bgm");
+        const audioRoot = join(root, "assets", "bootstrap", "audio", "bgm");
         mkdirSync(audioRoot, { recursive: true });
         const mp3 = join(audioRoot, "music.mp3");
         writeFileSync(mp3, Buffer.from([0xff, 0xfb, 0x90, 0x64]));
@@ -176,10 +176,9 @@ function createProjectFixture(): string {
     const root = mkdtempSync(join(tmpdir(), "lx-content-assets-"));
     fixtureRoots.push(root);
     mkdirSync(join(root, "settings"), { recursive: true });
-    mkdirSync(join(root, "assets", "bootstrap", "game", "images"), { recursive: true });
+    mkdirSync(join(root, "assets", "bootstrap", "images"), { recursive: true });
     writeJson(join(root, "settings", "ResourceLayout.json"), {
         roots: { bootstrap: "bootstrap", packages: "packages", shared: "shared", library: "library" },
-        bootstrapScopes: { framework: "framework", game: "game" },
     });
     writeJson(join(root, "settings", "PlayerSettings.json"), { spineVersion: "3.8" });
     writeJson(join(root, "settings", "EditorSettings.json"), { textureType: 2 });
