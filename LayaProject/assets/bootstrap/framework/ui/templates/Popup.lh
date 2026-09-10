@@ -7,12 +7,36 @@
   "height": 1280,
   "_$child": [
     {
+      "_$id": "popuproot_background",
+      "_$type": "GWidget",
+      "name": "full",
+      "width": 720,
+      "height": 1280,
+      "mouseThrough": true
+    },
+    {
       "_$id": "popuprootsafe",
       "_$type": "GWidget",
       "name": "safeContent",
       "width": 720,
       "height": 1280,
       "_$child": [
+        {
+          "_$id": "popuproot_safe_top",
+          "_$type": "GWidget",
+          "name": "top",
+          "width": 720,
+          "height": 0,
+          "mouseThrough": true
+        },
+        {
+          "_$id": "popuproot_safe_full",
+          "_$type": "GWidget",
+          "name": "full",
+          "width": 720,
+          "height": 1280,
+          "mouseThrough": true
+        },
         {
           "_$id": "popupmid",
           "_$type": "GWidget",
@@ -21,9 +45,20 @@
           "height": 390,
           "_$child": [],
           "x": 80,
-          "y": 445
+          "y": 445,
+          "mouseThrough": true
+        },
+        {
+          "_$id": "popuproot_safe_bottom",
+          "_$type": "GWidget",
+          "name": "bottom",
+          "width": 720,
+          "height": 0,
+          "mouseThrough": true
         }
-      ]
+      ],
+      "mouseThrough": true
     }
-  ]
+  ],
+  "mouseThrough": true
 }

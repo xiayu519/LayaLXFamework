@@ -20,7 +20,8 @@
       "background": {
         "_$type": "DrawRectCmd",
         "fillColor": "#081222"
-      }
+      },
+      "mouseThrough": true
     },
     {
       "_$id": "inventoryrootsafe",
@@ -64,7 +65,7 @@
               "name": "summaryText",
               "x": 52,
               "y": 128,
-              "width": 616,
+              "width": 344,
               "height": 32,
               "text": "100 种物品  /  共 300 件",
               "fontSize": 22,
@@ -83,8 +84,32 @@
                   ]
                 }
               ]
+            },
+            {
+              "_$id": "inventorymidexample",
+              "_$prefab": "b8e7a101-1934-4120-918c-7de8d8daba01",
+              "name": "midExampleButton",
+              "_$var": true,
+              "x": 420,
+              "y": 120,
+              "width": 248,
+              "height": 48,
+              "title": "全屏 mid 示例",
+              "relations": [
+                {
+                  "_$type": "Relation",
+                  "target": {
+                    "_$ref": "inventorytop"
+                  },
+                  "data": [
+                    9,
+                    0
+                  ]
+                }
+              ]
             }
-          ]
+          ],
+          "mouseThrough": true
         },
         {
           "_$id": "inventorymiddle",
@@ -202,7 +227,16 @@
                 }
               ]
             }
-          ]
+          ],
+          "mouseThrough": true
+        },
+        {
+          "_$id": "inventoryroot_safe_mid",
+          "_$type": "GWidget",
+          "name": "mid",
+          "width": 640,
+          "height": 680,
+          "mouseThrough": true
         },
         {
           "_$id": "inventorybottom",
@@ -341,9 +375,12 @@
                 }
               ]
             }
-          ]
+          ],
+          "mouseThrough": true
         }
-      ]
+      ],
+      "mouseThrough": true
     }
-  ]
+  ],
+  "mouseThrough": true
 }

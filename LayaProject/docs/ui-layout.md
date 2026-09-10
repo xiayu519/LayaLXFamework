@@ -12,14 +12,14 @@
 
 ## 所有窗口的 `.lh` 约定
 
-固定节点在 `.lh` 中声明。全屏和弹窗共用以下层级；弹窗至少保留 safeContent/mid，全部面板内容放入 mid：
+全部窗口在 `.lh` 中固定声明以下完整层级及顺序，未使用的节点留空保留。全屏按适配需求填充 full 或 mid；弹窗全部面板内容放入 mid：
 
 ```text
 Root
 ├─ full
 └─ safeContent
    ├─ top
-   ├─ full（可选拉伸内容区）
+   ├─ full（上下栏之间的拉伸内容区）
    ├─ mid
    └─ bottom
 ```
@@ -31,7 +31,7 @@ Root
 - `mid`：用于固定尺寸居中内容，保持设计尺寸和安全区中心；空间不足时整体等比缩小，同时避开 top、bottom。全屏滚动列表应使用 full。
 - `bottom`：保持自身设计高度、横向铺满，并贴安全区底部。
 
-不需要的 top/bottom 可以省略或设高度 0，不能让空槽位占用适配空间。槽位内部的按钮、文本和列表继续使用 ui2 的 Relation 系统相对槽位布局，不需要读取平台 API，也不需要逐控件计算刘海偏移。
+空 top/bottom 的高度固定为 0；其他空槽位仍保留，空容器使用 mouseThrough 避免拦截输入。弹窗的空槽位也跟随安全区布局，只有 mid 参与开合动画。槽位内部的按钮、文本和列表使用 ui2 Relation 相对槽位布局，不需要逐控件计算刘海偏移。
 
 全屏背景和安全内容必须分开：背景可以延伸到异形屏边缘，文字和可点击控件进入安全区。微信胶囊只改变 `top` 的起点，不会把 `mid` 和 `bottom` 一起下移。
 
@@ -82,6 +82,6 @@ closeOnMaskClick:false 保留遮挡但不允许点空白关闭。modal:false 不
 
 ## 当前公共界面
 
-`SceneLoading.lh` 和 `FrameworkStatus.lh` 已使用 `full + safeContent + mid`：背景始终覆盖当前 GRoot，中间卡片始终在当前安全区居中，不把资源创作画布中的固定 `x/y` 当作运行时布局。
+`SceneLoading.lh` 和 `FrameworkStatus.lh` 使用完整骨架，内容填入 mid，top/full/bottom 留空；背景覆盖 GRoot，卡片保持安全区居中。Fullscreen/Popup 模板、Inventory、FullscreenMid、Confirmation 和 RewardProbe 同样保留全部节点。按钮、列表项、PanelChrome 和池化 Tip 是组合组件，按各自职责嵌入或由对应服务呈现。
 
-[旅行背包示例](ui-examples.md) 使用 `safeContent(top / full / bottom)`：顶部标题和汇总、上下拉伸的虚拟列表、底部选择信息和操作按钮。`node tests/game/logic/ui-examples-resolutions.mjs` 在当前构建上检查多种浏览器分辨率及模拟安全区，包含固定行高、字号和重排后的实际鼠标操作。
+[旅行背包示例](ui-examples.md) 保留 `safeContent(top / full / mid / bottom)`，mid 留空：顶部标题和汇总、上下拉伸的虚拟列表、底部选择信息和操作按钮。`node tests/game/logic/ui-examples-resolutions.mjs` 在当前构建上检查多种浏览器分辨率及模拟安全区，包含固定行高、字号和重排后的实际鼠标操作。

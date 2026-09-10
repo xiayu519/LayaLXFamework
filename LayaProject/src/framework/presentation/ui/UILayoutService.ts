@@ -109,6 +109,7 @@ export class UILayoutService {
         const target = mode === "safe-screen" ? layout.topSafeArea : layout.viewport;
         setRect(window, target);
         setRect(pane, freezeRect(0, 0, target.width, target.height));
+        if (mode === "fullscreen" || mode === "center-popup") this.applyFullScreenShell(pane, layout);
         if (mode === "center-popup") {
             const full = childWidget(pane, UI_LAYOUT_NODE_NAMES.full);
             if (full) setRect(full, layout.viewport);
@@ -124,7 +125,6 @@ export class UILayoutService {
             mid.mouseEnabled = true;
             if (full) full.mouseThrough = true;
         }
-        if (mode === "fullscreen") this.applyFullScreenShell(pane, layout);
     }
 
     private applyFullScreenShell(pane: Laya.GWidget, layout: UILayoutSnapshot): void {

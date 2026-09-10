@@ -12,7 +12,8 @@
       "name": "full",
       "width": 720,
       "height": 1280,
-      "_$child": []
+      "_$child": [],
+      "mouseThrough": true
     },
     {
       "_$id": "fullscreenrootsafe",
@@ -29,14 +30,16 @@
           "height": 0,
           "_$child": [],
           "x": 0,
-          "y": 0
+          "y": 0,
+          "mouseThrough": true
         },
         {
           "_$id": "shellcontentfull",
           "_$type": "GWidget",
           "name": "full",
           "width": 720,
-          "height": 1280
+          "height": 1280,
+          "mouseThrough": true
         },
         {
           "_$id": "shellmid",
@@ -46,7 +49,8 @@
           "height": 680,
           "_$child": [],
           "x": 40,
-          "y": 300
+          "y": 300,
+          "mouseThrough": true
         },
         {
           "_$id": "shellbottom",
@@ -56,9 +60,12 @@
           "height": 0,
           "_$child": [],
           "x": 0,
-          "y": 1280
+          "y": 1280,
+          "mouseThrough": true
         }
-      ]
+      ],
+      "mouseThrough": true
     }
-  ]
+  ],
+  "mouseThrough": true
 }

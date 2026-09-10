@@ -8,6 +8,7 @@ async function runUIExamples() {
     const ui = LX.UI;
     const inventoryId = "lx.examples.inventory";
     const confirmId = "lx.examples.confirm";
+    const centeredId = "lx.examples.fullscreen-mid";
     const assert = (condition, message) => {
         if (!condition) throw new Error(`UI examples: ${message}`);
     };
@@ -20,6 +21,12 @@ async function runUIExamples() {
     };
     const visible = (id) => ui.listVisible().find((entry) => entry.routeId === id)?.window;
     const activeExamples = () => ui.listManaged().filter((entry) => entry.routeId.startsWith("lx.examples."));
+    const skeleton = (pane) => {
+        assert(pane.children.map(node => node.name).join("/") === "full/safeContent", "root skeleton order");
+        const safe = pane.getChild("safeContent");
+        assert(safe.children.map(node => node.name).join("/") === "top/full/mid/bottom", "safe skeleton order");
+        return safe;
+    };
     const click = (button) => {
         const point = Laya.SpriteUtils.getTransformRelativeToWindow(button, button.width / 2, button.height / 2);
         const canvas = document.querySelector("canvas");
@@ -60,11 +67,11 @@ async function runUIExamples() {
     const checkLayout = (window) => {
         const view = window.contentPane;
         const layout = ui.layout.snapshot();
-        const safe = view.getChild("safeContent");
+        const safe = skeleton(view);
         const top = safe.getChild("top");
         const content = safe.getChild("full");
         const bottom = safe.getChild("bottom");
-        assert(top && content && bottom && !safe.getChild("mid"), "stretching lists require top/full/bottom");
+        assert(safe.getChild("mid").numChildren === 0, "unused mid must remain empty in the stretching list example");
         assert(view.frame.parent === top && view.summaryText.parent === top, "header belongs to top");
         assert(view.itemList.parent.parent === content, "list belongs to safeContent/full");
         assert(view.selectionText.parent === bottom && view.useButton.parent.parent === bottom
@@ -88,6 +95,9 @@ async function runUIExamples() {
         within(rect(view.frame), t, "header frame");
         within(rect(window.closeButton), t, "close button");
         within(rect(view.summaryText), t, "summary");
+        within(rect(view.midExampleButton), t, "centered example entry");
+        assert(rect(view.summaryText).x + rect(view.summaryText).width <= rect(view.midExampleButton).x,
+            "summary overlaps the centered example entry");
         within(rect(view.itemList), m, "list");
         assert(Math.abs(view.itemList.width - content.width + 96) < 1
             && Math.abs(view.itemList.height - content.height + 104) < 1,
@@ -108,6 +118,7 @@ async function runUIExamples() {
     try {
         const status = visible("lx.status");
         assert(status, "startup window missing");
+        skeleton(status.contentPane);
         const entryButton = status.contentPane.findChild("examplesButton", Laya.GButton);
         assert(entryButton.title === "打开 UI 示例", "startup button label");
         click(entryButton);
@@ -145,7 +156,7 @@ async function runUIExamples() {
             click(selected);
             assert(list.selection.index === 9 && view.selectionText.text.includes("010"), `${profile.name}: select after reflow`);
             const popup = await openConfirmation(view);
-            const mid = popup.contentPane.getChild("safeContent").getChild("mid");
+            const mid = skeleton(popup.contentPane).getChild("mid");
             within(rect(mid), ui.layout.snapshot().topSafeArea, `${profile.name}: popup`);
             assert(popup.contentPane.width === Laya.GRoot.inst.width && popup.contentPane.height === Laya.GRoot.inst.height, "popup root must stay fullscreen");
             assert(popup.contentPane.frame.parent === mid && popup.contentPane.confirmButton.parent === mid, "popup controls must belong to mid");
@@ -156,6 +167,46 @@ async function runUIExamples() {
             click(view.resetButton);
             assert(list.selection.index === 0, `${profile.name}: reset after reflow`);
         }
+
+        // The same fullscreen centered window survives every safe-area change, including scale restoration.
+        click(view.midExampleButton);
+        await wait(() => visible(centeredId), "fullscreen centered example entry");
+        const centered = visible(centeredId), centerPane = centered.contentPane;
+        const centerSafe = skeleton(centerPane), centerMid = centerSafe.getChild("mid");
+        const centerFull = centerSafe.getChild("full");
+        assert(!centered.modal && !centered.hasPopupTransition && centerFull.numChildren === 0,
+            "centered fullscreen must use mid while preserving its empty full slot");
+        const action = centerPane.findChild("actionButton", Laya.GButton);
+        const counter = centerPane.findChild("counterText", Laya.GTextField);
+        const centeredScales = [];
+        let clicks = 0;
+        for (const profile of profiles) {
+            Object.defineProperty(platform, "viewport", { configurable: true, get: () => profile.viewport });
+            Laya.stage.event(Laya.Event.RESIZE);
+            await frame();
+            const snapshot = ui.layout.snapshot(), s = rect(centerSafe), m = rect(centerMid);
+            const top = rect(centerSafe.getChild("top")), bottom = rect(centerSafe.getChild("bottom"));
+            within(m, snapshot.safeArea, "fullscreen mid");
+            assert(Math.abs(m.x + m.width / 2 - s.x - s.width / 2) < 1
+                && Math.abs(m.y + m.height / 2 - s.y - s.height / 2) < 1, "fullscreen mid lost its center");
+            assert(m.y >= top.y + top.height - 1 && m.y + m.height <= bottom.y + 1, "fullscreen mid overlaps edge slots");
+            assert(centerPane.width === Laya.GRoot.inst.width && centerPane.height === Laya.GRoot.inst.height
+                && centerPane.scaleX === 1, "fullscreen centered root changed scale or screen coverage");
+            within(rect(action), m, "centered action");
+            within(rect(centered.closeButton), m, "centered close button");
+            click(action); clicks++;
+            assert(counter.text.endsWith(String(clicks)), "empty full slot blocked centered content input");
+            centeredScales.push(centerMid.scaleX);
+        }
+        assert(Math.abs(centeredScales[0] - centeredScales.at(-1)) < 0.001, "centered scale did not restore");
+        click(centered.closeButton);
+        await wait(() => centered.destroyed, "centered native frame close");
+        click(view.midExampleButton);
+        await wait(() => visible(centeredId), "centered reopen");
+        const reopenedCenter = visible(centeredId);
+        assert(reopenedCenter.contentPane.findChild("counterText", Laya.GTextField).text.endsWith("0"), "centered example retained old state");
+        click(reopenedCenter.closeButton);
+        await wait(() => reopenedCenter.destroyed, "centered reopened close");
 
         const row = await inspectRow(list, 89);
         rows.add(row);
@@ -219,10 +270,11 @@ async function runUIExamples() {
         await ui.waitForPendingLoads();
         assert(activeExamples().length === 0, "cancelled open left an orphan window");
         assert([...rows].every((row) => row.destroyed), "sampled virtual rows survived window destruction");
-        return { passed: true, viewport: `${innerWidth}x${innerHeight}`, layouts, items: 100, renderedRows,
+        return { passed: true, viewport: `${innerWidth}x${innerHeight}`, layouts, centeredScales, items: 100, renderedRows,
             reopenCycles: 8, confirmation: "cancel / once / owner close", pendingOpen: "cancelled" };
     } finally {
         ui.close(confirmId);
+        ui.close(centeredId);
         ui.close(inventoryId);
         await ui.waitForPendingLoads();
         await wait(() => activeExamples().length === 0, "final cleanup");

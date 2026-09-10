@@ -6,7 +6,7 @@ description: 按示意图制作窗口、选择全屏或弹窗骨架与 GList 功
 # Laya ui2
 
 1. 制作或重组窗口先读 [references/window-workflow.md](references/window-workflow.md)：判定窗口类型 → 选择分层骨架 → 组合功能模板 → 按散图拼装 → 绑定 → 验收。类型明确不重复询问；无法从上下文确定全屏/弹窗时先询问，不能按“背包/商城”等功能名称猜定。
-2. 所有窗口统一使用全屏 Root，下设可选背景 `full` 和 `safeContent`；安全区内可选 `top/full/mid/bottom`。全屏列表等拉伸内容放 safeContent/full，填满上下栏之间的空间，保持行高和字号；固定居中内容才用 mid，空槽位省略或高度为 0。弹窗全部内容归 mid，只动画 mid。复用原生 GRoot.modalLayer，弹窗默认 modal:true、closeOnMaskClick:true；关闭后扩展覆写 onClosed()。骨架、功能与视觉组件分开检索，见 [模板索引](../../../docs/ui-templates.md)。
+2. 所有窗口固定完整骨架：Root 的直接子节点依次为 full、safeContent；safeContent 内依次为 top、full、mid、bottom。节点始终保留，不用就留空；空 top/bottom 高度为 0，空容器不拦截输入。Root/full 放背景；全屏拉伸内容放 safeContent/full，固定居中内容放 mid。弹窗全部内容归 mid，只动画 mid。复用 GRoot.modalLayer，弹窗默认 modal:true、closeOnMaskClick:true，关闭后覆写 onClosed()。骨架、功能与组件见 [模板索引](../../../docs/ui-templates.md)。
 3. 读 [references/lifecycle.md](references/lifecycle.md)。固定节点在 `.lh/.ls` 声明，route 声明 layout 等现有配置；加载使用 `Laya.loader`，显示顺序以 `GRoot` 为准。
 4. singleton 可 Hide 或 Destroy；multiple 只允许 Destroy。窗口长期副作用归 `lifetime`，每次展示副作用归 `presentation`。异步回写经 `BindingToken.commit()`，动态图使用 `GLoader.src`，关闭时清理。
 5. 瞬时公共提示调用 `LX.UI.tip()`，不建业务队列、Tween 或池副本。

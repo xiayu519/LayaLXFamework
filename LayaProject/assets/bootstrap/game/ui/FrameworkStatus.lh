@@ -15,7 +15,8 @@
       "background": {
         "_$type": "DrawRectCmd",
         "fillColor": "#0b1220"
-      }
+      },
+      "mouseThrough": true
     },
     {
       "_$id": "statussafe",
@@ -24,6 +25,22 @@
       "width": 720,
       "height": 1280,
       "_$child": [
+        {
+          "_$id": "fwstatus_safe_top",
+          "_$type": "GWidget",
+          "name": "top",
+          "width": 720,
+          "height": 0,
+          "mouseThrough": true
+        },
+        {
+          "_$id": "fwstatus_safe_full",
+          "_$type": "GWidget",
+          "name": "full",
+          "width": 720,
+          "height": 1280,
+          "mouseThrough": true
+        },
         {
           "_$id": "statusmiddle",
           "_$type": "GWidget",
@@ -107,9 +124,20 @@
                 }
               ]
             }
-          ]
+          ],
+          "mouseThrough": true
+        },
+        {
+          "_$id": "fwstatus_safe_bottom",
+          "_$type": "GWidget",
+          "name": "bottom",
+          "width": 720,
+          "height": 0,
+          "mouseThrough": true
         }
-      ]
+      ],
+      "mouseThrough": true
     }
-  ]
+  ],
+  "mouseThrough": true
 }

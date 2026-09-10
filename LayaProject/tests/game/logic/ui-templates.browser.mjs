@@ -36,6 +36,12 @@ async function runTemplates() {
     const originalViewport = Object.getOwnPropertyDescriptor(platform, "viewport");
     const viewport = platform.viewport;
     class ProbeWindow extends Base {
+        constructor(pane) {
+            super(pane);
+            assert(pane.children.map(node => node.name).join("/") === "full/safeContent", "complete root skeleton");
+            assert(pane.getChild("safeContent").children.map(node => node.name).join("/") === "top/full/mid/bottom",
+                "complete ordered safe-area skeleton");
+        }
         closedCount = 0;
         cleaned = false;
         onBind(args, token) {
@@ -123,9 +129,7 @@ async function runTemplates() {
         maskClick();
         assert(!lower.isPopupHiding && !custom.isPopupHiding, "nonmodal top allowed lower mask close");
         // Test-only full-screen control, using the same native Size Relation documented for .lh.
-        const full = new Laya.GWidget(); full.name = "full"; custom.contentPane.addChildAt(full, 0);
-        full.size(custom.width, custom.height);
-        full.addRelation(custom.contentPane, Laya.RelationType.Size);
+        const full = custom.contentPane.getChild("full");
         const button = new Laya.GButton(); full.addChild(button); button.size(full.width, full.height);
         button.addRelation(full, Laya.RelationType.Size);
         button.on(Laya.Event.CLICK, custom, () => ui.close(customRoute.id));
@@ -152,7 +156,10 @@ async function runTemplates() {
         for (const name of ["VirtualList", "VirtualGrid"]) {
             const prefab = await Laya.loader.load(`bootstrap/framework/ui/templates/${name}.lh`, Laya.Loader.HIERARCHY);
             const list = prefab.create();
-            midOf(fullscreen).addChild(list);
+            const content = fullscreen.contentPane.getChild("safeContent").getChild("full");
+            content.addChild(list);
+            list.pos(24, 24); list.size(content.width - 48, content.height - 48);
+            list.addRelation(content, Laya.RelationType.Size);
             pools.push(list.itemPool);
             list.itemRenderer = (index, row) => { row.title = `item-${index}`; row.grayed = index % 2 === 0; };
             list.setVirtual(); list.numItems = 100;
@@ -179,6 +186,15 @@ async function runTemplates() {
         }
         ui.close(fullscreenRoute.id);
         await wait(() => fullscreen.destroyed, "fullscreen close");
+
+        const loading = await ready(register("loading-shell", {
+            url: "bootstrap/framework/ui/SceneLoading.lh", layout: "fullscreen", layer: 1,
+        }));
+        const loadingSafe = loading.contentPane.getChild("safeContent");
+        assert(loadingSafe.getChild("top").height === 0 && loadingSafe.getChild("bottom").height === 0,
+            "unused edge slots reserved space in loading UI");
+        assert(loadingSafe.getChild("full").width === loadingSafe.width, "loading empty full failed to adapt");
+        loading.destroy();
 
         const rewardRoute = register("forward-reward", { url: "bootstrap/game/ui/template-probe/RewardProbe.lh" });
         const reward = await ui.show(rewardRoute, { bind: (view, token, scope) => {

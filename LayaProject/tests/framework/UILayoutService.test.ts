@@ -52,6 +52,34 @@ const stage = new FakeStage();
 afterEach(() => vi.unstubAllGlobals());
 
 describe("UILayoutService", () => {
+    it.each(["fullscreen", "center-popup"] as const)("adapts all retained empty slots for %s", async mode => {
+        root.width = stage.width = 720; root.height = stage.height = 1280;
+        vi.stubGlobal("Laya", { GWidget: FakeWidget, GRoot: { inst: root }, stage });
+        const { UILayoutService } = await import("../../src/framework/presentation/ui/UILayoutService");
+        const layout = new UILayoutService(createPlatform({ width: 720, height: 1280,
+            safeArea: { x: 20, y: 40, width: 680, height: 1200 },
+            topRightAvoidance: { x: 600, y: 48, width: 100, height: 32 },
+        }));
+        const pane = sized(new FakeWidget(), 720, 1280);
+        const background = pane.addNamedChild("full", sized(new FakeWidget(), 720, 1280));
+        const safe = pane.addNamedChild("safeContent", sized(new FakeWidget(), 720, 1280));
+        const top = safe.addNamedChild("top", sized(new FakeWidget(), 720, 0));
+        const full = safe.addNamedChild("full", sized(new FakeWidget(), 720, 1280));
+        const mid = safe.addNamedChild("mid", sized(new FakeWidget(), 560, 390));
+        const bottom = safe.addNamedChild("bottom", sized(new FakeWidget(), 720, 0));
+        const window = new FakeWindow(pane);
+        layout.apply(window as unknown as Laya.GWindow, mode);
+        expect(top).toMatchObject({ y: 48, height: 0, width: 680 });
+        expect(bottom).toMatchObject({ y: 1200, height: 0, width: 680 });
+        expect(full).toMatchObject({ x: 0, y: 48, width: 680, height: 1152, scaleX: 1, scaleY: 1 });
+        expect(mid).toMatchObject({ width: 560, height: 390, x: 60, scaleX: 1 });
+        expect(mid.y).toBe(mode === "fullscreen" ? 405 : 429);
+        root.width = stage.width = 540; root.height = stage.height = 960;
+        layout.apply(window as unknown as Laya.GWindow, mode);
+        expect(background).toMatchObject({ width: 540, height: 960 });
+        expect(top.height).toBe(0); expect(bottom.height).toBe(0);
+        expect(full).toMatchObject({ y: 38, width: 510, height: 862, scaleX: 1 });
+    });
     it("stretches safeContent/full between moving top and bottom without scaling list content", async () => {
         root.width = stage.width = 720; root.height = stage.height = 1280;
         vi.stubGlobal("Laya", { GWidget: FakeWidget, GRoot: { inst: root }, stage, Event: { RESIZE: "resize" } });

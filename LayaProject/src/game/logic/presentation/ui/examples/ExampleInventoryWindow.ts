@@ -3,6 +3,7 @@ import { BaseGameWindow } from "../../../../../framework/presentation/ui/BaseGam
 import type { UIRoute } from "../../../../../framework/presentation/ui/UIRouter";
 import type { BindingToken } from "../../../../../framework/application/ui/AsyncBindingGuard";
 import type { ExampleConfirmationArgs } from "./ExampleConfirmationWindow";
+import type { ExampleFullscreenMidArgs } from "./ExampleFullscreenMidWindow";
 import { ExampleInventory } from "./ExampleInventory";
 import { ExampleInventoryView } from "./ExampleInventoryView";
 import { ExampleItemView } from "./ExampleItemView";
@@ -13,7 +14,8 @@ export class ExampleInventoryWindow extends BaseGameWindow<ExampleInventoryArgs>
     private readonly view: ExampleInventoryView;
     private readonly inventory = new ExampleInventory();
 
-    constructor(pane: Laya.GWidget, private readonly confirmationRoute: UIRoute<ExampleConfirmationArgs>) {
+    constructor(pane: Laya.GWidget, private readonly confirmationRoute: UIRoute<ExampleConfirmationArgs>,
+        private readonly centeredRoute: UIRoute<ExampleFullscreenMidArgs>) {
         super(pane);
         if (!(pane instanceof ExampleInventoryView)) {
             throw new Error("Inventory.lh must use ExampleInventoryView.");
@@ -33,6 +35,23 @@ export class ExampleInventoryWindow extends BaseGameWindow<ExampleInventoryArgs>
         let selectedId = this.inventory.items[0].id;
         let opening = false;
         let confirmation: BaseGameWindow<ExampleConfirmationArgs> | undefined;
+        let centered: BaseGameWindow<ExampleFullscreenMidArgs> | undefined;
+        let openingCentered = false;
+        const openCentered = async (): Promise<void> => {
+            if (openingCentered || centered?.isShowing || !token.isCurrent()) return;
+            openingCentered = true;
+            try {
+                const opened = await LX.UI.show(this.centeredRoute, { title: "全屏居中面板" }, { signal: token.signal });
+                if (token.isCurrent()) centered = opened;
+                else opened.hide();
+            } catch (error) {
+                if (token.isCurrent()) {
+                    console.error("[UI examples] fullscreen mid failed", error);
+                    LX.UI.tip("暂时无法打开，请重试");
+                }
+            } finally { openingCentered = false; }
+        };
+        const clickCentered = (): void => { void openCentered(); };
         const refresh = (): void => {
             token.commit(() => {
                 view.summaryText.text = `${this.inventory.items.length} 种物品  /  共 ${this.inventory.totalQuantity} 件`;
@@ -88,13 +107,16 @@ export class ExampleInventoryWindow extends BaseGameWindow<ExampleInventoryArgs>
             view.itemList.on(Laya.UIEvent.ClickItem, this, select);
             view.resetButton.on(Laya.Event.CLICK, this, reset);
             view.useButton.on(Laya.Event.CLICK, this, clickUse);
+            view.midExampleButton.on(Laya.Event.CLICK, this, clickCentered);
             refresh();
         });
         this.presentation.defer(() => {
             view.itemList.off(Laya.UIEvent.ClickItem, this, select);
             view.resetButton.off(Laya.Event.CLICK, this, reset);
             view.useButton.off(Laya.Event.CLICK, this, clickUse);
+            view.midExampleButton.off(Laya.Event.CLICK, this, clickCentered);
             if (confirmation && !confirmation.destroyed) confirmation.hide();
+            if (centered && !centered.destroyed) centered.hide();
         });
     }
 }

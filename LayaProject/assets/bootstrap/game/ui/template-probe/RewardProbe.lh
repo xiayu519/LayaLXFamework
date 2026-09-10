@@ -7,12 +7,36 @@
   "height": 1280,
   "_$child": [
     {
+      "_$id": "rewardroot_background",
+      "_$type": "GWidget",
+      "name": "full",
+      "width": 720,
+      "height": 1280,
+      "mouseThrough": true
+    },
+    {
       "_$id": "rewardrootsafe",
       "_$type": "GWidget",
       "name": "safeContent",
       "width": 720,
       "height": 1280,
       "_$child": [
+        {
+          "_$id": "rewardroot_safe_top",
+          "_$type": "GWidget",
+          "name": "top",
+          "width": 720,
+          "height": 0,
+          "mouseThrough": true
+        },
+        {
+          "_$id": "rewardroot_safe_full",
+          "_$type": "GWidget",
+          "name": "full",
+          "width": 720,
+          "height": 1280,
+          "mouseThrough": true
+        },
         {
           "_$id": "rewardmid",
           "_$type": "GWidget",
@@ -518,9 +542,20 @@
             "rt": 24,
             "lb": 24,
             "rb": 24
-          }
+          },
+          "mouseThrough": true
+        },
+        {
+          "_$id": "rewardroot_safe_bottom",
+          "_$type": "GWidget",
+          "name": "bottom",
+          "width": 720,
+          "height": 0,
+          "mouseThrough": true
         }
-      ]
+      ],
+      "mouseThrough": true
     }
-  ]
+  ],
+  "mouseThrough": true
 }

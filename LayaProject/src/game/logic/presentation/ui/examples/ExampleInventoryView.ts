@@ -9,4 +9,5 @@ export class ExampleInventoryView extends Laya.GWidget {
     selectionText!: Laya.GTextField;
     useButton!: Laya.GButton;
     resetButton!: Laya.GButton;
+    midExampleButton!: Laya.GButton;
 }
