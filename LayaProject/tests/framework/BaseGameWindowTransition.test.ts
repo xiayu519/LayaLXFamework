@@ -13,7 +13,11 @@ class FakeWidget {
     // Native GWindow starts in auto mode, whose public boolean getter returns false.
     mouseEnabled = false;
 
+    readonly children = new Map<string, FakeWidget>();
+    getChildByName(name: string): FakeWidget | undefined { return this.children.get(name); }
+
     destroy(): void {
+        for (const child of this.children.values()) child.destroy();
         this.destroyed = true;
     }
 }
@@ -112,13 +116,21 @@ const { BaseGameWindow } = await import("../../src/framework/presentation/ui/Bas
 
 class TestWindow extends BaseGameWindow<string> {
     shownCount = 0;
+    closedCount = 0;
+    closedAction = (): void => {};
 
     constructor(contentPane: Laya.GWidget) {
-        super(contentPane);
+        const rootPane = new FakeWidget();
+        rootPane.width = 720; rootPane.height = 1280;
+        const safe = new FakeWidget();
+        safe.children.set("mid", contentPane as unknown as FakeWidget);
+        rootPane.children.set("safeContent", safe);
+        super(rootPane as unknown as Laya.GWidget);
     }
 
     protected onBind(_args: string, _token: BindingToken): void {}
     protected override onShown(): void { this.shownCount += 1; }
+    protected override onClosed(): void { this.closedCount++; this.closedAction(); }
 }
 
 beforeEach(() => {
@@ -128,6 +140,57 @@ beforeEach(() => {
 afterAll(() => vi.unstubAllGlobals());
 
 describe("BaseGameWindow popup transition", () => {
+    it("notifies once after hide, again after reopen, and survives a throwing business hook", async () => {
+        const mid = new FakeWidget();
+        const window = new TestWindow(mid as unknown as Laya.GWidget);
+        window.configurePopupTransition(true);
+        await window.present("first"); tweens[0].complete();
+        window.hide(); window.hide();
+        expect(window.closedCount).toBe(0);
+        tweens[1].complete(); tweens[1].fireLateCallback();
+        expect(window.closedCount).toBe(0); // Native UNDISPLAY bookkeeping has not returned yet.
+        await Promise.resolve();
+        expect(window.closedCount).toBe(1);
+        await window.present("second"); tweens[2].complete();
+        window.closedAction = () => { throw new Error("business hook failed"); };
+        const error = vi.spyOn(console, "error").mockImplementation(() => {});
+        try {
+            expect(() => window.destroy()).not.toThrow();
+            await Promise.resolve();
+            expect(window.closedCount).toBe(2);
+            expect(window.destroyed && mid.destroyed).toBe(true);
+            expect(error).toHaveBeenCalledOnce();
+            window.destroy();
+            expect(window.closedCount).toBe(2);
+        } finally { error.mockRestore(); }
+    });
+
+    it("does not call onClosed for an instance that was never displayed", async () => {
+        const window = new TestWindow(new FakeWidget() as unknown as Laya.GWidget);
+        window.destroy();
+        await Promise.resolve();
+        expect(window.closedCount).toBe(0);
+    });
+    it.each(["showing", "hiding"])("reflows mid during %s without restoring stale animation coordinates", async (phase) => {
+        const mid = new FakeWidget();
+        const window = new TestWindow(mid as unknown as Laya.GWidget);
+        window.configurePopupTransition(true);
+        await window.present("args");
+        if (phase === "hiding") { tweens[0].complete(); window.hide(); }
+        const stale = tweens[tweens.length - 1];
+        window.updateLayout(() => {
+            mid.x = 30; mid.y = 50; mid.scaleX = mid.scaleY = 0.8;
+            window.contentPane.height = 900;
+        });
+        stale.fireLateCallback();
+        expect(stale.killed).toBe(true);
+        expect(window.mouseEnabled).toBe(false);
+        tweens[tweens.length - 1].complete();
+        expect(mid).toMatchObject({ x: 30, y: 50, scaleX: 0.8, scaleY: 0.8 });
+        expect(window.contentPane).toMatchObject({ x: 0, y: 0, width: 720, height: 900, scaleX: 1, scaleY: 1 });
+        expect(window.isShowing).toBe(phase === "showing");
+        window.destroy();
+    });
     it("preserves an explicit input disable across the popup animation", async () => {
         const window = new TestWindow(new FakeWidget() as unknown as Laya.GWidget);
         window.mouseEnabled = false;
@@ -163,6 +226,7 @@ describe("BaseGameWindow popup transition", () => {
         expect(window.mouseEnabled).toBe(false);
         expect(pane).toMatchObject({ x: 187, y: 123, scaleX: 0.3, scaleY: 0.3 });
         expect(tweens[0].durationMs).toBe(200);
+        expect(window.contentPane).toMatchObject({ x: 0, y: 0, width: 720, height: 1280, scaleX: 1, scaleY: 1 });
         tweens[0].complete();
         expect(window.shownCount).toBe(1);
         expect(window.mouseEnabled).toBe(true);

@@ -1,0 +1,29 @@
+{
+  "_$ver": 1,
+  "_$id": "popuproot",
+  "_$type": "GWidget",
+  "name": "Popup",
+  "width": 720,
+  "height": 1280,
+  "_$child": [
+    {
+      "_$id": "popuprootsafe",
+      "_$type": "GWidget",
+      "name": "safeContent",
+      "width": 720,
+      "height": 1280,
+      "_$child": [
+        {
+          "_$id": "popupmid",
+          "_$type": "GWidget",
+          "name": "mid",
+          "width": 560,
+          "height": 390,
+          "_$child": [],
+          "x": 80,
+          "y": 445
+        }
+      ]
+    }
+  ]
+}

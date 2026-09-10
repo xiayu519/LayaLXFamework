@@ -41,12 +41,12 @@ await LX.UI.show(inventoryRoute, { title: "旅行背包" });
 ## 复用预制体
 
 - [ActionButton.lh](../assets/bootstrap/game/ui/examples/ActionButton.lh)：原生 `GButton`、标题绑定和相对尺寸。
-- [WindowFrame.lh](../assets/bootstrap/game/ui/examples/WindowFrame.lh)：标题、关闭按钮与底板。全屏页的顶部标题区和确认弹窗引用同一个 Prefab，尺寸变化由 Relation 处理。
+- [PanelChrome.lh](../assets/bootstrap/game/ui/examples/PanelChrome.lh)：标题、关闭按钮与底板。全屏页的顶部标题区和确认弹窗引用同一个 Prefab，尺寸变化由 Relation 处理。
 - [InventoryItem.lh](../assets/bootstrap/game/ui/examples/InventoryItem.lh)：Radio 模式 `GButton`，由原生 `button` Controller 和 `GearDisplay` 展示选中边框。
-- [Inventory.lh](../assets/bootstrap/game/ui/examples/Inventory.lh)：完整声明 `fullBleed + safeContent(top / middle / bottom)`；标题和汇总归 `top`，虚拟列表归 `middle`，选择信息和操作按钮归 `bottom`。列表在源资产声明 Scroller 和模板节点。
-- [Confirmation.lh](../assets/bootstrap/game/ui/examples/Confirmation.lh)：根尺寸 `560×390`，对应 `center-popup`；根下名为 `frame` 的窗框供 `GWindow` 自动识别 `closeButton`。
+- [Inventory.lh](../assets/bootstrap/game/ui/examples/Inventory.lh)：完整声明 `full + safeContent(top / full / bottom)`；标题和汇总归 top，虚拟列表归 safeContent/full，选择信息和操作按钮归 bottom。列表随上下区域和安全区拉伸，行高与字号不变；源资产声明 Scroller、模板节点及宽高 Relation。
+- [Confirmation.lh](../assets/bootstrap/game/ui/examples/Confirmation.lh)：根尺寸 `720×1280` 随屏幕拉伸，safeContent/mid 为 `560×390` 内容画布，对应 `center-popup`；frame、文字和按钮全部归入 mid，只有 mid 做开合动画。
 
-全屏窗框位于安全区 `top` 内，所以窗口构造时用 `this.closeButton = pane.frame.getChild("closeButton")` 绑定关闭按钮。固定节点始终来自 `.lh`，无需运行时补建。底部按钮相对 `actions` 同时按比例关联宽度和左坐标，侧边安全区收窄时保持间距。
+PanelChrome 是装饰子组件，不是全屏或弹窗骨架。全屏窗框位于 safeContent/top，弹窗窗框位于 safeContent/mid，两者均在窗口构造时用 `this.closeButton = pane.frame.getChild("closeButton")` 绑定关闭按钮。固定节点始终来自 `.lh`，无需运行时补建。底部按钮相对 `actions` 同时按比例关联宽度和左坐标，侧边安全区收窄时保持间距。
 
 ## 类型与生命周期
 
@@ -72,10 +72,10 @@ node tests/game/logic/ui-examples-resolutions.mjs
 
 专项探针通过浏览器鼠标事件验证启动入口、虚拟列表选择、选中样式、确认/取消、模态阻挡、重复确认、父窗口关闭、8 次重开及立即取消打开；记录实际显示项数量，并断言窗口销毁后原生列表池为空。它保留现有浏览器运行时错误、404 和完整 owner 停机检查。
 
-分辨率矩阵复用上述构建，最多同时运行 3 个 Headless 浏览器，覆盖 `320×568`、`360×640`、`375×667`、`390×844`、`412×915`、`600×800`、`768×1024`、`1280×720`。每个视口均在同一窗口内切换普通、刘海/胶囊、侧边安全区和恢复场景，断言槽位归属、背景覆盖、居中、底部定位、无重叠/越界，以及重排后的选择、弹窗和重置点击。项目 `screenMode: vertical` 会按引擎规则旋转横向浏览器视口；这验证的是本项目竖屏适配。
+分辨率矩阵复用上述构建，最多同时运行 2 个 Headless 浏览器，覆盖 `320×568`、`360×640`、`375×667`、`390×844`、`412×915`、`600×800`、`768×1024`、`1280×720`。每个视口均切换普通、刘海/胶囊、侧边安全区和恢复场景，断言槽位归属、背景覆盖、列表上下拉伸、固定行高/字号、底部定位、无重叠/越界，以及重排后的选择、弹窗和重置点击。项目 `screenMode: vertical` 会按引擎规则旋转横向浏览器视口；这验证的是本项目竖屏适配。
 
 单个尺寸可复查：`node tools/test-browser.mjs --suite targeted --probe tests/game/logic/ui-examples.browser.mjs --viewport 390x844`。`--viewport` 设置真实浏览器 CSS 视口；平台刘海和胶囊数据由探针模拟，结束后恢复。
 
 同一构建输入未变时，后续 UI 框架回归可复用发布目录：`npm run test:browser -- --suite framework`。Windows Headless Chromium / SwiftShader 的结果不代表 macOS、小游戏真机或目标 GPU 的性能验收。
 
-2026-09-09 分层修正后的本机验证：typecheck、61 项相关单测、架构检查及 9 个层级资产的官方解析通过。8 种真实浏览器视口 × 4 组安全区场景全部通过；每个尺寸的 100 项列表实际实例化 7 个显示项，均通过交互与 8 次重开。共享布局修改后的 100 次 UI/Pool 框架循环也通过，无 404、运行时错误或停机 owner 残留。另用 CDP 在窗口打开期间连续切换 `390×844 → 600×800 → 320×568 → 390×844`，确认缩放恢复和按钮点击，并检查短屏、长屏与确认弹窗截图。
+模板选择与独立功能资产见 [UI 模板索引](ui-templates.md)；通用 Mask 配置和关闭后钩子见 [布局约定](ui-layout.md)。

@@ -19,6 +19,9 @@
     { "id": "independent_work_continues", "request": "公共存档格式变更尚待批准；当前游戏一个已授权且独立的分数显示修复不依赖它。对这个局部修复下一步？", "expected": "implement" }
   ],
   "cases": [
+    {"id":"ui_reference_home","request":"按给定主界面示意图，用已有散图拼好资源栏、主内容和底部导航，选择项目已有窗口与功能模板并验证适配。","expected":["laya-ui2"]},
+    {"id":"ui_reference_popup_grid","request":"制作奖励弹窗，中间显示100个奖励的三列网格，下方领取和取消，沿用框架开合动画并验证滚动。","expected":["laya-ui2"]},
+    {"id":"ui_reference_ambiguous_bag","request":"按背包示意图制作界面，图中只有物品格和详情，没说明全屏还是弹窗，请按现有流程处理。","expected":["laya-ui2"]},
     { "id": "unchanged_workflow_review", "request": "只读审查 AGENTS.md 是否准确区分单人维护、约 2–3 人使用和 Codex 默认单代理，不修改或重新设计任何工作流。", "expected": ["codex-workflow"] },
     { "id": "negative_arithmetic", "request": "只回答 12 乘以 7 等于多少，不操作项目。", "expected": [] },
     { "id": "negative_translation", "request": "把这句话译成英文：欢迎回来。不读取或修改文件。", "expected": [] },

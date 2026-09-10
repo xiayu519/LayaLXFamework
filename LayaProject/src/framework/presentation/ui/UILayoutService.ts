@@ -33,10 +33,10 @@ export interface UILayoutSnapshot {
 }
 
 export const UI_LAYOUT_NODE_NAMES = Object.freeze({
-    fullBleed: "fullBleed",
+    full: "full",
     safeContent: "safeContent",
     top: "top",
-    middle: "middle",
+    mid: "mid",
     bottom: "bottom",
 });
 
@@ -106,63 +106,79 @@ export class UILayoutService {
         const layout = this.currentValue;
         if (layout.viewport.width <= 0 || layout.viewport.height <= 0) return;
         const pane = window.contentPane;
-        if (mode === "center-popup") {
-            const size = this.captureSize(pane);
-            const width = Math.min(size.width, layout.topSafeArea.width);
-            const height = Math.min(size.height, layout.topSafeArea.height);
-            setRect(window, centeredRect(layout.topSafeArea, width, height));
-            setRect(pane, freezeRect(0, 0, width, height));
-            return;
-        }
-
         const target = mode === "safe-screen" ? layout.topSafeArea : layout.viewport;
         setRect(window, target);
         setRect(pane, freezeRect(0, 0, target.width, target.height));
+        if (mode === "center-popup") {
+            const full = childWidget(pane, UI_LAYOUT_NODE_NAMES.full);
+            if (full) setRect(full, layout.viewport);
+            const safe = childWidget(pane, UI_LAYOUT_NODE_NAMES.safeContent);
+            const mid = safe && childWidget(safe, UI_LAYOUT_NODE_NAMES.mid);
+            if (!safe || !mid) throw new Error("center-popup requires safeContent/mid under its fullscreen root.");
+            setRect(safe, layout.safeArea);
+            this.fitContent(mid, freezeRect(0, layout.topSafeArea.y - layout.safeArea.y,
+                layout.topSafeArea.width, layout.topSafeArea.height));
+            // Empty fullscreen containers pass input to GRoot.modalLayer; the card absorbs interior clicks.
+            pane.mouseThrough = safe.mouseThrough = true;
+            mid.mouseThrough = false;
+            mid.mouseEnabled = true;
+            if (full) full.mouseThrough = true;
+        }
         if (mode === "fullscreen") this.applyFullScreenShell(pane, layout);
     }
 
     private applyFullScreenShell(pane: Laya.GWidget, layout: UILayoutSnapshot): void {
-        const fullBleed = childWidget(pane, UI_LAYOUT_NODE_NAMES.fullBleed);
-        if (fullBleed) setRect(fullBleed, layout.viewport);
-
-        const safeContent = childWidget(pane, UI_LAYOUT_NODE_NAMES.safeContent);
-        if (!safeContent) return;
-        setRect(safeContent, layout.safeArea);
-
-        const top = childWidget(safeContent, UI_LAYOUT_NODE_NAMES.top);
+        const full = childWidget(pane, UI_LAYOUT_NODE_NAMES.full);
+        if (full) setRect(full, layout.viewport);
+        const safe = childWidget(pane, UI_LAYOUT_NODE_NAMES.safeContent);
+        if (!safe) return;
+        setRect(safe, layout.safeArea);
+        const top = childWidget(safe, UI_LAYOUT_NODE_NAMES.top);
         if (top) {
             const size = this.captureSize(top);
             const relativeY = layout.topSafeArea.y - layout.safeArea.y;
             setRect(top, freezeRect(
-                layout.topSafeArea.x - layout.safeArea.x,
+                0,
                 relativeY,
                 layout.topSafeArea.width,
                 Math.min(size.height, Math.max(0, layout.safeArea.height - relativeY)),
             ));
         }
 
-        const bottom = childWidget(safeContent, UI_LAYOUT_NODE_NAMES.bottom);
+        const bottom = childWidget(safe, UI_LAYOUT_NODE_NAMES.bottom);
         if (bottom) {
             const size = this.captureSize(bottom);
             const height = Math.min(size.height, layout.safeArea.height);
             setRect(bottom, freezeRect(0, layout.safeArea.height - height, layout.safeArea.width, height));
         }
 
-        const middle = childWidget(safeContent, UI_LAYOUT_NODE_NAMES.middle);
-        if (middle) {
-            const size = this.captureSize(middle);
+        // Scrollable content fills the remaining safe area at its original scale.
+        // This scoped full slot is distinct from pane/full, which covers the entire screen.
+        const contentFull = childWidget(safe, UI_LAYOUT_NODE_NAMES.full);
+        if (contentFull) {
+            const start = top ? top.y + top.height : layout.topSafeArea.y - layout.safeArea.y;
+            const end = bottom?.y ?? safe.height;
+            setRect(contentFull, freezeRect(0, start, safe.width, Math.max(0, end - start)));
+            contentFull.scaleX = contentFull.scaleY = 1;
+        }
+
+        const mid = childWidget(safe, UI_LAYOUT_NODE_NAMES.mid);
+        if (mid) {
             // Preserve the safe-area center, including when the capsule moves only the top slot.
             // Reserve equal space on both sides of that center so the slots cannot overlap.
-            const reservedHeight = Math.max(top ? top.y + top.height : 0, bottom?.height ?? 0);
+            const reservedHeight = Math.max(top && top.height > 0 ? top.y + top.height : 0, bottom?.height ?? 0);
             const availableHeight = Math.max(0, layout.safeArea.height - 2 * reservedHeight);
-            const scale = fitScale(size.width, size.height, layout.safeArea.width, availableHeight);
-            middle.width = size.width;
-            middle.height = size.height;
-            middle.scaleX = scale;
-            middle.scaleY = scale;
-            middle.x = (layout.safeArea.width - size.width * scale) / 2;
-            middle.y = (layout.safeArea.height - size.height * scale) / 2;
+            this.fitContent(mid, freezeRect(0, reservedHeight,
+                layout.safeArea.width, availableHeight));
         }
+    }
+
+    private fitContent(widget: Laya.GWidget, area: UILayoutRect): void {
+        const size = this.captureSize(widget);
+        const scale = fitScale(size.width, size.height, area.width, area.height);
+        const position = centeredRect(area, size.width * scale, size.height * scale);
+        setRect(widget, freezeRect(position.x, position.y, size.width, size.height));
+        widget.scaleX = widget.scaleY = scale;
     }
 
     private captureSize(widget: Laya.GWidget): Readonly<{ width: number; height: number }> {

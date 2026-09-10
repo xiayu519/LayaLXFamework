@@ -7,6 +7,13 @@ import { UILayer } from "../../src/framework/presentation/ui/UILayer";
 class FakeGWidget {
     destroyed = false;
     zOrder = 0;
+    private readonly events = new Map<string, Map<unknown, (...args: any[]) => void>>();
+    on(event: string, owner: unknown, fn: (...args: any[]) => void): void {
+        if (!this.events.has(event)) this.events.set(event, new Map());
+        this.events.get(event)!.set(owner, fn);
+    }
+    off(event: string, owner: unknown): void { this.events.get(event)?.delete(owner); }
+    event(event: string, value: unknown): void { for (const [owner, fn] of this.events.get(event) ?? []) fn.call(owner, value); }
     parent?: FakeRoot;
 
     removeSelf(): this {
@@ -98,6 +105,7 @@ vi.stubGlobal("Laya", {
     GWidget: FakeGWidget,
     GWindow: FakeGWindow,
     GRoot: { inst: root },
+    Event: { CLICK: "click" },
     Loader: { HIERARCHY: "HIERARCHY" },
     loader: { load: loaderLoad },
     timer: {
@@ -167,6 +175,29 @@ function prefab(content: FakeGWidget = new FakeGWidget()): Laya.Prefab {
 }
 
 describe("UIRouter", () => {
+    it("closes only the mask owner, honors opt-out, and detaches its listener on disposal", async () => {
+        loaderLoad.mockImplementation(() => Promise.resolve(prefab()));
+        const router = new UIRouter();
+        const lower = router.register({ ...route("mask-lower", p => new TestWindow(p)), layer: UILayer.Popup });
+        const upper = router.register({ ...route("mask-upper", p => new TestWindow(p)), layer: UILayer.Popup, closeOnMaskClick: false });
+        const custom = router.register({ ...route("mask-custom", p => new TestWindow(p)), layer: UILayer.Popup, modal: false });
+        const a = await router.show(lower, "a");
+        const b = await router.show(upper, "b");
+        const event = { stopPropagation: vi.fn() };
+        root.modalLayer.event("click", event);
+        expect(b.isShowing).toBe(true);
+        router.close(upper.id);
+        const c = await router.show(custom, "c");
+        root.modalLayer.event("click", event);
+        expect(a.isShowing).toBe(true);
+        expect(c.isShowing).toBe(true);
+        router.close(custom.id);
+        root.modalLayer.event("click", event);
+        expect(a.isShowing).toBe(false);
+        expect(event.stopPropagation).toHaveBeenCalledTimes(1);
+        router.dispose();
+        expect(() => root.modalLayer.event("click", event)).not.toThrow();
+    });
     it("rejects the unrecoverable multiple + hide policy", () => {
         const router = new UIRouter();
         expect(() => router.register(route(

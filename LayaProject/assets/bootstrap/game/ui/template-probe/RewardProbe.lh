@@ -1,0 +1,526 @@
+{
+  "_$ver": 1,
+  "_$id": "rewardroot",
+  "_$type": "GWidget",
+  "name": "RewardProbe",
+  "width": 720,
+  "height": 1280,
+  "_$child": [
+    {
+      "_$id": "rewardrootsafe",
+      "_$type": "GWidget",
+      "name": "safeContent",
+      "width": 720,
+      "height": 1280,
+      "_$child": [
+        {
+          "_$id": "rewardmid",
+          "_$type": "GWidget",
+          "name": "mid",
+          "width": 640,
+          "height": 860,
+          "_$child": [
+            {
+              "_$id": "rewardtitle",
+              "_$type": "GTextField",
+              "name": "titleText",
+              "x": 24,
+              "y": 30,
+              "width": 592,
+              "height": 54,
+              "text": "奖励领取",
+              "fontSize": 30,
+              "color": "#e2e8f0",
+              "align": "center",
+              "valign": "middle"
+            },
+            {
+              "_$id": "rewardhint",
+              "_$type": "GTextField",
+              "name": "hintText",
+              "x": 24,
+              "y": 92,
+              "width": 592,
+              "height": 32,
+              "text": "100 项奖励 · 上下滑动查看",
+              "fontSize": 20,
+              "color": "#94a3b8",
+              "align": "center",
+              "valign": "middle"
+            },
+            {
+              "_$id": "rewardgrid",
+              "_$type": "GList",
+              "name": "rewardGrid",
+              "width": 592,
+              "height": 592,
+              "_$child": [
+                {
+                  "_$id": "rewardtemplate",
+                  "_$prefab": "e2308cf9-fff8-4451-a3ff-c55459b1b3c8",
+                  "name": "ListItem",
+                  "width": 192,
+                  "height": 144
+                }
+              ],
+              "layout": {
+                "type": 3,
+                "columns": 3,
+                "columnGap": 8,
+                "rowGap": 8,
+                "stretchX": 1
+              },
+              "scroller": {
+                "_$type": "Scroller",
+                "direction": 0,
+                "barDisplay": 5
+              },
+              "_templateNode": {
+                "_$ref": "rewardtemplate",
+                "_$tmpl": "itemTemplate"
+              },
+              "_initItemNum": 100,
+              "_isDemo": false,
+              "x": 24,
+              "y": 148,
+              "_itemData": [
+                {
+                  "name": "reward-001",
+                  "title": "奖励 001\n× 1"
+                },
+                {
+                  "name": "reward-002",
+                  "title": "奖励 002\n× 1"
+                },
+                {
+                  "name": "reward-003",
+                  "title": "奖励 003\n× 1"
+                },
+                {
+                  "name": "reward-004",
+                  "title": "奖励 004\n× 1"
+                },
+                {
+                  "name": "reward-005",
+                  "title": "奖励 005\n× 1"
+                },
+                {
+                  "name": "reward-006",
+                  "title": "奖励 006\n× 1"
+                },
+                {
+                  "name": "reward-007",
+                  "title": "奖励 007\n× 1"
+                },
+                {
+                  "name": "reward-008",
+                  "title": "奖励 008\n× 1"
+                },
+                {
+                  "name": "reward-009",
+                  "title": "奖励 009\n× 1"
+                },
+                {
+                  "name": "reward-010",
+                  "title": "奖励 010\n× 1"
+                },
+                {
+                  "name": "reward-011",
+                  "title": "奖励 011\n× 1"
+                },
+                {
+                  "name": "reward-012",
+                  "title": "奖励 012\n× 1"
+                },
+                {
+                  "name": "reward-013",
+                  "title": "奖励 013\n× 1"
+                },
+                {
+                  "name": "reward-014",
+                  "title": "奖励 014\n× 1"
+                },
+                {
+                  "name": "reward-015",
+                  "title": "奖励 015\n× 1"
+                },
+                {
+                  "name": "reward-016",
+                  "title": "奖励 016\n× 1"
+                },
+                {
+                  "name": "reward-017",
+                  "title": "奖励 017\n× 1"
+                },
+                {
+                  "name": "reward-018",
+                  "title": "奖励 018\n× 1"
+                },
+                {
+                  "name": "reward-019",
+                  "title": "奖励 019\n× 1"
+                },
+                {
+                  "name": "reward-020",
+                  "title": "奖励 020\n× 1"
+                },
+                {
+                  "name": "reward-021",
+                  "title": "奖励 021\n× 1"
+                },
+                {
+                  "name": "reward-022",
+                  "title": "奖励 022\n× 1"
+                },
+                {
+                  "name": "reward-023",
+                  "title": "奖励 023\n× 1"
+                },
+                {
+                  "name": "reward-024",
+                  "title": "奖励 024\n× 1"
+                },
+                {
+                  "name": "reward-025",
+                  "title": "奖励 025\n× 1"
+                },
+                {
+                  "name": "reward-026",
+                  "title": "奖励 026\n× 1"
+                },
+                {
+                  "name": "reward-027",
+                  "title": "奖励 027\n× 1"
+                },
+                {
+                  "name": "reward-028",
+                  "title": "奖励 028\n× 1"
+                },
+                {
+                  "name": "reward-029",
+                  "title": "奖励 029\n× 1"
+                },
+                {
+                  "name": "reward-030",
+                  "title": "奖励 030\n× 1"
+                },
+                {
+                  "name": "reward-031",
+                  "title": "奖励 031\n× 1"
+                },
+                {
+                  "name": "reward-032",
+                  "title": "奖励 032\n× 1"
+                },
+                {
+                  "name": "reward-033",
+                  "title": "奖励 033\n× 1"
+                },
+                {
+                  "name": "reward-034",
+                  "title": "奖励 034\n× 1"
+                },
+                {
+                  "name": "reward-035",
+                  "title": "奖励 035\n× 1"
+                },
+                {
+                  "name": "reward-036",
+                  "title": "奖励 036\n× 1"
+                },
+                {
+                  "name": "reward-037",
+                  "title": "奖励 037\n× 1"
+                },
+                {
+                  "name": "reward-038",
+                  "title": "奖励 038\n× 1"
+                },
+                {
+                  "name": "reward-039",
+                  "title": "奖励 039\n× 1"
+                },
+                {
+                  "name": "reward-040",
+                  "title": "奖励 040\n× 1"
+                },
+                {
+                  "name": "reward-041",
+                  "title": "奖励 041\n× 1"
+                },
+                {
+                  "name": "reward-042",
+                  "title": "奖励 042\n× 1"
+                },
+                {
+                  "name": "reward-043",
+                  "title": "奖励 043\n× 1"
+                },
+                {
+                  "name": "reward-044",
+                  "title": "奖励 044\n× 1"
+                },
+                {
+                  "name": "reward-045",
+                  "title": "奖励 045\n× 1"
+                },
+                {
+                  "name": "reward-046",
+                  "title": "奖励 046\n× 1"
+                },
+                {
+                  "name": "reward-047",
+                  "title": "奖励 047\n× 1"
+                },
+                {
+                  "name": "reward-048",
+                  "title": "奖励 048\n× 1"
+                },
+                {
+                  "name": "reward-049",
+                  "title": "奖励 049\n× 1"
+                },
+                {
+                  "name": "reward-050",
+                  "title": "奖励 050\n× 1"
+                },
+                {
+                  "name": "reward-051",
+                  "title": "奖励 051\n× 1"
+                },
+                {
+                  "name": "reward-052",
+                  "title": "奖励 052\n× 1"
+                },
+                {
+                  "name": "reward-053",
+                  "title": "奖励 053\n× 1"
+                },
+                {
+                  "name": "reward-054",
+                  "title": "奖励 054\n× 1"
+                },
+                {
+                  "name": "reward-055",
+                  "title": "奖励 055\n× 1"
+                },
+                {
+                  "name": "reward-056",
+                  "title": "奖励 056\n× 1"
+                },
+                {
+                  "name": "reward-057",
+                  "title": "奖励 057\n× 1"
+                },
+                {
+                  "name": "reward-058",
+                  "title": "奖励 058\n× 1"
+                },
+                {
+                  "name": "reward-059",
+                  "title": "奖励 059\n× 1"
+                },
+                {
+                  "name": "reward-060",
+                  "title": "奖励 060\n× 1"
+                },
+                {
+                  "name": "reward-061",
+                  "title": "奖励 061\n× 1"
+                },
+                {
+                  "name": "reward-062",
+                  "title": "奖励 062\n× 1"
+                },
+                {
+                  "name": "reward-063",
+                  "title": "奖励 063\n× 1"
+                },
+                {
+                  "name": "reward-064",
+                  "title": "奖励 064\n× 1"
+                },
+                {
+                  "name": "reward-065",
+                  "title": "奖励 065\n× 1"
+                },
+                {
+                  "name": "reward-066",
+                  "title": "奖励 066\n× 1"
+                },
+                {
+                  "name": "reward-067",
+                  "title": "奖励 067\n× 1"
+                },
+                {
+                  "name": "reward-068",
+                  "title": "奖励 068\n× 1"
+                },
+                {
+                  "name": "reward-069",
+                  "title": "奖励 069\n× 1"
+                },
+                {
+                  "name": "reward-070",
+                  "title": "奖励 070\n× 1"
+                },
+                {
+                  "name": "reward-071",
+                  "title": "奖励 071\n× 1"
+                },
+                {
+                  "name": "reward-072",
+                  "title": "奖励 072\n× 1"
+                },
+                {
+                  "name": "reward-073",
+                  "title": "奖励 073\n× 1"
+                },
+                {
+                  "name": "reward-074",
+                  "title": "奖励 074\n× 1"
+                },
+                {
+                  "name": "reward-075",
+                  "title": "奖励 075\n× 1"
+                },
+                {
+                  "name": "reward-076",
+                  "title": "奖励 076\n× 1"
+                },
+                {
+                  "name": "reward-077",
+                  "title": "奖励 077\n× 1"
+                },
+                {
+                  "name": "reward-078",
+                  "title": "奖励 078\n× 1"
+                },
+                {
+                  "name": "reward-079",
+                  "title": "奖励 079\n× 1"
+                },
+                {
+                  "name": "reward-080",
+                  "title": "奖励 080\n× 1"
+                },
+                {
+                  "name": "reward-081",
+                  "title": "奖励 081\n× 1"
+                },
+                {
+                  "name": "reward-082",
+                  "title": "奖励 082\n× 1"
+                },
+                {
+                  "name": "reward-083",
+                  "title": "奖励 083\n× 1"
+                },
+                {
+                  "name": "reward-084",
+                  "title": "奖励 084\n× 1"
+                },
+                {
+                  "name": "reward-085",
+                  "title": "奖励 085\n× 1"
+                },
+                {
+                  "name": "reward-086",
+                  "title": "奖励 086\n× 1"
+                },
+                {
+                  "name": "reward-087",
+                  "title": "奖励 087\n× 1"
+                },
+                {
+                  "name": "reward-088",
+                  "title": "奖励 088\n× 1"
+                },
+                {
+                  "name": "reward-089",
+                  "title": "奖励 089\n× 1"
+                },
+                {
+                  "name": "reward-090",
+                  "title": "奖励 090\n× 1"
+                },
+                {
+                  "name": "reward-091",
+                  "title": "奖励 091\n× 1"
+                },
+                {
+                  "name": "reward-092",
+                  "title": "奖励 092\n× 1"
+                },
+                {
+                  "name": "reward-093",
+                  "title": "奖励 093\n× 1"
+                },
+                {
+                  "name": "reward-094",
+                  "title": "奖励 094\n× 1"
+                },
+                {
+                  "name": "reward-095",
+                  "title": "奖励 095\n× 1"
+                },
+                {
+                  "name": "reward-096",
+                  "title": "奖励 096\n× 1"
+                },
+                {
+                  "name": "reward-097",
+                  "title": "奖励 097\n× 1"
+                },
+                {
+                  "name": "reward-098",
+                  "title": "奖励 098\n× 1"
+                },
+                {
+                  "name": "reward-099",
+                  "title": "奖励 099\n× 1"
+                },
+                {
+                  "name": "reward-100",
+                  "title": "奖励 100\n× 1"
+                }
+              ]
+            },
+            {
+              "_$id": "rewardcancel",
+              "_$prefab": "b8e7a101-1934-4120-918c-7de8d8daba01",
+              "name": "cancelButton",
+              "x": 24,
+              "y": 766,
+              "width": 284,
+              "height": 62,
+              "title": "取消"
+            },
+            {
+              "_$id": "rewardclaim",
+              "_$prefab": "b8e7a101-1934-4120-918c-7de8d8daba01",
+              "name": "claimButton",
+              "x": 332,
+              "y": 766,
+              "width": 284,
+              "height": 62,
+              "title": "领取"
+            }
+          ],
+          "x": 40,
+          "y": 210,
+          "background": {
+            "_$type": "DrawRoundRectCmd",
+            "fillColor": "#121f32",
+            "lineColor": "#33465f",
+            "lineWidth": 1,
+            "lt": 24,
+            "rt": 24,
+            "lb": 24,
+            "rb": 24
+          }
+        }
+      ]
+    }
+  ]
+}

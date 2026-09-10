@@ -18,6 +18,7 @@ export class ExampleConfirmationWindow extends BaseGameWindow<ExampleConfirmatio
             throw new Error("Confirmation.lh must use ExampleConfirmationView.");
         }
         this.view = pane;
+        this.closeButton = pane.frame.getChild("closeButton");
     }
 
     protected onBind(args: ExampleConfirmationArgs, token: BindingToken): void {

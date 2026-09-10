@@ -1,0 +1,64 @@
+{
+  "_$ver": 1,
+  "_$id": "fullscreenroot",
+  "_$type": "GWidget",
+  "name": "Fullscreen",
+  "width": 720,
+  "height": 1280,
+  "_$child": [
+    {
+      "_$id": "shellfull",
+      "_$type": "GWidget",
+      "name": "full",
+      "width": 720,
+      "height": 1280,
+      "_$child": []
+    },
+    {
+      "_$id": "fullscreenrootsafe",
+      "_$type": "GWidget",
+      "name": "safeContent",
+      "width": 720,
+      "height": 1280,
+      "_$child": [
+        {
+          "_$id": "shelltop",
+          "_$type": "GWidget",
+          "name": "top",
+          "width": 720,
+          "height": 0,
+          "_$child": [],
+          "x": 0,
+          "y": 0
+        },
+        {
+          "_$id": "shellcontentfull",
+          "_$type": "GWidget",
+          "name": "full",
+          "width": 720,
+          "height": 1280
+        },
+        {
+          "_$id": "shellmid",
+          "_$type": "GWidget",
+          "name": "mid",
+          "width": 640,
+          "height": 680,
+          "_$child": [],
+          "x": 40,
+          "y": 300
+        },
+        {
+          "_$id": "shellbottom",
+          "_$type": "GWidget",
+          "name": "bottom",
+          "width": 720,
+          "height": 0,
+          "_$child": [],
+          "x": 0,
+          "y": 1280
+        }
+      ]
+    }
+  ]
+}

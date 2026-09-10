@@ -37,6 +37,7 @@ export abstract class BaseGameWindow<TArgs> extends Laya.GWindow {
     private transitionBaseline: WindowTransformSnapshot | undefined;
     private mouseEnabledBeforeTransition: boolean | undefined;
     private destroyWhenHidden = false;
+    private closeNotificationPending = false;
 
     protected constructor(contentPane: Laya.GWidget) {
         super();
@@ -67,10 +68,27 @@ export abstract class BaseGameWindow<TArgs> extends Laya.GWindow {
         if (this.popupTransitionEnabled === enabled) return;
         this.cancelPopupTransition();
         this.popupTransitionEnabled = enabled;
+        this.mouseThrough = enabled;
     }
 
     /** @internal Allows UIRouter to route destroy-retained popups through their hide animation. */
     get hasPopupTransition(): boolean { return this.popupTransitionEnabled; }
+
+    /** @internal Relayout cancels stale Tween targets before restarting the active transition. */
+    updateLayout(applyLayout: () => void): void {
+        const phase = this.transitionPhase;
+        this.cancelPopupTransition();
+        applyLayout();
+        if (!this.isShowing) return;
+        if (phase === "showing") this.doShowAnimation();
+        else if (phase === "hiding") this.doHideAnimation();
+    }
+
+    private get popupContent(): Laya.GWidget {
+        const mid = this.contentPane.getChildByName("safeContent")?.getChildByName("mid");
+        if (!(mid instanceof Laya.GWidget)) throw new Error("Popup animation requires safeContent/mid.");
+        return mid;
+    }
 
     /** @internal Configured by UIRouter so native close buttons honor route retention. */
     configureDestroyWhenHidden(enabled: boolean): void {
@@ -108,6 +126,7 @@ export abstract class BaseGameWindow<TArgs> extends Laya.GWindow {
             this.endPresentation(scope);
             return false;
         }
+        this.closeNotificationPending = true;
         this.show();
         return true;
     }
@@ -135,7 +154,7 @@ export abstract class BaseGameWindow<TArgs> extends Laya.GWindow {
         }
 
         this.cancelPopupTransition();
-        const pane = this.contentPane;
+        const pane = this.popupContent;
         const baseline = captureTransform(pane);
         this.transitionBaseline = baseline;
         this.transitionPhase = "showing";
@@ -164,15 +183,15 @@ export abstract class BaseGameWindow<TArgs> extends Laya.GWindow {
             this.killTransitionTween();
         } else {
             this.cancelPopupTransition();
-            this.transitionBaseline = captureTransform(this.contentPane);
+            this.transitionBaseline = captureTransform(this.popupContent);
             this.blockTransitionInput();
         }
-        const baseline = this.transitionBaseline ?? captureTransform(this.contentPane);
+        const baseline = this.transitionBaseline ?? captureTransform(this.popupContent);
         this.transitionBaseline = baseline;
         this.transitionPhase = "hiding";
-        const target = centeredScale(baseline, this.contentPane, POPUP_TRANSITION_SCALE);
+        const target = centeredScale(baseline, this.popupContent, POPUP_TRANSITION_SCALE);
         const version = ++this.transitionVersion;
-        this.transitionTween = Laya.Tween.create(this.contentPane, this)
+        this.transitionTween = Laya.Tween.create(this.popupContent, this)
             .duration(POPUP_TRANSITION_DURATION_MS)
             .to("x", target.x)
             .to("y", target.y)
@@ -233,6 +252,8 @@ export abstract class BaseGameWindow<TArgs> extends Laya.GWindow {
     }
 
     protected override onHide(): void {
+        const notifyClosed = this.closeNotificationPending;
+        this.closeNotificationPending = false;
         const errors: unknown[] = [];
         collectCleanup(errors, () => this.cancelPopupTransition());
         this.bindingGuard.invalidate();
@@ -241,6 +262,12 @@ export abstract class BaseGameWindow<TArgs> extends Laya.GWindow {
         collectCleanup(errors, () => this.lifecycleObserver?.onHidden(
             this as unknown as BaseGameWindow<unknown>,
         ));
+        // UNDISPLAY fires before native parent/order bookkeeping finishes. Run business code
+        // in the next microtask, after hideImmediately/destroy has completed its synchronous cleanup.
+        if (notifyClosed) void Promise.resolve().then(() => {
+            try { this.onClosed(); }
+            catch (error) { console.error("[UI] onClosed failed after window cleanup", error); }
+        });
         if (errors.length > 0) {
             throw new LifetimeCleanupError(errors);
         }
@@ -251,6 +278,9 @@ export abstract class BaseGameWindow<TArgs> extends Laya.GWindow {
     }
 
     protected abstract onBind(args: TArgs, token: BindingToken): void | Promise<void>;
+
+    /** Queued once after a displayed window is hidden. Do not access nodes or replace hide/destroy cleanup. */
+    protected onClosed(): void {}
 
     private finishShowTransition(version: number): void {
         if (!this.isCurrentTransition(version, "showing")) return;
@@ -295,7 +325,8 @@ export abstract class BaseGameWindow<TArgs> extends Laya.GWindow {
     private restoreTransitionTransform(): void {
         const baseline = this.transitionBaseline;
         if (!baseline || this.contentPane.destroyed) return;
-        applyTransform(this.contentPane, baseline);
+        const mid = this.popupContent;
+        if (!mid.destroyed) applyTransform(mid, baseline);
     }
 
     private blockTransitionInput(): void {

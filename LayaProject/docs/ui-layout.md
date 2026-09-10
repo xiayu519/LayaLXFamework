@@ -10,30 +10,32 @@
 
 默认平台选择规则：存在微信小游戏 `wx` API 时使用 `WeChatMiniGamePlatformService`，否则使用 `WebPlatformService`。微信实现优先读取 `wx.getWindowInfo()`，并通过 `wx.getMenuButtonBoundingClientRect()` 取得右上角胶囊；Web 实现读取 CSS `env(safe-area-inset-*)`。平台返回的是宿主窗口坐标，布局服务统一换算为 Laya Stage 逻辑坐标。
 
-## 全屏 `.lh` 约定
+## 所有窗口的 `.lh` 约定
 
-固定节点仍在 `.lh` 中声明。全屏界面可以按需要提供以下约定节点：
+固定节点在 `.lh` 中声明。全屏和弹窗共用以下层级；弹窗至少保留 safeContent/mid，全部面板内容放入 mid：
 
 ```text
 Root
-├─ fullBleed
+├─ full
 └─ safeContent
    ├─ top
-   ├─ middle
+   ├─ full（可选拉伸内容区）
+   ├─ mid
    └─ bottom
 ```
 
-- `fullBleed`：铺满当前 GRoot，适合背景、遮罩和边缘特效。
+- `Root/full`：铺满当前 GRoot，适合背景、自定义遮罩和边缘特效。
 - `safeContent`：铺满平台安全区，交互内容放在这里。
 - `top`：保持自身设计高度、横向铺满，并移动到刘海和微信胶囊下方。
-- `middle`：保持自身设计尺寸和安全区中心；空间不足时整体等比缩小，同时避开 `top`、`bottom` 的占用，避免列表或卡片与标题、操作区重叠。
+- `safeContent/full`：横向填满安全区，纵向从 top 下沿铺到 bottom 上沿；无 top 时避开胶囊，无 bottom 时到安全区底部。用于全屏滚动列表，通过原生宽高 Relation 让面板和 GList 拉伸，保持 scale=1、行高与字号不变。
+- `mid`：用于固定尺寸居中内容，保持设计尺寸和安全区中心；空间不足时整体等比缩小，同时避开 top、bottom。全屏滚动列表应使用 full。
 - `bottom`：保持自身设计高度、横向铺满，并贴安全区底部。
 
-不需要的槽位可以省略。槽位内部的按钮、文本和列表继续使用 ui2 的 Relation 系统相对槽位布局，不需要读取平台 API，也不需要逐控件计算刘海偏移。
+不需要的 top/bottom 可以省略或设高度 0，不能让空槽位占用适配空间。槽位内部的按钮、文本和列表继续使用 ui2 的 Relation 系统相对槽位布局，不需要读取平台 API，也不需要逐控件计算刘海偏移。
 
-全屏背景和安全内容必须分开：背景可以延伸到异形屏边缘，文字和可点击控件进入安全区。微信胶囊只改变 `top` 的起点，不会把 `middle` 和 `bottom` 一起下移。
+全屏背景和安全内容必须分开：背景可以延伸到异形屏边缘，文字和可点击控件进入安全区。微信胶囊只改变 `top` 的起点，不会把 `mid` 和 `bottom` 一起下移。
 
-`middle` 的可用高度按安全区中心到上下槽位边界的较短距离确定。长屏恢复设计尺寸，短屏等比缩小，始终不改变安全区中心。如果上下固定区域已占到中心，中心内容就没有可用空间；此时需降低该界面的固定区域高度或调整项目的屏幕策略，不能靠遮盖内容完成适配。
+`mid` 的可用高度按安全区中心到上下槽位边界的较短距离确定。长屏恢复设计尺寸，短屏等比缩小，始终不改变安全区中心。如果上下固定区域已占到中心，中心内容就没有可用空间；此时需降低该界面的固定区域高度或调整项目的屏幕策略，不能靠遮盖内容完成适配。
 
 `.lh` 必须拥有一个用于编辑器排版的设计宽高，但这个数值只属于该资源的创作画布。`fullscreen` 和 `safe-screen` 在显示时会由 `UILayoutService` 按当前项目的运行时 Stage 重新设置 Window、根 Pane 和约定槽位，因此框架内置界面的创作尺寸不会限制下游项目选择自己的设计分辨率。
 
@@ -64,14 +66,22 @@ const resultRoute: UIRoute<ResultArgs> = {
 
 - `fullscreen`：Window 和根 Pane 铺满 GRoot，并处理上述约定节点。
 - `safe-screen`：整个 Pane 限制在避开平台顶部占用后的安全区内，适合不需要满屏背景的工具页。
-- `center-popup`：保留预制体设计尺寸并在避开平台顶部占用后的安全区居中；Popup 层未声明时默认使用该策略。框架自动为该布局播放 `0.3 -> 1` 的 200ms 弹出动画和对应收起动画，`fullscreen`、`safe-screen` 不播放窗口动画。
+- `center-popup`：Window 和根 Pane 仍铺满屏幕，safeContent 铺满安全区；只让 mid 保留设计尺寸，在避开平台顶部占用后的安全区居中，空间不足时等比缩小；Popup 层未声明时默认使用该策略。框架自动为该布局播放 `0.3 -> 1` 的 200ms 弹出动画和对应收起动画，`fullscreen`、`safe-screen` 不播放窗口动画。
 
-特殊界面可以读取 `LX.UI.layout.snapshot()` 获得 `viewport`、`safeArea` 和 `topSafeArea`，但一般业务 UI 只需遵循 `.lh` 槽位约定。弹窗动画由 `BaseGameWindow` 通过原生 `GWindow.doShowAnimation()` / `doHideAnimation()` 扩展点统一处理，目标是弹窗 `contentPane`，不会缩放全屏 modal 遮罩。动画期间窗口输入会被禁用；关闭、销毁、重复关闭以及关闭尚未完成时再次显示，都会使旧 Tween 和晚到回调失效。`retention: "destroy"` 在收起动画完成后直接安全销毁，`retention: "hide"` 则恢复原始变换并保留实例。
+特殊界面可以读取 `LX.UI.layout.snapshot()` 获得 `viewport`、`safeArea` 和 `topSafeArea`，但一般业务 UI 只需遵循 `.lh` 槽位约定。弹窗动画由 `BaseGameWindow` 通过原生 `GWindow.doShowAnimation()` / `doHideAnimation()` 扩展点统一处理，目标是弹窗 `safeContent/mid`，Root/full/safeContent 和原生 modal 遮罩不参与动画。resize 会先取消旧 Tween、按新安全区布局，再继续当前开合阶段；恢复尺寸时还原设计缩放。动画期间窗口输入会被禁用；关闭、销毁、重复关闭以及关闭尚未完成时再次显示，都会使旧 Tween 和晚到回调失效。`retention: "destroy"` 在收起动画完成后直接安全销毁，`retention: "hide"` 则恢复原始变换并保留实例。
 
 公共 `Tip` 使用 `topSafeArea` 定位；当安全区比 Tip 设计尺寸更窄时会整体等比缩小，并按缩放后的显示宽度居中，回池时恢复原始变换。
 
+## 通用 Mask 与关闭后处理
+
+center-popup 默认 modal:true、closeOnMaskClick:true。复用原生 GRoot.modalLayer，不新增固定 Mask 层：栈为全屏、A、Mask、B，关闭 B 后恢复为全屏、Mask、A。点击只关闭最上层可交互模态窗口；动画期间忽略重复点击。上方存在非模态窗口时，不会越过它关闭下层窗口。
+
+closeOnMaskClick:false 保留遮挡但不允许点空白关闭。modal:false 不为本窗口请求原生遮罩，可在 full 内放自定义全屏按钮，通过 LX.UI.close 关闭；仍保留下层模态窗口的遮罩。Root 和 safeContent 的透明区域透传到 Mask，mid 吸收内部空白点击；full 内自定义按钮需要覆盖整个 full 并设置原生 Size Relation。
+
+子类通过 protected onClosed(): void {} 扩展关闭后业务处理。钩子在原生隐藏/销毁调用结束后的 microtask 执行，每次实际展示关闭后调用一次；Hide 保留实例再次打开后可再次调用，未展示的取消不调用。presentation、旧异步和 Tween 先失效，再执行钩子；钩子异常会记录日志并允许原生回收继续。钩子只做业务后处理，不访问已关闭节点、不替代 hide/destroy 的清理。
+
 ## 当前公共界面
 
-`SceneLoading.lh` 和 `FrameworkStatus.lh` 已使用 `fullBleed + safeContent + middle`：背景始终覆盖当前 GRoot，中间卡片始终在当前安全区居中，不把资源创作画布中的固定 `x/y` 当作运行时布局。
+`SceneLoading.lh` 和 `FrameworkStatus.lh` 已使用 `full + safeContent + mid`：背景始终覆盖当前 GRoot，中间卡片始终在当前安全区居中，不把资源创作画布中的固定 `x/y` 当作运行时布局。
 
-[旅行背包示例](ui-examples.md) 完整使用 `top / middle / bottom`：顶部标题和汇总、中部虚拟列表、底部选择信息和操作按钮。`node tests/game/logic/ui-examples-resolutions.mjs` 在当前构建上检查多种浏览器分辨率及模拟安全区，包含重排后的实际鼠标操作。
+[旅行背包示例](ui-examples.md) 使用 `safeContent(top / full / bottom)`：顶部标题和汇总、上下拉伸的虚拟列表、底部选择信息和操作按钮。`node tests/game/logic/ui-examples-resolutions.mjs` 在当前构建上检查多种浏览器分辨率及模拟安全区，包含固定行高、字号和重排后的实际鼠标操作。

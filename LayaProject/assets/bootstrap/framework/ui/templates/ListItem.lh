@@ -1,0 +1,112 @@
+{
+  "_$ver": 1,
+  "_$id": "exampleitem",
+  "_$type": "GButton",
+  "name": "ListItem",
+  "x": 0,
+  "y": 0,
+  "width": 592,
+  "height": 88,
+  "mode": 2,
+  "background": {
+    "_$type": "DrawRoundRectCmd",
+    "fillColor": "#192b41",
+    "lineColor": "#2c415b",
+    "lineWidth": 1,
+    "lt": 12,
+    "rt": 12,
+    "lb": 12,
+    "rb": 12
+  },
+  "titleWidget": {
+    "_$ref": "genericlabel"
+  },
+  "controllers": {
+    "_$type": "Record",
+    "button": {
+      "_$type": "Controller",
+      "pages": [
+        "up",
+        "down",
+        "over",
+        "selectedOver"
+      ]
+    }
+  },
+  "_$child": [
+    {
+      "_$id": "itemselected",
+      "_$type": "GWidget",
+      "name": "selectedBorder",
+      "x": 0,
+      "y": 0,
+      "width": 592,
+      "height": 88,
+      "background": {
+        "_$type": "DrawRoundRectCmd",
+        "fillColor": "rgba(16,185,129,0.12)",
+        "lineColor": "#6ee7b7",
+        "lineWidth": 1,
+        "lt": 12,
+        "rt": 12,
+        "lb": 12,
+        "rb": 12
+      },
+      "relations": [
+        {
+          "_$type": "Relation",
+          "target": {
+            "_$ref": "exampleitem"
+          },
+          "data": [
+            1,
+            0,
+            2,
+            0
+          ]
+        }
+      ],
+      "gears": [
+        {
+          "_$type": "GearDisplay",
+          "controller": {
+            "_$ref": "exampleitem",
+            "_$ctrl": "button"
+          },
+          "pages": [
+            1,
+            3
+          ]
+        }
+      ]
+    },
+    {
+      "_$id": "genericlabel",
+      "_$type": "GTextField",
+      "name": "titleText",
+      "x": 12,
+      "y": 8,
+      "width": 568,
+      "height": 72,
+      "text": "Item",
+      "fontSize": 22,
+      "color": "#e2e8f0",
+      "align": "center",
+      "valign": "middle",
+      "relations": [
+        {
+          "_$type": "Relation",
+          "target": {
+            "_$ref": "exampleitem"
+          },
+          "data": [
+            1,
+            0,
+            2,
+            0
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -9,7 +9,7 @@
     {
       "_$id": "statusbleed",
       "_$type": "GWidget",
-      "name": "fullBleed",
+      "name": "full",
       "width": 720,
       "height": 1280,
       "background": {
@@ -27,7 +27,7 @@
         {
           "_$id": "statusmiddle",
           "_$type": "GWidget",
-          "name": "middle",
+          "name": "mid",
           "x": 49,
           "y": 390,
           "width": 622,

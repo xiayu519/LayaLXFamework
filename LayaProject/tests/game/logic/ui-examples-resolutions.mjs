@@ -6,7 +6,7 @@ const projectRoot = fileURLToPath(new URL("../../../", import.meta.url));
 const viewports = ["320x568", "360x640", "375x667", "390x844", "412x915", "600x800", "768x1024", "1280x720"];
 const pending = [...viewports];
 const failures = [];
-await Promise.all(Array.from({ length: 3 }, async () => {
+await Promise.all(Array.from({ length: 2 }, async () => {
     while (pending.length) {
         const viewport = pending.shift();
         try {
@@ -23,7 +23,7 @@ function run(viewport) {
     return new Promise((resolve, reject) => {
         const child = spawn(process.execPath, [
             "tools/test-browser.mjs", "--suite", "targeted",
-            "--probe", "tests/game/logic/ui-examples.browser.mjs", "--viewport", viewport,
+            "--probe", "tests/game/logic/ui-templates.browser.mjs", "--viewport", viewport,
         ], { cwd: projectRoot, env: process.env, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
         let output = "";
         child.stdout.on("data", (data) => { output += data; });

@@ -59,9 +59,9 @@ export async function runFrameworkProbes(validation) {
 
     try {
         const layout = ui.layout.snapshot();
-        const fullBleed = base.window.contentPane.getChildByName("fullBleed");
+        const fullBleed = base.window.contentPane.getChildByName("full");
         const safeContent = base.window.contentPane.getChildByName("safeContent");
-        const middle = safeContent?.getChildByName("middle");
+        const middle = safeContent?.getChildByName("mid");
         assert(layout.viewport.width === root.width && layout.viewport.height === root.height,
             `layout viewport ${JSON.stringify(layout.viewport)} differs from GRoot ${root.width}x${root.height}`);
         assert(fullBleed?.width === root.width && fullBleed?.height === root.height,

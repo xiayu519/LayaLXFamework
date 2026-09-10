@@ -52,6 +52,62 @@ const stage = new FakeStage();
 afterEach(() => vi.unstubAllGlobals());
 
 describe("UILayoutService", () => {
+    it("stretches safeContent/full between moving top and bottom without scaling list content", async () => {
+        root.width = stage.width = 720; root.height = stage.height = 1280;
+        vi.stubGlobal("Laya", { GWidget: FakeWidget, GRoot: { inst: root }, stage, Event: { RESIZE: "resize" } });
+        const viewport = {
+            width: 720, height: 1280,
+            safeArea: { x: 20, y: 40, width: 680, height: 1200 },
+            topRightAvoidance: { x: 580, y: 48, width: 120, height: 32 },
+        };
+        const { UILayoutService } = await import("../../src/framework/presentation/ui/UILayoutService");
+        const layout = new UILayoutService(createPlatform(viewport));
+        const pane = sized(new FakeWidget(), 720, 1280);
+        const background = pane.addNamedChild("full", sized(new FakeWidget(), 720, 1280));
+        const safe = pane.addNamedChild("safeContent", sized(new FakeWidget(), 720, 1280));
+        const top = safe.addNamedChild("top", sized(new FakeWidget(), 720, 184));
+        const full = safe.addNamedChild("full", sized(new FakeWidget(), 720, 888));
+        const bottom = safe.addNamedChild("bottom", sized(new FakeWidget(), 720, 208));
+        const window = new FakeWindow(pane);
+        const check = () => {
+            layout.apply(window as unknown as Laya.GWindow, "fullscreen");
+            expect(full).toMatchObject({ x: 0, y: top.y + top.height, width: safe.width, scaleX: 1, scaleY: 1 });
+            expect(full.y + full.height).toBeCloseTo(bottom.y);
+            expect(background).toMatchObject({ x: 0, y: 0, width: stage.width, height: stage.height });
+            return full.height;
+        };
+        const initial = check();
+        viewport.topRightAvoidance.y += 32;
+        expect(check()).toBeCloseTo(initial - 32);
+        root.height = stage.height = viewport.height = 960;
+        viewport.safeArea.height = 880;
+        expect(check()).toBeCloseTo(initial - 352);
+        root.height = stage.height = viewport.height = 1280;
+        viewport.safeArea.height = 1200;
+        viewport.topRightAvoidance.y -= 32;
+        expect(check()).toBeCloseTo(initial);
+    });
+    it("requires popup mid, fits all its contents uniformly and restores the design size", async () => {
+        root.width = stage.width = 400; root.height = stage.height = 600;
+        vi.stubGlobal("Laya", { GWidget: FakeWidget, GRoot: { inst: root }, stage });
+        const { UILayoutService } = await import("../../src/framework/presentation/ui/UILayoutService");
+        const layout = new UILayoutService(createPlatform({ width: 400, height: 600 }));
+        const pane = sized(new FakeWidget(), 720, 1280);
+        const window = new FakeWindow(pane);
+        expect(() => layout.apply(window as unknown as Laya.GWindow, "center-popup")).toThrow(/mid/);
+        const safe = pane.addNamedChild("safeContent", sized(new FakeWidget(), 720, 1280));
+        const mid = safe.addNamedChild("mid", sized(new FakeWidget(), 560, 390));
+        const full = pane.addNamedChild("full", sized(new FakeWidget(), 720, 1280));
+        layout.apply(window as unknown as Laya.GWindow, "center-popup");
+        expect(pane).toMatchObject({ x: 0, y: 0, width: 400, height: 600, scaleX: 1, scaleY: 1 });
+        expect(full).toMatchObject({ width: 400, height: 600, scaleX: 1, scaleY: 1 });
+        expect(mid).toMatchObject({ width: 560, height: 390, x: 0 });
+        expect(mid.scaleX).toBeCloseTo(400 / 560);
+        expect(mid.scaleY).toBe(mid.scaleX);
+        root.width = stage.width = 720; root.height = stage.height = 1280;
+        layout.apply(window as unknown as Laya.GWindow, "center-popup");
+        expect(mid).toMatchObject({ x: 80, y: 445, width: 560, height: 390, scaleX: 1, scaleY: 1 });
+    });
     it("fits a full-screen prefab to a project-selected 720 by 1280 stage", async () => {
         root.width = stage.width = 720;
         root.height = stage.height = 1280;
@@ -65,8 +121,8 @@ describe("UILayoutService", () => {
         const { UILayoutService } = await import("../../src/framework/presentation/ui/UILayoutService");
         const layout = new UILayoutService(platform);
         const pane = sized(new FakeWidget(), 750, 1334);
-        const fullBleed = pane.addNamedChild("fullBleed", sized(new FakeWidget(), 750, 1334));
-        const safeContent = pane.addNamedChild("safeContent", sized(new FakeWidget(), 750, 1334));
+        const fullBleed = pane.addNamedChild("full", sized(new FakeWidget(), 750, 1334));
+        const safeContent = pane.addNamedChild("safeContent", sized(new FakeWidget(), 720, 1280));
         const window = new FakeWindow(pane);
 
         layout.apply(window as unknown as Laya.GWindow, "fullscreen");
@@ -95,10 +151,10 @@ describe("UILayoutService", () => {
         const { UILayoutService } = await import("../../src/framework/presentation/ui/UILayoutService");
         const layout = new UILayoutService(platform);
         const pane = sized(new FakeWidget(), 750, 1334);
-        const fullBleed = pane.addNamedChild("fullBleed", sized(new FakeWidget(), 750, 1334));
-        const safeContent = pane.addNamedChild("safeContent", sized(new FakeWidget(), 750, 1334));
+        const fullBleed = pane.addNamedChild("full", sized(new FakeWidget(), 750, 1334));
+        const safeContent = pane.addNamedChild("safeContent", sized(new FakeWidget(), 720, 1280));
         const top = safeContent.addNamedChild("top", sized(new FakeWidget(), 750, 100));
-        const middle = safeContent.addNamedChild("middle", sized(new FakeWidget(), 604, 370));
+        const middle = safeContent.addNamedChild("mid", sized(new FakeWidget(), 604, 370));
         const bottom = safeContent.addNamedChild("bottom", sized(new FakeWidget(), 750, 120));
         const window = new FakeWindow(pane);
 
@@ -129,7 +185,7 @@ describe("UILayoutService", () => {
         const layout = new UILayoutService(platform);
         const pane = sized(new FakeWidget(), 720, 1280);
         const safeContent = pane.addNamedChild("safeContent", sized(new FakeWidget(), 720, 1280));
-        const middle = safeContent.addNamedChild("middle", sized(new FakeWidget(), 604, 370));
+        const middle = safeContent.addNamedChild("mid", sized(new FakeWidget(), 604, 370));
         const window = new FakeWindow(pane);
 
         layout.apply(window as unknown as Laya.GWindow, "fullscreen");
@@ -162,19 +218,19 @@ describe("UILayoutService", () => {
         const pane = sized(new FakeWidget(), 720, 1280);
         const safe = pane.addNamedChild("safeContent", sized(new FakeWidget(), 720, 1280));
         const top = safe.addNamedChild("top", sized(new FakeWidget(), 720, 184));
-        const middle = safe.addNamedChild("middle", sized(new FakeWidget(), 640, 680));
+        const middle = safe.addNamedChild("mid", sized(new FakeWidget(), 640, 680));
         const bottom = safe.addNamedChild("bottom", sized(new FakeWidget(), 720, 208));
         const window = new FakeWindow(pane);
         const check = (): void => {
             layout.apply(window as unknown as Laya.GWindow, "fullscreen");
             expect(middle.y).toBeGreaterThanOrEqual(top.y + top.height - 0.001);
             expect(middle.y + middle.height * middle.scaleY).toBeLessThanOrEqual(bottom.y + 0.001);
-            expect(middle.y + middle.height * middle.scaleY / 2).toBeCloseTo(safe.height / 2);
+            expect(middle.y + middle.height * middle.scaleY / 2).toBeCloseTo(layout.snapshot().safeArea.height / 2);
             expect(middle.x + middle.width * middle.scaleX / 2).toBeCloseTo(safe.width / 2);
             expect(middle.scaleX).toBe(middle.scaleY);
             expect(middle.scaleX).toBeGreaterThan(0);
             expect(top.height).toBe(184);
-            expect(bottom.y + bottom.height).toBe(safe.height);
+            expect(bottom.y + bottom.height).toBe(layout.snapshot().safeArea.height);
         };
 
         check();
@@ -204,14 +260,17 @@ describe("UILayoutService", () => {
         });
         const { UILayoutService } = await import("../../src/framework/presentation/ui/UILayoutService");
         const layout = new UILayoutService(platform);
-        const pane = sized(new FakeWidget(), 600, 400);
+        const pane = sized(new FakeWidget(), 720, 1280);
+        const safe = pane.addNamedChild("safeContent", sized(new FakeWidget(), 720, 1280));
+        const mid = safe.addNamedChild("mid", sized(new FakeWidget(), 600, 400));
         const window = new FakeWindow(pane);
         const snapshots: number[] = [];
         layout.subscribe((value) => snapshots.push(value.viewport.width));
         layout.start();
         layout.apply(window as unknown as Laya.GWindow, "center-popup");
 
-        expect(window).toMatchObject({ x: 200, y: 700, width: 600, height: 400 });
+        expect(window).toMatchObject({ x: 0, y: 0, width: 1000, height: 1800 });
+        expect(mid).toMatchObject({ x: 180, y: 600, width: 600, height: 400 });
         stage.resize(800, 1600);
         expect(layout.snapshot().viewport).toMatchObject({ width: 800, height: 1600 });
         expect(layout.snapshot().safeArea.x).toBe(16);

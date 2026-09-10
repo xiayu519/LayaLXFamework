@@ -2,7 +2,7 @@
   "_$ver": 1,
   "_$id": "exampleframe",
   "_$type": "GLabel",
-  "name": "WindowFrame",
+  "name": "PanelChrome",
   "x": 0,
   "y": 0,
   "width": 640,

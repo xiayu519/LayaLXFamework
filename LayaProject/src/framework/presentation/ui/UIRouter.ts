@@ -26,6 +26,8 @@ export interface UIRoute<TArgs> {
     readonly url: string;
     readonly layer?: UILayer;
     readonly modal?: boolean;
+    /** Defaults to true for center-popup; requires modal and a topmost, interactive window. */
+    readonly closeOnMaskClick?: boolean;
     /** Defaults to center-popup for Popup routes and fullscreen for every other layer. */
     readonly layout?: UIWindowLayout;
     readonly multiplicity: UIWindowMultiplicity;
@@ -85,6 +87,7 @@ export class UIRouter implements WindowLifecycleObserver {
     private readonly pendingHiddenDestructions = new Set<UnknownWindow>();
     private readonly unsubscribeLayout: (() => void) | undefined;
     private disposed = false;
+    private mask: Laya.GWidget | undefined;
 
     constructor(
         private readonly tips?: TipQueue,
@@ -236,6 +239,8 @@ export class UIRouter implements WindowLifecycleObserver {
         const errors: unknown[] = [];
         if (!this.disposed) {
             this.disposed = true;
+            this.mask?.off(Laya.Event.CLICK, this, this.onMaskClick);
+            this.mask = undefined;
             this.unsubscribeLayout?.();
             Laya.timer.clearAll(this);
             this.pendingHiddenDestructions.clear();
@@ -367,13 +372,13 @@ export class UIRouter implements WindowLifecycleObserver {
         this.presentationVersions.set(unknownWindow, version);
         request.phase = "binding";
         request.window = window;
-        window.modal = route.modal ?? resolveLayer(route) === UILayer.Popup;
-        window.zOrder = resolveLayer(route) * 1000;
         const layout = resolveWindowLayout(route);
-        window.configurePopupTransition(layout === "center-popup");
-        window.configureDestroyWhenHidden(route.retention === "destroy");
-        this.layoutService?.apply(window, layout);
         try {
+            window.modal = route.modal ?? layout === "center-popup";
+            window.zOrder = resolveLayer(route) * 1000;
+            window.configurePopupTransition(layout === "center-popup");
+            window.configureDestroyWhenHidden(route.retention === "destroy");
+            window.updateLayout(() => this.layoutService?.apply(window, layout));
             const shown = await window.present(args, request.controller.signal);
             if (!shown || window.destroyed || this.disposed
                 || this.presentationVersions.get(unknownWindow) !== version) {
@@ -478,13 +483,28 @@ export class UIRouter implements WindowLifecycleObserver {
             return;
         }
         syncModalOrder(root);
+        if (!this.disposed && !this.mask) {
+            this.mask = root.modalLayer;
+            this.mask.on(Laya.Event.CLICK, this, this.onMaskClick);
+        }
+    }
+
+    private onMaskClick(event: Laya.Event): void {
+        const root = Laya.GRoot.inst;
+        const top = Array.from(root.children).reverse().find(child => child instanceof Laya.GWindow);
+        const record = top && this.records.get(top as UnknownWindow);
+        if (!record || this.disposed || !record.window.modal || !record.window.mouseEnabled
+            || record.window.isPopupHiding || !root.modalLayer.parent) return;
+        if (!(record.route.closeOnMaskClick ?? resolveWindowLayout(record.route) === "center-popup")) return;
+        event.stopPropagation();
+        this.close(record.route.id, record.window);
     }
 
     private layoutManagedWindows(): void {
         if (this.disposed || !this.layoutService) return;
         for (const record of this.records.values()) {
             if (!record.window.destroyed) {
-                this.layoutService.apply(record.window, resolveWindowLayout(record.route));
+                record.window.updateLayout(() => this.layoutService?.apply(record.window, resolveWindowLayout(record.route)));
             }
         }
     }

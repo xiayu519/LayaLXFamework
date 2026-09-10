@@ -19,7 +19,7 @@ export class ExampleInventoryWindow extends BaseGameWindow<ExampleInventoryArgs>
             throw new Error("Inventory.lh must use ExampleInventoryView.");
         }
         this.view = pane;
-        // The fullscreen frame lives in safeContent/top; native GWindow only finds direct frames.
+        // The fullscreen title component lives in top; bind its nested close button explicitly.
         this.closeButton = pane.frame.getChild("closeButton");
         pane.itemList.itemRenderer = (index: number, row: Laya.GWidget): void => {
             if (!(row instanceof ExampleItemView)) throw new Error("Inventory rows must use ExampleItemView.");

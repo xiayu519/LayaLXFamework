@@ -62,14 +62,14 @@ async function runUIExamples() {
         const layout = ui.layout.snapshot();
         const safe = view.getChild("safeContent");
         const top = safe.getChild("top");
-        const middle = safe.getChild("middle");
+        const content = safe.getChild("full");
         const bottom = safe.getChild("bottom");
-        assert(top && middle && bottom, "all three functional slots must be present");
+        assert(top && content && bottom && !safe.getChild("mid"), "stretching lists require top/full/bottom");
         assert(view.frame.parent === top && view.summaryText.parent === top, "header belongs to top");
-        assert(view.itemList.parent === middle, "list belongs to middle");
+        assert(view.itemList.parent.parent === content, "list belongs to safeContent/full");
         assert(view.selectionText.parent === bottom && view.useButton.parent.parent === bottom
             && view.resetButton.parent.parent === bottom, "selection and actions belong to bottom");
-        const bleed = rect(view.getChild("fullBleed"));
+        const bleed = rect(view.getChild("full"));
         assert(Math.abs(bleed.width - Laya.GRoot.inst.width) < 1
             && Math.abs(bleed.height - Laya.GRoot.inst.height) < 1 && bleed.x === 0 && bleed.y === 0,
             "fullBleed must cover the live viewport");
@@ -77,23 +77,32 @@ async function runUIExamples() {
         within(safeRect, layout.safeArea, "safeContent");
         assert(Math.abs(safeRect.width - layout.safeArea.width) < 1
             && Math.abs(safeRect.height - layout.safeArea.height) < 1, "safeContent must fill the safe area");
-        const t = rect(top), m = rect(middle), b = rect(bottom);
+        const t = rect(top), m = rect(content), b = rect(bottom);
         assert(Math.abs(t.y - layout.topSafeArea.y) < 1, "top must start below the notch and capsule");
         assert(Math.abs(b.y + b.height - safeRect.y - safeRect.height) < 1, "bottom must remain anchored");
-        assert(m.y >= t.y + t.height - 1 && m.y + m.height <= b.y + 1, "middle overlaps top or bottom");
-        assert(Math.abs(m.x + m.width / 2 - safeRect.x - safeRect.width / 2) < 1
-            && Math.abs(m.y + m.height / 2 - safeRect.y - safeRect.height / 2) < 1, "middle lost the safe-area center");
-        assert(middle.scaleX > 0 && middle.scaleX <= 1 && middle.scaleX === middle.scaleY, "middle must fit uniformly");
+        assert(Math.abs(m.y - t.y - t.height) < 1 && Math.abs(m.y + m.height - b.y) < 1,
+            "full content must fill the exact space between top and bottom");
+        assert(Math.abs(m.x - safeRect.x) < 1 && Math.abs(m.width - safeRect.width) < 1,
+            "full content width must follow the safe area");
+        assert(content.scaleX === 1 && content.scaleY === 1, "scrolling content must resize without scaling rows");
         within(rect(view.frame), t, "header frame");
         within(rect(window.closeButton), t, "close button");
         within(rect(view.summaryText), t, "summary");
         within(rect(view.itemList), m, "list");
+        assert(Math.abs(view.itemList.width - content.width + 96) < 1
+            && Math.abs(view.itemList.height - content.height + 104) < 1,
+            "list must stretch with full content while retaining its padding");
+        assert(view.itemList.scaleX === 1 && view.itemList.scaleY === 1, "list was scaled instead of resized");
+        const firstRow = view.itemList.getChildAt(0);
+        assert(firstRow.height === 88 && firstRow.scaleX === 1 && firstRow.scaleY === 1
+            && firstRow.getChild("titleText").fontSize === 22, "list row height or text size changed during adaptation");
         within(rect(view.selectionText), b, "selection");
         within(rect(view.useButton), b, "use button");
         within(rect(view.resetButton), b, "reset button");
         const reset = rect(view.resetButton), use = rect(view.useButton);
         assert(reset.x + reset.width < use.x, `footer buttons overlap ${JSON.stringify({ reset, use })}`);
-        return { stage: `${view.width}x${view.height}`, middleScale: middle.scaleX };
+        return { stage: `${view.width}x${view.height}`, contentHeight: content.height,
+            listHeight: view.itemList.height, rowHeight: view.itemList.getChildAt(0)?.height };
     };
     let renderedRows = 0;
     try {
@@ -136,9 +145,12 @@ async function runUIExamples() {
             click(selected);
             assert(list.selection.index === 9 && view.selectionText.text.includes("010"), `${profile.name}: select after reflow`);
             const popup = await openConfirmation(view);
-            within(rect(popup.contentPane), ui.layout.snapshot().topSafeArea, `${profile.name}: popup`);
-            within(rect(popup.contentPane.confirmButton), rect(popup.contentPane), "popup confirm button");
-            within(rect(popup.closeButton), rect(popup.contentPane), "popup close button");
+            const mid = popup.contentPane.getChild("safeContent").getChild("mid");
+            within(rect(mid), ui.layout.snapshot().topSafeArea, `${profile.name}: popup`);
+            assert(popup.contentPane.width === Laya.GRoot.inst.width && popup.contentPane.height === Laya.GRoot.inst.height, "popup root must stay fullscreen");
+            assert(popup.contentPane.frame.parent === mid && popup.contentPane.confirmButton.parent === mid, "popup controls must belong to mid");
+            within(rect(popup.contentPane.confirmButton), rect(mid), "popup confirm button");
+            within(rect(popup.closeButton), rect(mid), "popup close button");
             click(popup.contentPane.cancelButton);
             await wait(() => popup.destroyed, "cancel after reflow");
             click(view.resetButton);
@@ -154,9 +166,10 @@ async function runUIExamples() {
         assert(row.selected && marker.visible && gear.pages.includes(gear.controller.selectedIndex),
             "selected marker must be enabled on the controller's actual page");
         const cancelled = await openConfirmation(view);
-        assert(cancelled.contentPane.width === 560 && cancelled.contentPane.height === 390,
+        const cancelledMid = cancelled.contentPane.getChild("safeContent").getChild("mid");
+        assert(cancelledMid.width === 560 && cancelledMid.height === 390,
             "popup must retain its own authored size");
-        assert(cancelled.closeButton === cancelled.contentPane.frame.getChild("closeButton"), "native frame discovery");
+        assert(cancelled.closeButton === cancelled.contentPane.frame.getChild("closeButton"), "nested frame close binding");
         assert(Laya.GRoot.inst.getChildIndex(Laya.GRoot.inst.modalLayer)
             === Laya.GRoot.inst.getChildIndex(cancelled) - 1, "modal mask order");
         click(cancelled.contentPane.cancelButton);
