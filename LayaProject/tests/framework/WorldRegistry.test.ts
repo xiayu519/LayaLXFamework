@@ -87,7 +87,7 @@ describe("WorldRegistry", () => {
         expect(exited).toBe(false);
         await expect(worlds.enter("battle")).rejects.toThrow("not finished unloading");
         load.resolve();
-        // The drain observes late callback work even though the caller-facing enter already rejected.
+        // 即使调用方的 enter 已失败，清理等待仍会跟踪之后才执行的回调工作。
         let drained = false;
         const drain = worlds.waitForPendingLoads().then(() => { drained = true; });
         await Promise.resolve();

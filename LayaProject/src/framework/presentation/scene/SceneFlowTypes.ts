@@ -22,9 +22,9 @@ export interface SceneRoute<TArgs> {
 }
 
 export interface SceneOpenOptions {
-    /** Shows the configured System-layer loading UI. Defaults to true. */
+    /** 显示配置在 System 层的 Loading UI，默认为 true。 */
     readonly showLoading?: boolean;
-    /** Hides loading after the scene reaches ready. Defaults to true. */
+    /** 场景就绪后隐藏 Loading，默认为 true。 */
     readonly autoCloseLoading?: boolean;
     readonly signal?: AbortSignal;
     readonly onProgress?: (progress: SceneTransitionProgress) => void;
@@ -38,11 +38,11 @@ export interface SceneLoadingPresenter {
 }
 
 export interface SceneFlowOptions {
-    /** @internal Runtime composition configures scene-local UI before preparation. */
+    /** @internal 框架组装时，在场景准备前配置其局部 UI。 */
     readonly configureScene?: (scene: import("./BaseGameScene").BaseGameScene<unknown>) => void;
     readonly loadingPresenter?: SceneLoadingPresenter;
     readonly waitForFrame?: () => Promise<void>;
-    /** @internal SceneRegistry defers global collection while sibling scene owners are unsettled. */
+    /** @internal 同级场景持有者尚未稳定时，SceneRegistry 推迟全局回收。 */
     readonly collectGarbage?: () => void;
 }
 
@@ -57,28 +57,28 @@ export interface SceneFlowSnapshot {
 }
 
 export class SceneTransitionCancelledError extends Error {
-    constructor() {
+    public constructor() {
         super("Scene transition was cancelled or superseded.");
         this.name = "SceneTransitionCancelledError";
     }
 }
 
 export class SceneCreationError extends Error {
-    constructor(readonly routeId: string, readonly errors: readonly unknown[]) {
+    public constructor(public readonly routeId: string, public readonly errors: readonly unknown[]) {
         super(`Scene route '${routeId}' reported ${errors.length} creation error(s).`);
         this.name = "SceneCreationError";
     }
 }
 
 export class SceneFlowCleanupError extends Error {
-    constructor(readonly errors: readonly unknown[]) {
+    public constructor(public readonly errors: readonly unknown[]) {
         super(`${errors.length} scene flow cleanup operation(s) failed.`);
         this.name = "SceneFlowCleanupError";
     }
 }
 
 export class SceneTransitionFailureError extends Error {
-    constructor(readonly cause: unknown, readonly cleanupErrors: readonly unknown[]) {
+    public constructor(public readonly cause: unknown, public readonly cleanupErrors: readonly unknown[]) {
         super(`Scene transition failed and ${cleanupErrors.length} cleanup/recovery operation(s) also failed.`);
         this.name = "SceneTransitionFailureError";
     }

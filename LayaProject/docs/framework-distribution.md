@@ -21,14 +21,18 @@
 旧项目迁移到 ResourceLayout version 2 时，在自己的同步分支合并启动资源目录并保留 `.meta` UUID，更新资源 URL、动态图集 prefix、Tables 输出位置，删除 `bootstrapScopes`。同步会保留旧 lock 曾管理的启动资源并解除其锁定，不自动删除或猜测移动游戏文件；迁移后由游戏确认资源和 Runtime 引用。已退役的框架代码、工具等仍按原同步规则清理。
 
 ```text
-Laya.init() -> src/AppEntry.ts main()
-  -> src/game/bootstrap/createApplication.ts
-  -> 未接入命名游戏时调用 src/game/logic 中的可调用模板逻辑
-  -> 开始业务后由 src/game/<game-id>/bootstrap 接管组合
-  -> src/framework/bootstrap/createRuntime.ts
+Laya.init() → AppEntry.main()
+  → StartupScene.openStartup()：先显示固定 Loading
+  → lx.init(GameApplication)：唯一框架初始化入口
+  → 全局数据和红点同步完成 → initialWorld → Lobby UI
+  → 销毁 Startup
+
+GameStartup.ts 选择游戏配置与 StartupScene；框架模块全部在 lx.ts 初始化。
 ```
 
 `AppEntry.ts` 使用 Laya 原生启动脚本入口，负责去重启动和失败回滚，不重复初始化引擎；停机调用 `await lx.stop()`。应用生命周期不依赖 `Startup.ls`，销毁业务场景或启动展示场景不会停止应用。IDE 的“启动场景预览”执行配置的 `main()`；“当前场景预览”只打开当前资产，需要应用服务时应切回启动预览。`logic` 不是游戏目录；固定桥接与命名游戏组合都归下游，framework 不依赖 game。
+
+游戏桥接改为 src/game/bootstrap/GameStartup.ts，导出 GameApplication 配置类和 StartupScene。AppEntry 直接调用 lx.init，不再调用运行时工厂。升级到本版的下游需迁移这个游戏所有的桥接文件，并按 ApplicationConfig 实现 register/initialize/synchronization/dispose；框架同步限制与 lock 规则保持原样。当前模板配置保留在 logic/bootstrap/GameApplication.ts，明确使用开发模拟器，真实游戏需接入自己的协议。
 
 ## 发布与同步
 

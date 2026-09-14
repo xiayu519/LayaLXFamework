@@ -30,6 +30,7 @@ export {
     SceneTransitionCancelledError,
     SceneTransitionFailureError,
 } from "./SceneFlowTypes";
+
 export type {
     SceneFlowOptions,
     SceneFlowSnapshot,
@@ -46,9 +47,10 @@ interface SceneRecord {
 }
 
 type UnknownRoute = SceneRoute<unknown>;
+
 type UnknownScene = BaseGameScene<unknown>;
 
-/** @internal Single-route transition implementation owned by SceneRegistry. */
+/** @internal 由 SceneRegistry 持有的单路由切换实现。 */
 export class SceneFlow {
     private readonly routes = new Map<string, UnknownRoute>();
     private readonly pending = new Set<Promise<unknown>>();
@@ -66,30 +68,38 @@ export class SceneFlow {
     private progressValue: SceneTransitionProgress | undefined;
     private lastErrorValue: string | undefined;
 
-    constructor(private readonly options: SceneFlowOptions = {}) {
+    public constructor(private readonly options: SceneFlowOptions = {}) {
         this.loadingPresenter = options.loadingPresenter;
         this.waitForFrame = options.waitForFrame ?? waitForNextFrame;
     }
 
-    register<TArgs>(route: SceneRoute<TArgs>): SceneRoute<TArgs> {
+    public register<TArgs>(route: SceneRoute<TArgs>): SceneRoute<TArgs> {
         this.requireActive();
-        if (!route.id || !route.url) throw new Error("Scene route id and url are required.");
-        if (this.routes.has(route.id)) throw new Error(`Duplicate scene route '${route.id}'.`);
+        if (!route.id || !route.url) {
+            throw new Error("Scene route id and url are required.");
+        }
+        if (this.routes.has(route.id)) {
+            throw new Error(`Duplicate scene route '${route.id}'.`);
+        }
         this.routes.set(route.id, route as unknown as UnknownRoute);
         return route;
     }
 
-    open<TArgs>(
+    public open<TArgs>(
         route: SceneRoute<TArgs>, args: NoInfer<TArgs>, options?: SceneOpenOptions,
     ): Promise<BaseGameScene<TArgs>>;
-    open<TArgs>(
+
+    public open<TArgs>(
         routeId: string, args: TArgs, options?: SceneOpenOptions,
     ): Promise<BaseGameScene<TArgs>>;
-    open<TArgs>(
+
+    public open<TArgs>(
         routeOrId: string | SceneRoute<TArgs>, args: TArgs, options: SceneOpenOptions = {},
     ): Promise<BaseGameScene<TArgs>> {
         this.requireActive();
-        if (options.signal?.aborted) return Promise.reject(new SceneTransitionCancelledError());
+        if (options.signal?.aborted) {
+            return Promise.reject(new SceneTransitionCancelledError());
+        }
         const routeId = typeof routeOrId === "string" ? routeOrId : routeOrId.id;
         const route = this.requireRoute(routeId);
         if (typeof routeOrId !== "string" && route !== (routeOrId as unknown as UnknownRoute)) {
@@ -122,11 +132,11 @@ export class SceneFlow {
         return operation;
     }
 
-    get current(): BaseGameScene<unknown> | undefined {
+    public get current(): BaseGameScene<unknown> | undefined {
         return this.currentRecord?.scene;
     }
 
-    snapshot(): SceneFlowSnapshot {
+    public snapshot(): SceneFlowSnapshot {
         return Object.freeze({
             state: this.stateValue,
             currentRouteId: this.currentRecord?.route.id,
@@ -138,8 +148,10 @@ export class SceneFlow {
         });
     }
 
-    dispose(): void {
-        if (this.stateValue === "disposed") return;
+    public dispose(): void {
+        if (this.stateValue === "disposed") {
+            return;
+        }
         this.stateValue = "disposed";
         this.requestVersion += 1;
         this.activeController?.abort();
@@ -162,12 +174,16 @@ export class SceneFlow {
             }
         }
         this.routes.clear();
-        if (errors.length > 0) throw new SceneFlowCleanupError(errors);
+        if (errors.length > 0) {
+            throw new SceneFlowCleanupError(errors);
+        }
     }
 
-    async waitForPendingLoads(): Promise<void> {
+    public async waitForPendingLoads(): Promise<void> {
         while (this.pending.size > 0) await Promise.allSettled([...this.pending]);
-        if (this.cleanupFailures.length) throw new SceneFlowCleanupError([...this.cleanupFailures]);
+        if (this.cleanupFailures.length) {
+            throw new SceneFlowCleanupError([...this.cleanupFailures]);
+        }
     }
 
     private async openRoute<TArgs>(
@@ -217,7 +233,9 @@ export class SceneFlow {
             this.assertCurrent(requestId, signal);
 
             reporter.emit("cleanup", 0);
-            if (oldRecord) await this.pauseScene(oldRecord.scene, route.id);
+            if (oldRecord) {
+                await this.pauseScene(oldRecord.scene, route.id);
+            }
             this.assertCurrent(requestId, signal);
             await this.releasePreviousScene(oldRecord);
             reporter.emit("cleanup", 1);
@@ -241,7 +259,9 @@ export class SceneFlow {
             }
             nextScene = node as BaseGameScene<TArgs>;
             this.options.configureScene?.(nextScene as BaseGameScene<unknown>);
-            if (hasLoading) nextScene.bindTransitionLoadingCompletion(requestLoadingClose);
+            if (hasLoading) {
+                nextScene.bindTransitionLoadingCompletion(requestLoadingClose);
+            }
             if (creationErrors.length > 0) {
                 throw new SceneCreationError(route.id, creationErrors);
             }
@@ -314,8 +334,11 @@ export class SceneFlow {
                 this.lastErrorValue = errorMessage(primaryError);
                 if (hasLoading) {
                     try {
-                        if (oldSceneAvailable) this.hideLoading(requestId);
-                        else this.failLoading(requestId, reporter.current, primaryError);
+                        if (oldSceneAvailable) {
+                            this.hideLoading(requestId);
+                        } else {
+                            this.failLoading(requestId, reporter.current, primaryError);
+                        }
                     } catch (loadingError) {
                         primaryError = new SceneTransitionFailureError(primaryError, [loadingError]);
                         this.lastErrorValue = errorMessage(primaryError);
@@ -330,46 +353,63 @@ export class SceneFlow {
         let operation = this.releaseOperation;
         if (!operation && oldRecord && this.currentRecord === oldRecord) {
             this.currentRecord = undefined;
-            if (this.pausedScene === oldRecord.scene) this.pausedScene = undefined;
+            if (this.pausedScene === oldRecord.scene) {
+                this.pausedScene = undefined;
+            }
             operation = this.releaseAndCollectScene(oldRecord.scene);
             this.releaseOperation = operation;
             const clear = () => {
-                if (this.releaseOperation === operation) this.releaseOperation = undefined;
+                if (this.releaseOperation === operation) {
+                    this.releaseOperation = undefined;
+                }
             };
             operation.then(clear, error => {
-                // A stop/superseding request may report cancellation, but teardown failure must
-                // still reach runtime cleanup before it decides whether global GC is safe.
+                // 停止或替换请求可能向调用方报告取消，但销毁失败仍必须
+                // 传递给框架清理流程，以判断能否安全执行全局 GC。
                 this.cleanupFailures.push(error);
                 clear();
             });
         }
-        if (operation) await operation;
+        if (operation) {
+            await operation;
+        }
     }
 
     private async releaseAndCollectScene(scene: UnknownScene): Promise<void> {
         await leaveAndDestroyScene(scene, "scene-replaced");
         await scene.waitForUI();
         await this.waitForFrame();
-        // Runtime shutdown owns collection once disposal starts, including a late native UI load.
+        // 框架关闭后由关闭流程统一回收，也包括之后才完成的原生 UI 加载。
         if (this.stateValue !== "disposed" && !this.cleanupFailures.length) {
-            if (this.options.collectGarbage) this.options.collectGarbage();
-            else Laya.Scene.gc();
+            if (this.options.collectGarbage) {
+                this.options.collectGarbage();
+            } else {
+                Laya.Scene.gc();
+            }
         }
     }
 
     private completeSceneLoading(requestId: number, scene: UnknownScene): void {
-        if (!this.ownsRequest(requestId) || this.currentRecord?.scene !== scene) return;
+        if (!this.ownsRequest(requestId) || this.currentRecord?.scene !== scene) {
+            return;
+        }
         this.hideLoading(requestId);
     }
 
     private hideLoading(requestId: number): void {
-        if (this.loadingRequestId !== requestId) return;
+        if (this.loadingRequestId !== requestId) {
+            return;
+        }
         this.loadingPresenter?.hide();
-        if (this.loadingRequestId === requestId) this.loadingRequestId = undefined;
+        if (this.loadingRequestId === requestId) {
+            this.loadingRequestId = undefined;
+        }
     }
 
     private hideRetainedLoading(): void {
-        if (this.loadingRequestId === undefined) return;
+        if (this.loadingRequestId === undefined) {
+            return;
+        }
         this.loadingPresenter?.hide();
         this.loadingRequestId = undefined;
     }
@@ -377,33 +417,47 @@ export class SceneFlow {
     private failLoading(
         requestId: number, progress: SceneTransitionProgress, error: unknown,
     ): void {
-        if (this.loadingRequestId !== requestId) return;
+        if (this.loadingRequestId !== requestId) {
+            return;
+        }
         this.loadingPresenter?.fail(progress, error);
     }
 
     private async pauseScene(scene: UnknownScene, nextRouteId: string): Promise<void> {
-        if (this.pausedScene === scene || scene.destroyed) return;
+        if (this.pausedScene === scene || scene.destroyed) {
+            return;
+        }
         if (this.pauseOperation?.scene === scene) {
             await this.pauseOperation.promise;
             return;
         }
         const promise = scene.pauseForTransition({ nextRouteId }).then(() => {
-            if (!scene.destroyed) this.pausedScene = scene;
+            if (!scene.destroyed) {
+                this.pausedScene = scene;
+            }
         }).finally(() => {
-            if (this.pauseOperation?.promise === promise) this.pauseOperation = undefined;
+            if (this.pauseOperation?.promise === promise) {
+                this.pauseOperation = undefined;
+            }
         });
         this.pauseOperation = { scene, promise };
         await promise;
     }
 
     private async resumeScene(scene: UnknownScene): Promise<void> {
-        if (this.pausedScene !== scene || scene.destroyed) return;
+        if (this.pausedScene !== scene || scene.destroyed) {
+            return;
+        }
         await scene.resumeAfterTransitionFailure();
-        if (this.pausedScene === scene) this.pausedScene = undefined;
+        if (this.pausedScene === scene) {
+            this.pausedScene = undefined;
+        }
     }
 
     private normalizeError(error: unknown, requestId: number, signal: AbortSignal): unknown {
-        if (!this.isCurrent(requestId, signal)) return new SceneTransitionCancelledError();
+        if (!this.isCurrent(requestId, signal)) {
+            return new SceneTransitionCancelledError();
+        }
         return error;
     }
 
@@ -416,17 +470,23 @@ export class SceneFlow {
     }
 
     private assertCurrent(requestId: number, signal: AbortSignal): void {
-        if (!this.isCurrent(requestId, signal)) throw new SceneTransitionCancelledError();
+        if (!this.isCurrent(requestId, signal)) {
+            throw new SceneTransitionCancelledError();
+        }
     }
 
     private requireRoute(routeId: string): UnknownRoute {
         const route = this.routes.get(routeId);
-        if (!route) throw new Error(`Unknown scene route '${routeId}'.`);
+        if (!route) {
+            throw new Error(`Unknown scene route '${routeId}'.`);
+        }
         return route;
     }
 
     private requireActive(): void {
-        if (this.stateValue === "disposed") throw new Error("SceneFlow has been disposed.");
+        if (this.stateValue === "disposed") {
+            throw new Error("SceneFlow has been disposed.");
+        }
     }
 }
 
@@ -443,11 +503,16 @@ function destroyScene(scene: BaseGameScene<unknown>, reason: string): void {
         try {
             scene.destroy();
         } catch (error) {
-            if (error instanceof SceneLifecycleCleanupError) errors.push(...error.errors);
-            else errors.push(error);
+            if (error instanceof SceneLifecycleCleanupError) {
+                errors.push(...error.errors);
+            } else {
+                errors.push(error);
+            }
         }
     }
-    if (errors.length > 0) throw new SceneFlowCleanupError(errors);
+    if (errors.length > 0) {
+        throw new SceneFlowCleanupError(errors);
+    }
 }
 
 async function leaveAndDestroyScene(scene: BaseGameScene<unknown>, reason: string): Promise<void> {
@@ -460,10 +525,15 @@ async function leaveAndDestroyScene(scene: BaseGameScene<unknown>, reason: strin
     try {
         destroyScene(scene, reason);
     } catch (error) {
-        if (error instanceof SceneFlowCleanupError) errors.push(...error.errors);
-        else errors.push(error);
+        if (error instanceof SceneFlowCleanupError) {
+            errors.push(...error.errors);
+        } else {
+            errors.push(error);
+        }
     }
-    if (errors.length > 0) throw new SceneFlowCleanupError(errors);
+    if (errors.length > 0) {
+        throw new SceneFlowCleanupError(errors);
+    }
 }
 
 function waitForNextFrame(): Promise<void> {

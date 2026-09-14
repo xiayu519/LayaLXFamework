@@ -5,8 +5,8 @@ import { pathToFileURL } from "node:url";
 import ts from "typescript";
 import { LayaHttpTransport, type HttpRequestOptions } from "../../src/framework/infrastructure/network/HttpTransport";
 
-// Run the installed, baseline-checked engine sources. Only XHR is controlled;
-// HttpRequest.send/_onLoad/complete and event delivery are the real engine code.
+// 运行本地安装且已核对基线的引擎源码；仅控制 XHR，
+// HttpRequest.send/_onLoad/complete 与事件派发均使用真实引擎代码。
 const resolver = await import(pathToFileURL(resolve("tools/layaair.mjs")).href) as {
     resolveLayaRuntime(): { runtimeRoot: string };
 };

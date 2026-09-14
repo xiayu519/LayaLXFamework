@@ -10,14 +10,16 @@ export interface UIConfirmationArgs {
     readonly onConfirm: () => void;
 }
 
-/** Statically assigned prefab Runtime; presentation behavior stays beside its native node references. */
+/** 资源中静态指定的预制体 Runtime；展示逻辑与原生节点引用集中维护。 */
 @regClass()
 export class UIConfirmation extends UIConfirmationBase {
-    /** Called for each presentation; return all asynchronous binding work for owner cleanup. */
-    onBind(args: UIConfirmationArgs, session: UIViewSession): void {
+    /** 每次展示时调用；返回全部异步绑定工作，以便持有者清理。 */
+    public onBind(args: UIConfirmationArgs, session: UIViewSession): void {
         let answered = false;
         const confirm = (): void => {
-            if (answered || !session.token.isCurrent() || !this.mouseEnabled) return;
+            if (answered || !session.token.isCurrent() || !this.mouseEnabled) {
+                return;
+            }
             answered = true;
             session.close();
             args.onConfirm();

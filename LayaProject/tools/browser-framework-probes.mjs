@@ -1,12 +1,15 @@
-/** Self-contained browser function: stringify and evaluate with awaitPromise/returnByValue. */
+/** 可独立执行的浏览器函数，序列化后使用 awaitPromise/returnByValue 求值。 */
 export async function runFrameworkProbes(validation) {
     const { lx, Laya } = globalThis;
     const ui = lx.ui;
     const root = Laya.GRoot.inst;
     const base = lx.scenes.get('examples.lobby')?.ui.snapshot().views.find((entry) => entry.routeId === validation.uiProbe.baseRouteId);
-    const loading = ui.snapshot().managed.find(entry => entry.routeId === "lx.scene-loading");
-    if (!base || !loading) throw new Error("Framework probe requires a native scene page and loading window.");
-    const WindowBase = Object.getPrototypeOf(loading.window.constructor);
+    if (!base) throw new Error("Framework probe requires a native scene page.");
+    // 启动流程直接持有进度界面；应用内的 Loading 按需实例化。
+    const loadingWindow = ui.snapshot().managed.find(entry => entry.routeId === "lx.scene-loading")?.window
+        ?? await ui.show("lx.scene-loading", { phase: "ready", scene: 1, resources: 1, overall: 1 });
+    ui.close("lx.scene-loading", loadingWindow);
+    const WindowBase = Object.getPrototypeOf(loadingWindow.constructor);
     const assert = (condition, message) => {
         if (!condition) throw new Error(`Framework probe failed: ${message}`);
     };

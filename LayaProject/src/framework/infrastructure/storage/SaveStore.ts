@@ -31,7 +31,7 @@ interface SaveEnvelope {
 }
 
 export class UnsupportedSaveVersionError extends Error {
-    constructor(readonly storedVersion: number, readonly currentVersion: number) {
+    public constructor(public readonly storedVersion: number, public readonly currentVersion: number) {
         super(`Save version ${storedVersion} is newer than supported version ${currentVersion}.`);
         this.name = "UnsupportedSaveVersionError";
     }
@@ -40,10 +40,10 @@ export class UnsupportedSaveVersionError extends Error {
 export type SaveStorageOperation = "read" | "write" | "verify-write" | "remove" | "verify-remove";
 
 export class SaveStorageError extends Error {
-    constructor(
-        readonly key: string,
-        readonly operation: SaveStorageOperation,
-        readonly cause?: unknown,
+    public constructor(
+        public readonly key: string,
+        public readonly operation: SaveStorageOperation,
+        public readonly cause?: unknown,
     ) {
         super(`Save storage '${key}' failed during ${operation}.`);
         this.name = "SaveStorageError";
@@ -51,7 +51,7 @@ export class SaveStorageError extends Error {
 }
 
 export class SaveStore<T> {
-    constructor(
+    public constructor(
         private readonly driver: StorageDriver,
         private readonly schema: SaveSchema<T>,
     ) {
@@ -60,7 +60,7 @@ export class SaveStore<T> {
         }
     }
 
-    load(): SaveLoadResult<T> {
+    public load(): SaveLoadResult<T> {
         const raw = this.readStored();
         if (raw === null) {
             return this.createDefault(true);
@@ -107,7 +107,7 @@ export class SaveStore<T> {
         return { value, source: "stored" };
     }
 
-    save(value: T): void {
+    public save(value: T): void {
         if (!this.schema.validate(value)) {
             throw new Error(`Refusing to save invalid data for '${this.schema.key}'.`);
         }
@@ -116,8 +116,8 @@ export class SaveStore<T> {
             data: value,
         };
         const serialized = JSON.stringify(envelope);
-        // Read immediately before writing: a different client may have upgraded
-        // since load(). LocalStorage has no transaction/CAS across browser tabs.
+        // 写入前重新读取：其他客户端可能在 load() 之后升级过存档；
+        // LocalStorage 不提供跨浏览器标签页的事务或 CAS。
         this.assertWritableVersion(this.readStored());
         try {
             this.driver.setItem(this.schema.key, serialized);
@@ -129,7 +129,7 @@ export class SaveStore<T> {
         }
     }
 
-    clear(): void {
+    public clear(): void {
         try {
             this.driver.removeItem(this.schema.key);
         } catch (cause) {
@@ -149,7 +149,9 @@ export class SaveStore<T> {
     }
 
     private assertWritableVersion(raw: string | null): void {
-        if (raw === null) return;
+        if (raw === null) {
+            return;
+        }
         let parsed: unknown;
         try {
             parsed = JSON.parse(raw);
@@ -184,15 +186,15 @@ export class SaveStore<T> {
 }
 
 export class LayaLocalStorageDriver implements StorageDriver {
-    getItem(key: string): string | null {
+    public getItem(key: string): string | null {
         return Laya.LocalStorage.getItem(key);
     }
 
-    setItem(key: string, value: string): void {
+    public setItem(key: string, value: string): void {
         Laya.LocalStorage.setItem(key, value);
     }
 
-    removeItem(key: string): void {
+    public removeItem(key: string): void {
         Laya.LocalStorage.removeItem(key);
     }
 }

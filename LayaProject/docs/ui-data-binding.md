@@ -2,7 +2,11 @@
 
 业务模型保存事实，UI 在展示期间读取快照。节点引用由 Laya IDE Runtime、`.generated.ts` 或静态 Script 的原生 `@property` 完成；`bindData` 只管理模型事件订阅和刷新，不创建节点、不查找同名字段，也不生成另一套 Binder。生成文件不手改，引用在 Prefab 反序列化完成后使用。
 
-按背包、角色、任务等大功能建立共享模型，寿命归应用/账号或明确的场景业务。一个模型可以通知任意多个 UI，一个 UI 也可以订阅多个模型；模型不保存 UI route、节点或消费者白名单。只有选中项、输入草稿等表现状态留在 UI。组合根注入查询、命令和原生事件源，不在每次 show 时新建业务数据。
+本项目 IAP 游戏的数据系统全局存在：背包、角色、任务等账号模型由框架根 World 初始化并持有，协议接收也归根；小 World 只管理相应 UI 表现和订阅。一个模型可以通知任意多个 UI，一个 UI 也可以订阅多个模型；模型不保存 UI route、节点或消费者白名单。只有选中项、输入草稿等表现状态留在 UI。组合根注入查询、命令和原生事件源，不在每次 show 或进入小 World 时新建全局业务数据。
+
+根初始化全局模型及红点系统后，等待首次数据同步（含红点状态）完成，才允许进入 LobbyWorld。真实连接与同步接入为 TODO；小 World 不负责补做这一步。完整启动就绪条件及模拟数据边界见 [World 生命周期设计](world-lifecycle-design.md)。
+
+当前背包 UI 的默认入口是组合处注入的 `ExampleInventoryContext`：读取 `context.state`、调用 `context.commands`，通过 `session.bindData(context.changes, context.changedEvent, refresh)` 刷新。`DataRegistry` 是同一数据对象的可选查询目录，UI 不需要先查目录再构造 Context；一个消费者无需重复使用两条访问路径。
 
 ## 模型与通知
 
@@ -36,7 +40,7 @@ session.bindRedDot(this.badge, "inventory", {
 
 `source` 是 `Laya.EventDispatcher`；render 无事件参数，每次主动读取当前状态。`bindData` 首次同步渲染，后续通知用原生 `Laya.timer.callLater` 合并同一次绑定的刷新。该合并只发生在表现层，不延迟模型落地，也不合并业务命令。
 
-场景窗口根节点必须静态挂载并启用 UIViewLifecycle，模板已预置，运行时不补挂。页面暂停时解除订阅并取消待执行刷新；恢复时立即读取最新快照。展示关闭时全部解绑，隐藏缓存重开建立新的展示绑定。两个方法都返回解除函数，适合在 GList 复用行换业务 key 前停止旧绑定；不能在 itemRenderer 中只追加订阅。
+场景窗口根节点必须静态挂载并启用 UIViewLifecycle，模板已预置，运行时不补挂。原生组件禁用时解除订阅并取消待执行刷新；重新启用时读取最新快照。全屏 replace 会结束旧展示，stack 则保留其订阅。展示关闭时全部解绑，隐藏缓存重开建立新的展示绑定。两个方法都返回解除函数，适合在 GList 复用行换业务 key 前停止旧绑定；不能在 itemRenderer 中只追加订阅。
 
 应用 `BaseGameWindow` 提供同名 protected `bindData` / `bindRedDot` 方法，绑定归当前 presentation。普通同步节点赋值直接执行，按钮等非数据事件仍使用原生 on/off，并将清理登记到 `session.lifetime` 或窗口 presentation。
 
@@ -44,7 +48,7 @@ session.bindRedDot(this.badge, "inventory", {
 
 ## 独立账号数据与协议入口
 
-[createGameApplication.ts](../src/game/logic/bootstrap/createGameApplication.ts) 在创建 runtime 前构造账号 ExampleInventory 模型与 [ExampleInventoryData](../src/game/logic/infrastructure/examples/ExampleInventoryData.ts)，再通过 ApplicationDefinition.data 安装到 DataRegistry。目录只引用对象，不负责 new 模型或替业务决定寿命。功能 query key 使用 import type，不引入数据实现、服务或 UI 类：
+[GameApplication.ts](../src/game/logic/bootstrap/GameApplication.ts) 创建演示账号模型与 [ExampleInventoryData](../src/game/logic/infrastructure/examples/ExampleInventoryData.ts)，通过 ApplicationConfig.data 交给 lx.init 登记。页面收到的 state/changes 与 lx.data 指向同一个账号对象；数据目录不负责创建模型或决定业务寿命。下面的查询入口适用于只读消费者。定义 query key 时使用 import type 引用查询类型：
 
 ```ts
 import { EXAMPLE_INVENTORY_DATA } from "../application/ExampleDataKeys";

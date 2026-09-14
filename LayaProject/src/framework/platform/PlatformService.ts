@@ -6,12 +6,12 @@ export interface PlatformRect {
 }
 
 export interface PlatformViewport {
-    /** Width and height use the host viewport coordinate system, not Laya stage units. */
+    /** 宽高使用宿主视口坐标系，不使用 Laya 舞台单位。 */
     readonly width: number;
     readonly height: number;
-    /** Omitted when the host cannot report a trustworthy safe area. */
+    /** 宿主无法提供可信的安全区时省略。 */
     readonly safeArea?: PlatformRect;
-    /** Reserved top-right host UI, such as the WeChat menu capsule. */
+    /** 宿主右上角保留的 UI 区域，例如微信菜单胶囊。 */
     readonly topRightAvoidance?: PlatformRect;
 }
 

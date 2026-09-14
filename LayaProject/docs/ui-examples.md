@@ -8,7 +8,7 @@
 
 ## 接入入口
 
-示例属于 src/game/logic 可调用脚本库。createGameApplication 先创建账号数据和独立模拟服务器，再安装应用服务；模拟登录数据落地后，GameReadyService 进入大厅 World。
+示例属于 src/game/logic 可调用脚本库。GameApplication 配置创建演示账号和独立模拟服务器；lx.init 调用其 register/initialize，并等待明确标记的模拟同步完成后进入大厅。框架模块自身只在 lx.ts 初始化。
 
 | 阶段 | World / Scene ID | 场景与页面 |
 | --- | --- | --- |
@@ -25,7 +25,7 @@ const inventoryRoute = registerCommonUI(ui, inventoryContext, deliveryContext);
 // World 只对自己的页面和 Scene 登记 world.own，不撤销公共路由。
 ```
 
-依赖组装参考 [createGameApplication.ts](../src/game/logic/bootstrap/createGameApplication.ts)；World 流程参考 [registerExampleWorlds.ts](../src/game/logic/bootstrap/registerExampleWorlds.ts)。场景内打开：
+依赖组装参考 [GameApplication.ts](../src/game/logic/bootstrap/GameApplication.ts)；World 流程参考 [GameApplication.ts](../src/game/logic/bootstrap/GameApplication.ts)。场景内打开：
 
 ```ts
 await this.ui.show(inventoryRoute, { title: "旅行背包" });
@@ -70,7 +70,7 @@ InventoryItem 的嵌套图标引用框架 UIDynamicImage 组件，来自 supplie
 
 打开预制体，选择根节点查看 Runtime：状态页对应 UILobby，背包对应 UIInventory，确认框对应 UIConfirmation，全屏居中页对应 UIFullscreenMid，战斗页对应 UIBattle。这些脚本直接包含界面交互和刷新，原来的四个外部 Page 绑定脚本已合并移除；InventoryItem 继续使用 UIInventoryItem。
 
-根节点的组件列表中还静态挂有框架 UIViewLifecycle，所有窗口骨架已预置。场景 UI 必须保留并启用它；路由只用 getComponent 获取，漏配或禁用会在展示前报错并销毁该实例。它连接原生启用、禁用与销毁回调，负责暂停数据订阅、恢复快照和直接销毁时的 owner 清理，并在 IDE 中提供 layout/layer/navigation/modal/closeOnMaskClick/multiplicity/retention 窗口参数。
+根节点的组件列表中还静态挂有框架 UIViewLifecycle，所有窗口骨架已预置。场景 UI 必须保留并启用它；路由只用 getComponent 获取，漏配或禁用会在展示前报错并销毁该实例。它连接原生启用、禁用与销毁回调，负责暂停数据订阅、恢复快照和直接销毁时的 owner 清理，并在 IDE 中提供 layout/layer/openMode/modal/closeOnMaskClick/multiplicity/retention 窗口参数。
 
 在 IDE 选择根节点下的 UIViewLifecycle 组件修改参数并保存，预览时会读取静态配置；例如 Confirmation 的 closeOnMaskClick、Inventory 的 retention。尺寸、文字和节点关系在预制体中调整。LayaAir 3.4.1 的 Runtime 是运行时替代类型，不能把 Runtime 新增的 @property 当作可保存的根节点属性；需要业务可调字段时使用静态 Script 组件。节点导出仍走 IDE 生成，不手改 .generated.ts。
 
@@ -86,7 +86,7 @@ InventoryItem 的嵌套图标引用框架 UIDynamicImage 组件，来自 supplie
 
 点击事件归 session.lifetime，模型刷新通过 session.bindData，红点通过 session.bindRedDot。第一次绑定和页面恢复同步读取快照；后续通知由原生 callLater 合并。确认框由 session.show 归父展示，父关闭清理已显示、隐藏缓存及未完成请求；旧回调不能重复扣减。服务拥有的延迟奖励继续落模型，不依赖窗口 token。销毁后由原生 GList 清空自己的池，不逐条 clearRes()。
 
-场景示例全部挂所属 uiRoot，确认框也不转移到全局 GRoot。center-popup 只动画 mid，场景局部遮罩位于最高模态窗口正下方；navigation:page 控制页面覆盖和恢复，与弹窗布局及模态分别配置。
+场景示例全部挂所属 uiRoot，确认框也不转移到全局 GRoot。center-popup 只动画 mid，场景局部遮罩位于最高模态窗口正下方；openMode:replace/stack 控制全屏关闭下层或叠加；背包通过 onBack 显式返回大厅，居中示例使用 stack。见 [打开方式](ui-navigation.md)。
 
 ## 验证
 

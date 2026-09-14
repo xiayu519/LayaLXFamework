@@ -48,16 +48,17 @@ export class AudioService {
     private bgmId: number | undefined;
     private disposed = false;
 
-    constructor(private readonly backend: AudioBackend = new LayaAudioBackend()) {}
+    public constructor(private readonly backend: AudioBackend = new LayaAudioBackend()) {
+    }
 
-    applySettings(settings: AudioSettings): void {
+    public applySettings(settings: AudioSettings): void {
         this.requireActive();
         this.backend.muted = settings.muted;
         this.backend.musicVolume = clampVolume(settings.musicVolume);
         this.backend.soundVolume = clampVolume(settings.soundVolume);
     }
 
-    get settings(): AudioSettings {
+    public get settings(): AudioSettings {
         return {
             muted: this.backend.muted,
             musicVolume: this.backend.musicVolume,
@@ -65,7 +66,7 @@ export class AudioService {
         };
     }
 
-    playBgm(url: string, loops = 0): AudioHandle {
+    public playBgm(url: string, loops = 0): AudioHandle {
         this.requireActive();
         this.stopBgm();
         const handle = this.play("bgm", url, loops);
@@ -75,7 +76,7 @@ export class AudioService {
         return handle;
     }
 
-    stopBgm(): void {
+    public stopBgm(): void {
         const id = this.bgmId;
         if (id === undefined) {
             return;
@@ -84,7 +85,7 @@ export class AudioService {
         this.finish(id, false);
     }
 
-    playSfx(
+    public playSfx(
         url: string,
         loops = 1,
         owner?: object | string,
@@ -93,7 +94,7 @@ export class AudioService {
         return this.play("sfx", url, loops, owner);
     }
 
-    stopOwner(owner: object | string): void {
+    public stopOwner(owner: object | string): void {
         for (const entry of Array.from(this.active.values())) {
             if (entry.handle.owner === owner) {
                 this.finish(entry.handle.id, true);
@@ -101,7 +102,7 @@ export class AudioService {
         }
     }
 
-    stopAllSfx(): void {
+    public stopAllSfx(): void {
         const ids = Array.from(this.active.values())
             .filter((entry) => entry.handle.kind === "sfx")
             .map((entry) => entry.handle.id);
@@ -113,7 +114,7 @@ export class AudioService {
         }
     }
 
-    snapshot(): AudioSnapshot {
+    public snapshot(): AudioSnapshot {
         const bgm = this.bgmId === undefined ? undefined : this.active.get(this.bgmId)?.handle;
         return Object.freeze({
             bgm: bgm ? Object.freeze({ id: bgm.id, url: bgm.url, stopped: bgm.stopped }) : undefined,
@@ -122,7 +123,7 @@ export class AudioService {
         });
     }
 
-    dispose(): void {
+    public dispose(): void {
         if (this.disposed) {
             return;
         }
@@ -158,7 +159,9 @@ export class AudioService {
             url,
             owner,
             stoppedValue: false,
-            get stopped() { return this.stoppedValue; },
+            get stopped() {
+                return this.stoppedValue;
+            },
             stop: () => this.finish(id, true),
         };
         this.active.set(id, { handle, channel });
@@ -191,43 +194,43 @@ export class AudioService {
 }
 
 export class LayaAudioBackend implements AudioBackend {
-    get muted(): boolean {
+    public get muted(): boolean {
         return Laya.SoundManager.muted;
     }
 
-    set muted(value: boolean) {
+    public set muted(value: boolean) {
         Laya.SoundManager.muted = value;
     }
 
-    get musicVolume(): number {
+    public get musicVolume(): number {
         return Laya.SoundManager.musicVolume;
     }
 
-    set musicVolume(value: number) {
+    public set musicVolume(value: number) {
         Laya.SoundManager.musicVolume = value;
     }
 
-    get soundVolume(): number {
+    public get soundVolume(): number {
         return Laya.SoundManager.soundVolume;
     }
 
-    set soundVolume(value: number) {
+    public set soundVolume(value: number) {
         Laya.SoundManager.soundVolume = value;
     }
 
-    playMusic(url: string, loops: number, complete: () => void): Laya.SoundChannel {
+    public playMusic(url: string, loops: number, complete: () => void): Laya.SoundChannel {
         return Laya.SoundManager.playMusic(url, loops, complete);
     }
 
-    playSound(url: string, loops: number, complete: () => void): Laya.SoundChannel {
+    public playSound(url: string, loops: number, complete: () => void): Laya.SoundChannel {
         return Laya.SoundManager.playSound(url, loops, complete);
     }
 
-    stopMusic(): void {
+    public stopMusic(): void {
         Laya.SoundManager.stopMusic();
     }
 
-    stopAllSound(): void {
+    public stopAllSound(): void {
         Laya.SoundManager.stopAllSound();
     }
 }

@@ -1,11 +1,11 @@
 import type { PlatformRect, PlatformService, PlatformViewport } from "./PlatformService";
 
 export class WebPlatformService implements PlatformService {
-    readonly name = "platform:web";
-    readonly kind = "web" as const;
+    public readonly name = "platform:web";
+    public readonly kind = "web" as const;
     private safeAreaProbe: HTMLDivElement | undefined;
 
-    get viewport(): PlatformViewport {
+    public get viewport(): PlatformViewport {
         const browser = Laya.Browser;
         const width = finiteSize(browser?.clientWidth ?? globalThis.window?.innerWidth ?? 0);
         const height = finiteSize(browser?.clientHeight ?? globalThis.window?.innerHeight ?? 0);
@@ -16,9 +16,11 @@ export class WebPlatformService implements PlatformService {
         });
     }
 
-    start(): void {
+    public start(): void {
         const document = Laya.Browser?.window?.document ?? globalThis.document;
-        if (!document?.body || this.safeAreaProbe) return;
+        if (!document?.body || this.safeAreaProbe) {
+            return;
+        }
         enableViewportFitCover(document);
         const probe = document.createElement("div");
         probe.setAttribute("aria-hidden", "true");
@@ -36,18 +38,20 @@ export class WebPlatformService implements PlatformService {
         this.safeAreaProbe = probe;
     }
 
-    stop(): void {
+    public stop(): void {
         this.safeAreaProbe?.remove();
         this.safeAreaProbe = undefined;
     }
 
-    nowMs(): number {
+    public nowMs(): number {
         return Laya.Browser?.window?.performance?.now?.() ?? globalThis.performance?.now?.() ?? Date.now();
     }
 
-    openExternalUrl(url: string): void {
+    public openExternalUrl(url: string): void {
         const hostWindow = Laya.Browser?.window ?? globalThis.window;
-        if (!hostWindow) throw new Error("Browser window is unavailable.");
+        if (!hostWindow) {
+            throw new Error("Browser window is unavailable.");
+        }
         const parsed = new URL(url, hostWindow.location.href);
         if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
             throw new Error(`Unsupported external URL protocol '${parsed.protocol}'.`);
@@ -57,7 +61,9 @@ export class WebPlatformService implements PlatformService {
 
     private readSafeArea(width: number, height: number): PlatformRect {
         const probe = this.safeAreaProbe;
-        if (!probe) return freezeRect(0, 0, width, height);
+        if (!probe) {
+            return freezeRect(0, 0, width, height);
+        }
         const style = (Laya.Browser?.window ?? globalThis.window).getComputedStyle(probe);
         const top = cssPixel(style.paddingTop, height);
         const right = cssPixel(style.paddingRight, width);
@@ -82,6 +88,8 @@ function freezeRect(x: number, y: number, width: number, height: number): Platfo
 
 function enableViewportFitCover(document: Document): void {
     const viewport = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
-    if (!viewport || /(?:^|,)\s*viewport-fit\s*=/.test(viewport.content)) return;
+    if (!viewport || /(?:^|,)\s*viewport-fit\s*=/.test(viewport.content)) {
+        return;
+    }
     viewport.content = `${viewport.content}${viewport.content ? "," : ""}viewport-fit=cover`;
 }

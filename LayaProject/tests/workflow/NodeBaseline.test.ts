@@ -13,7 +13,7 @@ describe("Node runtime baseline", () => {
         expect(manifest.jsonContracts["LayaProject/package.json"].engines.node).toBe(pkg.engines.node);
         expect(read("../.github/workflows/framework-sync.yml").match(/node-version:\s*(\d+)/)?.[1])
             .toBe(major);
-        // The pinned Vitest toolchain accepts 24.x; keep this explicit when upgrading tools.
+        // 固定的 Vitest 工具链接受 24.x；升级工具时继续显式检查。
         expect(major).toBe("24");
         expect(lock.packages["node_modules/vitest"].engines.node).toContain("^24.0.0");
     });

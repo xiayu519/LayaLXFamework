@@ -61,13 +61,13 @@ owner 决定谁关闭和回收 UI，host 决定实际父节点，layout 决定�
 | --- | --- |
 | layout | fullscreen 或 center-popup；不按 layer 猜测 |
 | layer | Background / Screen / HUD / Popup / Guide / Toast / System |
-| navigation | page 参与覆盖与恢复，overlay 保留下面页面 |
+| openMode | replace 关闭下层全屏；stack 叠加下层。弹窗强制 stack |
 | modal | 是否请求所属宿主的公共遮罩 |
 | closeOnMaskClick | 有遮罩时能否点击空白关闭 |
 | multiplicity | singleton 按 owner 隔离；multiple 允许多实例 |
 | retention | destroy 关闭销毁；hide 在 owner 存活期间缓存。multiple 只能 destroy |
 
-Fullscreen 模板默认 Screen/page、非模态、singleton/destroy；Popup 模板默认 Popup/overlay、modal:true、closeOnMaskClick:true、singleton/destroy。确认框示例使用 multiple/destroy，旅行背包使用 singleton/hide。配置在原生反序列化后校验，漏挂、禁用或非法组合会报错。
+Fullscreen 模板默认 Screen/replace、非模态、singleton/destroy；Popup 模板默认 Popup/stack、modal:true、closeOnMaskClick:true、singleton/destroy。确认框示例使用 multiple/destroy，旅行背包使用 singleton/hide。配置在原生反序列化后校验，漏挂、禁用或非法组合会报错。层级范围、真实关闭与返回流程见 [UI 层级与打开方式](ui-navigation.md)。
 
 ```ts
 const battleHudRoute: UIViewRoute<BattleHudArgs> = {
@@ -87,7 +87,7 @@ const resultRoute: UIViewRoute<ResultArgs, ResultView> = {
 };
 ```
 
-fullscreen 铺满屏幕并适配完整骨架。center-popup 的根与 safeContent 仍拉伸，mid 保留设计尺寸并在避开平台顶部占用后的安全区居中；空间不足等比缩小，只对 mid 播放开合动画。导航、模态和布局各自独立：场景内弹窗仍属于场景，fullscreen 也可以用 overlay。
+fullscreen 铺满屏幕并适配完整骨架。center-popup 的根与 safeContent 仍拉伸，mid 保留设计尺寸并在避开平台顶部占用后的安全区居中；空间不足等比缩小，只对 mid 播放开合动画。模态和布局分别配置；打开方式只影响全屏，弹窗保持叠加且仍归原场景或父展示。
 
 应用级 GWindow 继续由 UIRoute/register 配置和创建，用于 Loading 等跨场景窗口；其 safe-screen 将整个 Pane 限制在安全区。它与场景原生 GWidget 的 UIViewRoute 是两个明确用途，不能把应用创建器复制到普通场景 UI。
 

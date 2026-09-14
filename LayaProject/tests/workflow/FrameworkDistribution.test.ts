@@ -44,7 +44,7 @@ describe("framework distribution", () => {
         write(join(destination, resource), "game custom skin\n");
         const legacy = "LayaProject/assets/bootstrap/framework/ui/Tip.lh";
         write(join(destination, legacy), "legacy game skin\n");
-        // Emulate a previous release's ownership record; the next sync must relinquish it without deletion.
+        // 模拟旧发布版本的持有记录；下次同步应移交归属，不删除资源。
         writeJson(join(destination, ".framework-lock.json"), { files: [{ path: legacy }] });
         git(source, "init");
         git(source, "config", "user.name", "Framework Test");

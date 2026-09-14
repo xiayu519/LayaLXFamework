@@ -17,13 +17,13 @@ interface SceneRegistration {
 }
 
 export class SceneRegistryCleanupError extends Error {
-    constructor(readonly errors: readonly unknown[]) {
+    public constructor(public readonly errors: readonly unknown[]) {
         super(`${errors.length} scene registry cleanup operation(s) failed.`);
         this.name = "SceneRegistryCleanupError";
     }
 }
 
-/** Owns native scenes; independent route registrations have independent transition lifetimes. */
+/** 持有原生场景；各路由注册项拥有独立的切换生命周期。 */
 export class SceneRegistry {
     private readonly entries = new Map<string, SceneRegistration>();
     private readonly pending = new Set<Promise<unknown>>();
@@ -32,9 +32,10 @@ export class SceneRegistry {
     private disposeTask: Promise<void> | undefined;
     private disposed = false;
 
-    constructor(private readonly options: SceneFlowOptions = {}) {}
+    public constructor(private readonly options: SceneFlowOptions = {}) {
+    }
 
-    register<TArgs>(route: SceneRoute<TArgs>): SceneRoute<TArgs> {
+    public register<TArgs>(route: SceneRoute<TArgs>): SceneRoute<TArgs> {
         this.requireActive();
         if (!route.id.trim() || !route.url.trim() || this.entries.has(route.id)) {
             throw new Error(`Duplicate or invalid scene route '${route.id}'.`);
@@ -43,91 +44,124 @@ export class SceneRegistry {
         return route;
     }
 
-    get<TArgs>(route: SceneRoute<TArgs>): BaseGameScene<TArgs> | undefined;
-    get(route: string): BaseGameScene<unknown> | undefined;
-    get(route: string | SceneRoute<unknown>): BaseGameScene<unknown> | undefined {
+    public get<TArgs>(route: SceneRoute<TArgs>): BaseGameScene<TArgs> | undefined;
+
+    public get(route: string): BaseGameScene<unknown> | undefined;
+
+    public get(route: string | SceneRoute<unknown>): BaseGameScene<unknown> | undefined {
         const entry = this.entries.get(typeof route === "string" ? route : route.id);
-        if (!entry || entry.retiring || entry.closing || entry.failure || this.disposed) return undefined;
-        if (typeof route !== "string" && entry.route !== route) return undefined;
+        if (!entry || entry.retiring || entry.closing || entry.failure || this.disposed) {
+            return undefined;
+        }
+        if (typeof route !== "string" && entry.route !== route) {
+            return undefined;
+        }
         const scene = entry.flow?.current;
         return scene && !scene.destroyed ? scene : undefined;
     }
 
-    open<TArgs>(route: SceneRoute<TArgs>, args: NoInfer<TArgs>, options?: SceneOpenOptions): Promise<BaseGameScene<TArgs>>;
-    open<TArgs>(route: string, args: TArgs, options?: SceneOpenOptions): Promise<BaseGameScene<TArgs>>;
-    open<TArgs>(route: string | SceneRoute<TArgs>, args: TArgs, options: SceneOpenOptions = {}): Promise<BaseGameScene<TArgs>> {
+    public open<TArgs>(route: SceneRoute<TArgs>, args: NoInfer<TArgs>, options?: SceneOpenOptions): Promise<BaseGameScene<TArgs>>;
+
+    public open<TArgs>(route: string, args: TArgs, options?: SceneOpenOptions): Promise<BaseGameScene<TArgs>>;
+
+    public open<TArgs>(route: string | SceneRoute<TArgs>, args: TArgs, options: SceneOpenOptions = {}): Promise<BaseGameScene<TArgs>> {
         const entry = this.requireEntry(route);
         const version = entry.version;
         return this.track((async () => {
             await entry.closing;
             this.assertOpen(entry, version, options);
-            if (!entry.flow) entry.flow = this.createFlow(entry);
+            if (!entry.flow) {
+                entry.flow = this.createFlow(entry);
+            }
             let scene: BaseGameScene<TArgs>;
             try {
                 scene = await entry.flow.open(entry.route.id, args, options);
                 this.assertOpen(entry, version, options);
-                if (scene.destroyed) throw new SceneTransitionCancelledError();
+                if (scene.destroyed) {
+                    throw new SceneTransitionCancelledError();
+                }
             } catch (error) {
                 if (error instanceof SceneFlowCleanupError || error instanceof SceneTransitionFailureError) {
                     entry.failure = new SceneRegistryCleanupError([error]);
                 }
-                try { await this.drainScenes(entry, false); }
-                catch (cleanupError) { throw new SceneRegistryCleanupError([error, cleanupError]); }
+                try {
+                    await this.drainScenes(entry, false);
+                }
+                catch (cleanupError) {
+                    throw new SceneRegistryCleanupError([error, cleanupError]);
+                }
                 throw error;
             }
             await this.drainScenes(entry, false);
             this.assertOpen(entry, version, options);
-            if (scene.destroyed || entry.flow?.current !== scene) throw new SceneTransitionCancelledError();
+            if (scene.destroyed || entry.flow?.current !== scene) {
+                throw new SceneTransitionCancelledError();
+            }
             return scene;
         })());
     }
 
-    /** Cancel queued opens and unload this instance, retaining its definition. */
-    close(route: string | SceneRoute<unknown>): Promise<void> {
+    /** 取消排队中的打开请求并卸载当前实例，保留注册定义。 */
+    public close(route: string | SceneRoute<unknown>): Promise<void> {
         return this.closeEntry(this.requireEntry(route));
     }
 
-    /** Revoke new opens immediately; stale definition objects cannot remove a replacement. */
-    unregister(route: string | SceneRoute<unknown>): Promise<void> {
+    /** 立即禁止新的打开请求；旧定义对象不能移除替代它的新定义。 */
+    public unregister(route: string | SceneRoute<unknown>): Promise<void> {
         const id = typeof route === "string" ? route : route.id;
         const entry = this.entries.get(id);
-        if (!entry || typeof route !== "string" && entry.route !== route) return Promise.resolve();
-        if (entry.unregistering) return entry.unregistering;
+        if (!entry || typeof route !== "string" && entry.route !== route) {
+            return Promise.resolve();
+        }
+        if (entry.unregistering) {
+            return entry.unregistering;
+        }
         entry.retiring = true;
         let close: Promise<void>;
         entry.unregistering = this.track(Promise.resolve().then(() => close).then(() => {
-            if (this.entries.get(id) === entry) this.entries.delete(id);
+            if (this.entries.get(id) === entry) {
+                this.entries.delete(id);
+            }
         }));
         close = this.closeEntry(entry);
         return entry.unregistering;
     }
 
-    dispose(): Promise<void> {
-        if (this.disposeTask) return this.disposeTask;
+    public dispose(): Promise<void> {
+        if (this.disposeTask) {
+            return this.disposeTask;
+        }
         this.disposed = true;
         let exits: Promise<void>[];
         this.disposeTask = Promise.resolve().then(async () => {
             await Promise.allSettled(exits);
             await this.waitForPendingLoads();
         });
-        void this.disposeTask.catch(() => {});
+        void this.disposeTask.catch(() => {
+        });
         exits = [...this.entries.values()].map(entry => this.unregister(entry.route));
         return this.disposeTask;
     }
 
-    async waitForPendingLoads(): Promise<void> {
+    public async waitForPendingLoads(): Promise<void> {
         do {
             while (this.pending.size) await Promise.allSettled([...this.pending]);
             await Promise.all([...this.entries.values()].map(async entry => {
-                try { await entry.flow?.waitForPendingLoads(); }
-                catch (error) { entry.failure ??= new SceneRegistryCleanupError([error]); }
+                try {
+                    await entry.flow?.waitForPendingLoads();
+                }
+                catch (error) {
+                    entry.failure ??= new SceneRegistryCleanupError([error]);
+                }
             }));
         } while (this.pending.size);
         const failures = [...this.entries.values()].flatMap(entry => entry.failure ? [entry.failure] : []);
-        if (failures.length) throw new SceneRegistryCleanupError(failures);
+        if (failures.length) {
+            throw new SceneRegistryCleanupError(failures);
+        }
     }
 
-    snapshot() {
+    public snapshot() {
         return {
             disposed: this.disposed, registeredRoutes: [...this.entries.keys()], pendingTransitions: this.pending.size,
             cleanupFailures: [...this.entries.values()].filter(entry => entry.failure !== undefined).length,
@@ -144,7 +178,7 @@ export class SceneRegistry {
             loadingPresenter: this.presenterFor(entry),
             collectGarbage: () => this.collect(entry),
             configureScene: scene => {
-                // Retain pending and rolled-back scenes until their native UI work has drained.
+                // 保留加载中和已回滚的场景，直到其原生 UI 工作全部结束。
                 entry.scenes.add(scene);
                 this.options.configureScene?.(scene);
             },
@@ -155,15 +189,29 @@ export class SceneRegistry {
 
     private closeEntry(entry: SceneRegistration): Promise<void> {
         entry.version += 1;
-        if (entry.closing) return entry.closing;
-        if (entry.failure && (!entry.flow || entry.flow.snapshot().state === "disposed")) return Promise.reject(entry.failure);
+        if (entry.closing) {
+            return entry.closing;
+        }
+        if (entry.failure && (!entry.flow || entry.flow.snapshot().state === "disposed")) {
+            return Promise.reject(entry.failure);
+        }
         const flow = entry.flow;
         const errors: unknown[] = entry.failure ? [entry.failure] : [];
-        // Publish before synchronous disposal/abort callbacks can reenter this registration.
+        // 先保存任务，避免同步销毁或取消回调重入当前注册项。
         entry.closing = this.track(Promise.resolve().then(async () => {
-            try { await flow?.waitForPendingLoads(); } catch (error) { errors.push(error); }
-            try { await this.drainScenes(entry, true); } catch (error) { errors.push(error); }
-            if (errors.length) throw new SceneRegistryCleanupError(errors);
+            try {
+                await flow?.waitForPendingLoads();
+            } catch (error) {
+                errors.push(error);
+            }
+            try {
+                await this.drainScenes(entry, true);
+            } catch (error) {
+                errors.push(error);
+            }
+            if (errors.length) {
+                throw new SceneRegistryCleanupError(errors);
+            }
             if (flow) {
                 await (this.options.waitForFrame?.() ?? new Promise<void>(resolve => Laya.timer.frameOnce(1, null, resolve)));
                 this.collect(entry);
@@ -175,10 +223,26 @@ export class SceneRegistry {
             throw failure;
         }));
         const closing = entry.closing;
-        void closing.then(() => { if (entry.closing === closing) entry.closing = undefined; },
-            () => { if (entry.closing === closing) entry.closing = undefined; });
-        try { flow?.dispose(); } catch (error) { errors.push(error); }
-        try { this.hideLoading(entry); } catch (error) { errors.push(error); }
+        void closing.then(() => {
+            if (entry.closing === closing) {
+                entry.closing = undefined;
+            }
+        },
+            () => {
+                if (entry.closing === closing) {
+                    entry.closing = undefined;
+                }
+            });
+        try {
+            flow?.dispose();
+        } catch (error) {
+            errors.push(error);
+        }
+        try {
+            this.hideLoading(entry);
+        } catch (error) {
+            errors.push(error);
+        }
         return closing;
     }
 
@@ -186,7 +250,9 @@ export class SceneRegistry {
         const scenes = [...entry.scenes].filter(scene => all || scene.destroyed);
         const outcomes = await Promise.allSettled(scenes.map(async scene => {
             await scene.waitForUI();
-            if (scene.destroyed) entry.scenes.delete(scene);
+            if (scene.destroyed) {
+                entry.scenes.delete(scene);
+            }
         }));
         const errors = outcomes.flatMap(outcome => outcome.status === "rejected" ? [outcome.reason] : []);
         if (errors.length) {
@@ -196,12 +262,17 @@ export class SceneRegistry {
     }
 
     private collect(owner: SceneRegistration): void {
-        // Runtime stop collects globally. A local close never waits for or collects during a sibling transition.
+        // 框架停止时统一回收；局部关闭不等待同级场景切换，也不在其切换期间回收。
         if (this.disposed || [...this.entries.values()].some(entry => entry.failure
-            || entry !== owner && (entry.closing || entry.flow?.snapshot().pendingTransitions))) return;
+            || entry !== owner && (entry.closing || entry.flow?.snapshot().pendingTransitions))) {
+            return;
+        }
         try {
-            if (this.options.collectGarbage) this.options.collectGarbage();
-            else Laya.Scene.gc();
+            if (this.options.collectGarbage) {
+                this.options.collectGarbage();
+            } else {
+                Laya.Scene.gc();
+            }
         } catch (error) {
             owner.failure = new SceneRegistryCleanupError([error]);
             throw error;
@@ -210,30 +281,48 @@ export class SceneRegistry {
 
     private presenterFor(entry: SceneRegistration): SceneLoadingPresenter | undefined {
         const presenter = this.options.loadingPresenter;
-        if (!presenter) return undefined;
+        if (!presenter) {
+            return undefined;
+        }
         return {
             show: async progress => {
                 this.loading.delete(entry);
                 this.loading.set(entry, progress);
-                // Keep the settled task for the whole shared presentation, so concurrent scenes do not show it twice.
+                // 共享展示期间保留已完成的任务，避免多个场景重复显示同一界面。
                 if (!this.loadingTask) {
                     const task: Promise<void> = Promise.resolve().then(() => {
-                        if (this.loadingTask === task && this.loading.size > 0) return presenter.show(progress);
+                        if (this.loadingTask === task && this.loading.size > 0) {
+                            return presenter.show(progress);
+                        }
                     });
                     this.loadingTask = task;
-                    void task.catch(() => { if (this.loadingTask === task) this.loadingTask = undefined; });
+                    void task.catch(() => {
+                        if (this.loadingTask === task) {
+                            this.loadingTask = undefined;
+                        }
+                    });
                 }
                 const task = this.loadingTask;
                 await task;
                 const front = this.loadingFront();
-                if (this.loadingTask === task && front?.entry === entry) presenter.update(front.progress);
+                if (this.loadingTask === task && front?.entry === entry) {
+                    presenter.update(front.progress);
+                }
             },
             update: progress => {
-                if (!this.loading.has(entry)) return;
+                if (!this.loading.has(entry)) {
+                    return;
+                }
                 this.loading.set(entry, progress);
-                if (this.loadingFront()?.entry === entry) presenter.update(progress);
+                if (this.loadingFront()?.entry === entry) {
+                    presenter.update(progress);
+                }
             },
-            fail: (progress, error) => { if (this.loadingFront()?.entry === entry) presenter.fail(progress, error); },
+            fail: (progress, error) => {
+                if (this.loadingFront()?.entry === entry) {
+                    presenter.fail(progress, error);
+                }
+            },
             hide: () => this.hideLoading(entry),
         };
     }
@@ -245,10 +334,13 @@ export class SceneRegistry {
     }
 
     private hideLoading(entry: SceneRegistration): void {
-        if (!this.loading.delete(entry)) return;
+        if (!this.loading.delete(entry)) {
+            return;
+        }
         const latest = this.loadingFront();
-        if (latest) this.options.loadingPresenter?.update(latest.progress);
-        else {
+        if (latest) {
+            this.options.loadingPresenter?.update(latest.progress);
+        } else {
             this.loadingTask = undefined;
             this.options.loadingPresenter?.hide();
         }
@@ -256,8 +348,12 @@ export class SceneRegistry {
 
     private assertOpen(entry: SceneRegistration, version: number, options: SceneOpenOptions): void {
         if (this.disposed || entry.retiring || entry.version !== version || options.signal?.aborted
-            || this.entries.get(entry.route.id) !== entry) throw new SceneTransitionCancelledError();
-        if (entry.failure) throw entry.failure;
+            || this.entries.get(entry.route.id) !== entry) {
+            throw new SceneTransitionCancelledError();
+        }
+        if (entry.failure) {
+            throw entry.failure;
+        }
     }
 
     private requireEntry(route: string | SceneRoute<unknown>): SceneRegistration {
@@ -270,7 +366,12 @@ export class SceneRegistry {
         return entry;
     }
 
-    private requireActive(): void { if (this.disposed) throw new Error("Scene registry has been disposed."); }
+    private requireActive(): void {
+        if (this.disposed) {
+            throw new Error("Scene registry has been disposed.");
+        }
+    }
+
     private track<T>(operation: Promise<T>): Promise<T> {
         this.pending.add(operation);
         void operation.then(() => this.pending.delete(operation), () => this.pending.delete(operation));

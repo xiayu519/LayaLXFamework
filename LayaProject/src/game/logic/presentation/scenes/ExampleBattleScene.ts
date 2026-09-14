@@ -3,7 +3,7 @@ import type { ExampleSceneArgs } from "../../application/ExampleWorlds";
 
 const { regClass } = Laya;
 
-/** The Battle scene selects its own first page; the World registers and unloads this scene. */
+/** 战斗场景自行选择首个页面；World 负责注册和卸载此场景。 */
 @regClass()
 export class ExampleBattleScene extends BaseGameScene<ExampleSceneArgs> {
     protected override async onWaitUntilReady(context: ScenePhaseContext<ExampleSceneArgs>): Promise<void> {

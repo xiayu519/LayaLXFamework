@@ -20,17 +20,18 @@ const { ExampleDeliveryService } = await import("../../../src/game/logic/infrast
 afterAll(() => vi.unstubAllGlobals());
 beforeEach(() => { pending.clear(); once.mockClear(); clearAll.mockClear(); });
 
-function start() {
+async function start() {
     const inventory = new ExampleInventoryData(new ExampleInventory());
     const receiver = inventory.createReceiver();
     const delivery = new ExampleDeliveryService(new ExampleInventory(), receiver);
     delivery.start();
+    await delivery.synchronize(new AbortController().signal);
     return { inventory, delivery, receiver, stop() { delivery.stop(); inventory.dispose(); } };
 }
 function deliver(owner: object): void { const callback = pending.get(owner)!; pending.delete(owner); callback.call(owner); }
 
 describe("feature-owned inventory and independent server delivery", () => {
-    it("accepts login packets before any service or World exists and invalidates old-account receivers", () => {
+    it("accepts login packets before any service or World exists and invalidates old-account receivers", async () => {
         const inventory = new ExampleInventoryData(new ExampleInventory());
         const stale = inventory.createReceiver();
         const observed: number[] = [];
@@ -47,8 +48,8 @@ describe("feature-owned inventory and independent server delivery", () => {
         inventory.dispose();
     });
 
-    it("rejects missing and exhausted commands without changing another account", () => {
-        const first = start(), second = start();
+    it("rejects missing and exhausted commands without changing another account", async () => {
+        const first = await start(), second = await start();
         expect(first.delivery.use("missing")).toBe(false);
         for (let index = 0; index < 3; index++) expect(first.delivery.use("supply-1")).toBe(true);
         const snapshot = first.inventory.snapshot();
@@ -59,8 +60,8 @@ describe("feature-owned inventory and independent server delivery", () => {
         first.stop(); second.stop();
     });
 
-    it("commits before notifying arbitrary consumers without constructing any UI", () => {
-        const app = start();
+    it("commits before notifying arbitrary consumers without constructing any UI", async () => {
+        const app = await start();
         const values: number[] = [];
         app.inventory.on(ExampleInventoryData.CHANGED, {}, () => values.push(app.inventory.totalQuantity));
         app.inventory.on(ExampleInventoryData.CHANGED, {}, () => values.push(app.inventory.totalQuantity));
@@ -69,8 +70,8 @@ describe("feature-owned inventory and independent server delivery", () => {
         app.stop();
     });
 
-    it("keeps delivery feedback separate from inventory changes", () => {
-        const app = start(), inventoryRender = vi.fn(), feedbackRender = vi.fn();
+    it("keeps delivery feedback separate from inventory changes", async () => {
+        const app = await start(), inventoryRender = vi.fn(), feedbackRender = vi.fn();
         app.inventory.on(ExampleInventoryData.CHANGED, {}, inventoryRender);
         app.delivery.on(ExampleDeliveryService.CHANGED, {}, feedbackRender);
         app.delivery.scheduleReward();
@@ -86,8 +87,8 @@ describe("feature-owned inventory and independent server delivery", () => {
         app.stop();
     });
 
-    it("updates account state while all inventory UI subscribers are closed", () => {
-        const app = start(), owner = {}, render = vi.fn();
+    it("updates account state while all inventory UI subscribers are closed", async () => {
+        const app = await start(), owner = {}, render = vi.fn();
         app.inventory.on(ExampleInventoryData.CHANGED, owner, render);
         app.delivery.scheduleReward();
         app.inventory.off(ExampleInventoryData.CHANGED, owner);
@@ -98,8 +99,8 @@ describe("feature-owned inventory and independent server delivery", () => {
         app.stop();
     });
 
-    it("isolates accounts and rejects timer callbacks and protocol results after shutdown", () => {
-        const first = start(), second = start();
+    it("isolates accounts and rejects timer callbacks and protocol results after shutdown", async () => {
+        const first = await start(), second = await start();
         first.delivery.scheduleReward(); second.delivery.scheduleReward();
         const late = pending.get(first.delivery)!;
         first.stop(); late();
@@ -111,8 +112,8 @@ describe("feature-owned inventory and independent server delivery", () => {
         second.stop();
     });
 
-    it("ignores old packets without refreshing inventory and resets pending demo delivery explicitly", () => {
-        const app = start();
+    it("ignores old packets without refreshing inventory and resets pending demo delivery explicitly", async () => {
+        const app = await start();
         app.delivery.use("supply-50");
         app.delivery.rebuildFromServer();
         const current = app.inventory.snapshot(), render = vi.fn();
@@ -127,8 +128,8 @@ describe("feature-owned inventory and independent server delivery", () => {
         app.stop();
     });
 
-    it("rejects gaps and invalid patches without exposing partial state or emitting changes", () => {
-        const app = start(), render = vi.fn();
+    it("rejects gaps and invalid patches without exposing partial state or emitting changes", async () => {
+        const app = await start(), render = vi.fn();
         app.inventory.on(ExampleInventoryData.CHANGED, {}, render);
         expect(app.receiver.applyPatch({ version: 9, baseVersion: 8, upserts: [], removedIds: ["supply-1"] }))
             .toBe("base-mismatch");

@@ -1,3 +1,4 @@
+import { logger as xlog } from "../../application/diagnostics/Logger";
 import {
     LifetimeCleanupError,
     LifetimeScope,
@@ -11,7 +12,7 @@ export interface WindowLifecycleObserver {
     onHidden(window: BaseGameWindow<unknown>): void;
     onDestroyed(window: BaseGameWindow<unknown>): void;
     onOrderChanged?(window: BaseGameWindow<unknown>): void;
-    /** Keep underlying work tracked even when cancellation ends present() immediately. */
+    /** 即使取消使 present() 立即结束，仍跟踪底层未完成的工作。 */
     onBinding?(operation: Promise<void>): void;
 }
 
@@ -32,8 +33,8 @@ export abstract class BaseGameWindow<TArgs> extends Laya.GWindow {
 
     protected constructor(contentPane: Laya.GWidget) {
         super();
-        // Native auto input reads as false; restoring that boolean after a Tween disables the subtree.
-        // GWindow already listens for mouse input. Make its enabled state explicit before transitions.
+        // 原生自动输入模式读取为 false；Tween 后按此值恢复会禁用整个子树。
+        // GWindow 已监听鼠标输入，因此在过渡前显式启用输入。
         this.mouseEnabled = true;
         this.contentPane = contentPane;
         this.popupTransition = new UIPopupTransition(this, contentPane);
@@ -50,13 +51,17 @@ export abstract class BaseGameWindow<TArgs> extends Laya.GWindow {
         return this.presentationScopeValue;
     }
 
-    get destructionComplete(): boolean { return this.destructionCompleteValue; }
+    public get destructionComplete(): boolean {
+        return this.destructionCompleteValue;
+    }
 
-    /** Native destroyed may become true before cleanup throws; it does not prove completion. */
-    get destructionFailure(): LifetimeCleanupError | undefined { return this.destructionFailureValue; }
+    /** 原生 destroyed 可能在清理抛错前已变为 true，不能据此认定清理完成。 */
+    public get destructionFailure(): LifetimeCleanupError | undefined {
+        return this.destructionFailureValue;
+    }
 
-    /** @internal The router supplies shared data before the next presentation. */
-    configureBindings(redDots: RedDotStore | undefined): void {
+    /** @internal 路由器在下次展示前提供共享数据。 */
+    public configureBindings(redDots: RedDotStore | undefined): void {
         this.redDots = redDots;
     }
 
@@ -68,47 +73,64 @@ export abstract class BaseGameWindow<TArgs> extends Laya.GWindow {
         return this.requireBindings().bindRedDot(badge, key, options);
     }
 
-    /** @internal Configured by UIRouter from the resolved window layout. */
-    configurePopupTransition(enabled: boolean): void {
-        if (this.popupTransitionEnabled === enabled) return;
+    /** @internal 由 UIRouter 根据已解析的窗口布局配置。 */
+    public configurePopupTransition(enabled: boolean): void {
+        if (this.popupTransitionEnabled === enabled) {
+            return;
+        }
         this.popupTransition.cancel();
         this.popupTransitionEnabled = enabled;
         this.mouseThrough = enabled;
     }
 
-    /** @internal Allows UIRouter to route destroy-retained popups through their hide animation. */
-    get hasPopupTransition(): boolean { return this.popupTransitionEnabled; }
+    /** @internal 让 UIRouter 在销毁策略的弹窗关闭前播放隐藏动画。 */
+    public get hasPopupTransition(): boolean {
+        return this.popupTransitionEnabled;
+    }
 
-    /** @internal Relayout cancels stale Tween targets before restarting the active transition. */
-    updateLayout(applyLayout: () => void): void {
+    /** @internal 重新布局时先取消指向旧位置的 Tween，再重启当前过渡。 */
+    public updateLayout(applyLayout: () => void): void {
         const phase = this.popupTransition.phase;
         this.popupTransition.cancel();
         applyLayout();
-        if (!this.isShowing) return;
-        if (phase === "showing") this.doShowAnimation();
-        else if (phase === "hiding") this.doHideAnimation();
+        if (!this.isShowing) {
+            return;
+        }
+        if (phase === "showing") {
+            this.doShowAnimation();
+        } else if (phase === "hiding") {
+            this.doHideAnimation();
+        }
     }
 
-    /** @internal Configured by UIRouter so native close buttons honor route retention. */
-    configureDestroyWhenHidden(enabled: boolean): void {
+    /** @internal 由 UIRouter 配置，使原生关闭按钮遵循路由的保留策略。 */
+    public configureDestroyWhenHidden(enabled: boolean): void {
         this.destroyWhenHidden = enabled;
     }
 
-    /** @internal Allows UIRouter to resolve a show request racing an unfinished hide animation. */
-    get isPopupHiding(): boolean { return this.popupTransition.phase === "hiding"; }
+    /** @internal 供 UIRouter 处理显示请求与尚未结束的隐藏动画之间的竞态。 */
+    public get isPopupHiding(): boolean {
+        return this.popupTransition.phase === "hiding";
+    }
 
-    /** @internal Completes a retained popup hide before presenting the same instance again. */
-    finishPopupHideImmediately(): void {
-        if (!this.isPopupHiding) return;
+    /** @internal 再次展示同一弹窗实例前，先完成其尚未结束的隐藏过程。 */
+    public finishPopupHideImmediately(): void {
+        if (!this.isPopupHiding) {
+            return;
+        }
         const errors: unknown[] = [];
         collectCleanup(errors, () => this.popupTransition.cancel());
         collectCleanup(errors, () => {
-            if (this.isShowing) this.hideImmediately();
+            if (this.isShowing) {
+                this.hideImmediately();
+            }
         });
-        if (errors.length > 0) throw new LifetimeCleanupError(errors);
+        if (errors.length > 0) {
+            throw new LifetimeCleanupError(errors);
+        }
     }
 
-    async present(args: TArgs, signal?: AbortSignal): Promise<boolean> {
+    public async present(args: TArgs, signal?: AbortSignal): Promise<boolean> {
         this.endPresentation();
         const scope = new LifetimeScope();
         this.presentationScopeValue = scope;
@@ -125,7 +147,9 @@ export abstract class BaseGameWindow<TArgs> extends Laya.GWindow {
         } catch (error) {
             const cancelled = token.signal.aborted;
             this.endPresentation(scope);
-            if (cancelled) return false;
+            if (cancelled) {
+                return false;
+            }
             throw error;
         }
         if (!token.isCurrent()) {
@@ -137,18 +161,20 @@ export abstract class BaseGameWindow<TArgs> extends Laya.GWindow {
         return true;
     }
 
-    hideForReuse(): void {
+    public hideForReuse(): void {
         this.hide();
     }
 
-    override hide(): void {
+    public override hide(): void {
         const errors: unknown[] = [];
         collectCleanup(errors, () => this.endPresentation());
         collectCleanup(errors, () => super.hide());
-        if (errors.length > 0) throw new LifetimeCleanupError(errors);
+        if (errors.length > 0) {
+            throw new LifetimeCleanupError(errors);
+        }
     }
 
-    override bringToFront(): void {
+    public override bringToFront(): void {
         super.bringToFront();
         this.lifecycleObserver?.onOrderChanged?.(this as unknown as BaseGameWindow<unknown>);
     }
@@ -160,35 +186,51 @@ export abstract class BaseGameWindow<TArgs> extends Laya.GWindow {
         }
 
         this.popupTransition.show(() => {
-            if (!this.destroyed && this.isShowing) this.onShown();
+            if (!this.destroyed && this.isShowing) {
+                this.onShown();
+            }
         });
     }
 
     protected override doHideAnimation(): void {
         if (!this.popupTransitionEnabled) {
-            if (this.destroyWhenHidden) this.destroy();
-            else super.doHideAnimation();
+            if (this.destroyWhenHidden) {
+                this.destroy();
+            } else {
+                super.doHideAnimation();
+            }
             return;
         }
         this.popupTransition.hide(() => {
-            if (this.destroyed || !this.isShowing) return;
-            if (this.destroyWhenHidden) this.destroy();
-            else this.hideImmediately();
+            if (this.destroyed || !this.isShowing) {
+                return;
+            }
+            if (this.destroyWhenHidden) {
+                this.destroy();
+            } else {
+                this.hideImmediately();
+            }
         });
     }
 
-    /** @internal Used by UIRouter to observe native GWindow hide/destroy lifecycle. */
-    observeLifecycle(observer: WindowLifecycleObserver): void {
+    /** @internal 供 UIRouter 监听原生 GWindow 的隐藏与销毁生命周期。 */
+    public observeLifecycle(observer: WindowLifecycleObserver): void {
         if (this.lifecycleObserver && this.lifecycleObserver !== observer) {
             throw new Error("Window lifecycle observer is already assigned.");
         }
         this.lifecycleObserver = observer;
     }
 
-    override destroy(): void {
-        if (this.destroying) return;
-        if (this.destructionFailureValue) throw this.destructionFailureValue;
-        if (this.destroyed) return;
+    public override destroy(): void {
+        if (this.destroying) {
+            return;
+        }
+        if (this.destructionFailureValue) {
+            throw this.destructionFailureValue;
+        }
+        if (this.destroyed) {
+            return;
+        }
         this.destroying = true;
         const observer = this.lifecycleObserver;
         this.lifecycleObserver = undefined;
@@ -202,11 +244,15 @@ export abstract class BaseGameWindow<TArgs> extends Laya.GWindow {
             let nativeCompleted = false;
             try {
                 super.destroy();
-                if (!this.destroyed) throw new Error("GWindow.destroy() returned without destroying the window.");
+                if (!this.destroyed) {
+                    throw new Error("GWindow.destroy() returned without destroying the window.");
+                }
                 nativeCompleted = true;
             } catch (error) {
                 errors.push(error);
-                if (this.destroyed) permanentErrors.push(error);
+                if (this.destroyed) {
+                    permanentErrors.push(error);
+                }
             }
             if (permanentErrors.length > 0) {
                 this.destructionFailureValue = new LifetimeCleanupError(permanentErrors);
@@ -238,12 +284,18 @@ export abstract class BaseGameWindow<TArgs> extends Laya.GWindow {
         collectCleanup(errors, () => this.lifecycleObserver?.onHidden(
             this as unknown as BaseGameWindow<unknown>,
         ));
-        // UNDISPLAY fires before native parent/order bookkeeping finishes. Run business code
-        // in the next microtask, after hideImmediately/destroy has completed its synchronous cleanup.
-        if (notifyClosed) void Promise.resolve().then(() => {
-            try { this.onClosed(); }
-            catch (error) { console.error("[UI] onClosed failed after window cleanup", error); }
-        });
+        // UNDISPLAY 触发时，原生父节点和排序记录尚未更新完成；业务代码延后到
+        // 下一次微任务执行，确保 hideImmediately/destroy 已完成同步清理。
+        if (notifyClosed) {
+            void Promise.resolve().then(() => {
+                try {
+                    this.onClosed();
+                }
+                catch (error) {
+                    xlog.error("[UI] onClosed failed after window cleanup", error);
+                }
+            });
+        }
         if (errors.length > 0) {
             throw new LifetimeCleanupError(errors);
         }
@@ -251,8 +303,9 @@ export abstract class BaseGameWindow<TArgs> extends Laya.GWindow {
 
     protected abstract onBind(args: TArgs, token: BindingToken): void | Promise<void>;
 
-    /** Queued once after a displayed window is hidden. Do not access nodes or replace hide/destroy cleanup. */
-    protected onClosed(): void {}
+    /** 已展示窗口隐藏后排队执行一次；不得访问节点，也不替代 hide/destroy 的清理。 */
+    protected onClosed(): void {
+    }
 
     private endPresentation(scope = this.presentationScopeValue): void {
         if (scope === this.presentationScopeValue) {
@@ -271,7 +324,9 @@ export abstract class BaseGameWindow<TArgs> extends Laya.GWindow {
     }
 
     private requireBindings(): UIBindings {
-        if (!this.presentationBindings) throw new Error("The window has no active presentation bindings.");
+        if (!this.presentationBindings) {
+            throw new Error("The window has no active presentation bindings.");
+        }
         return this.presentationBindings;
     }
 }

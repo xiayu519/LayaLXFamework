@@ -3,12 +3,15 @@ import {
     type WindowLifecycleObserver,
 } from "./BaseGameWindow";
 import { UILayer } from "./UILayer";
+import { applyLayerOrder } from "./UILayerOrder";
 import { TipQueue, type TipQueueSnapshot } from "./TipQueue";
 import { awaitBinding, BindingCancelledError } from "../../application/ui/AsyncBindingGuard";
 import { UIRequestTracker, type UIRequest, type UIRequestInfo } from "./UIRequestTracker";
 import { syncModalOrder } from "./UIModalOrder";
-import { destroyManagedWindow, getWindowCleanupDiagnostic,
-    type CleanupWindowRecord, type UIWindowCleanupDiagnostic } from "./UIWindowCleanup";
+import {
+    destroyManagedWindow, getWindowCleanupDiagnostic,
+    type CleanupWindowRecord, type UIWindowCleanupDiagnostic
+} from "./UIWindowCleanup";
 import { UILayoutService, type UIWindowLayout } from "./UILayoutService";
 import { SceneUI } from "./SceneUI";
 import type { UIViewRoute } from "./UIViewRoute";
@@ -22,7 +25,9 @@ import {
 } from "./UIWindowRoutePolicy";
 
 export type UIWindowMultiplicity = "singleton" | "multiple";
+
 export type UIWindowRetention = "hide" | "destroy";
+
 export type UIWindowState = "visible" | "hidden-retained" | "cleanup-failed";
 
 export interface UIRoute<TArgs> {
@@ -30,9 +35,9 @@ export interface UIRoute<TArgs> {
     readonly url: string;
     readonly layer?: UILayer;
     readonly modal?: boolean;
-    /** Defaults to true for center-popup; requires modal and a topmost, interactive window. */
+    /** center-popup 默认为 true；要求窗口为模态、处于最上层且可交互。 */
     readonly closeOnMaskClick?: boolean;
-    /** Defaults to center-popup for Popup routes and fullscreen for every other layer. */
+    /** Popup 路由默认使用 center-popup，其他层默认使用 fullscreen。 */
     readonly layout?: UIWindowLayout;
     readonly multiplicity: UIWindowMultiplicity;
     readonly retention: UIWindowRetention;
@@ -61,12 +66,12 @@ export interface UIRouterSnapshot {
 }
 
 export interface UIShowOptions {
-    /** Cancels the pending show; once shown, close the window through its normal lifecycle. */
+    /** 取消尚未完成的显示请求；显示完成后应通过正常生命周期关闭窗口。 */
     readonly signal?: AbortSignal;
 }
 
 export class UIRouterCleanupError extends Error {
-    constructor(readonly errors: readonly unknown[]) {
+    public constructor(public readonly errors: readonly unknown[]) {
         super(`${errors.length} UI window(s) failed to clean up.`);
         this.name = "UIRouterCleanupError";
     }
@@ -75,9 +80,12 @@ export class UIRouterCleanupError extends Error {
 interface WindowRecord extends CleanupWindowRecord {
     readonly route: UnknownRoute;
     readonly window: UnknownWindow;
+    order: number;
+    presenting?: number;
 }
 
 type UnknownRoute = UIRoute<unknown>;
+
 type UnknownWindow = BaseGameWindow<unknown>;
 
 interface UIRouterOptions {
@@ -99,8 +107,10 @@ export class UIRouter implements WindowLifecycleObserver {
     private readonly unsubscribeLayout: (() => void) | undefined;
     private disposed = false;
     private mask: Laya.GWidget | undefined;
+    private sequence = 0;
+    private readonly requestOrders = new WeakMap<UIRequest, number>();
 
-    constructor(
+    public constructor(
         private readonly tips?: TipQueue,
         private readonly layoutService?: UILayoutService,
         private readonly options: UIRouterOptions = {},
@@ -108,30 +118,38 @@ export class UIRouter implements WindowLifecycleObserver {
         this.unsubscribeLayout = layoutService?.subscribe(() => this.layoutManagedWindows());
     }
 
-    get redDots(): RedDotStore {
+    public get redDots(): RedDotStore {
         const store = this.options.redDots;
-        if (!store) throw new Error("UI red dots are not configured.");
+        if (!store) {
+            throw new Error("UI red dots are not configured.");
+        }
         return store;
     }
 
-    /** @internal Optional in isolated hosts which do not use badges. */
-    get bindingStore(): RedDotStore | undefined { return this.options.redDots; }
+    /** @internal 不使用红点的独立宿主可省略。 */
+    public get bindingStore(): RedDotStore | undefined {
+        return this.options.redDots;
+    }
 
-    registerView<TArgs, TView extends Laya.GWidget = Laya.GWidget>(route: UIViewRoute<TArgs, TView>): UIViewRoute<TArgs, TView> {
+    public registerView<TArgs, TView extends Laya.GWidget = Laya.GWidget>(route: UIViewRoute<TArgs, TView>): UIViewRoute<TArgs, TView> {
         this.requireActive();
-        if (!route.id || !route.url) throw new Error("UI view id and url are required.");
-        if (this.routes.has(route.id) || this.viewRoutes.has(route.id)) throw new Error(`Duplicate UI route '${route.id}'.`);
+        if (!route.id || !route.url) {
+            throw new Error("UI view id and url are required.");
+        }
+        if (this.routes.has(route.id) || this.viewRoutes.has(route.id)) {
+            throw new Error(`Duplicate UI route '${route.id}'.`);
+        }
         this.viewRoutes.set(route);
         return route;
     }
 
-    /** Block new opens immediately, then destroy this route's instances and drain their underlying work. */
-    unregisterView<TArgs, TView extends Laya.GWidget>(route: string | UIViewRoute<TArgs, TView>): Promise<void> {
+    /** 立即阻止新打开请求，再销毁此路由的实例并等待底层工作结束。 */
+    public unregisterView<TArgs, TView extends Laya.GWidget>(route: string | UIViewRoute<TArgs, TView>): Promise<void> {
         return this.viewRoutes.unregister(route, this.scenes);
     }
 
-    /** @internal BaseGameScene owns the returned scope and destroys it before its native children. */
-    createSceneUI(root: Laya.GWidget): SceneUI {
+    /** @internal 返回的作用域由 BaseGameScene 持有，在销毁原生子节点前清理。 */
+    public createSceneUI(root: Laya.GWidget): SceneUI {
         this.requireActive();
         const scene = new SceneUI(root, this, this.layout, id => this.viewRoutes.get(id), scope => {
             void scope.waitForPendingLoads().then(() => {
@@ -142,18 +160,23 @@ export class UIRouter implements WindowLifecycleObserver {
         return scene;
     }
 
-    get layout(): UILayoutService {
-        if (!this.layoutService) throw new Error("UI layout is not configured.");
+    public get layout(): UILayoutService {
+        if (!this.layoutService) {
+            throw new Error("UI layout is not configured.");
+        }
         return this.layoutService;
     }
 
-    register<TArgs>(route: UIRoute<TArgs>): UIRoute<TArgs> {
+    public register<TArgs>(route: UIRoute<TArgs>): UIRoute<TArgs> {
         this.requireActive();
         if (!route.id || !route.url) {
             throw new Error("UI route id and url are required.");
         }
         if (route.multiplicity === "multiple" && route.retention === "hide") {
             throw new Error(`UI route '${route.id}' cannot combine multiplicity 'multiple' with retention 'hide'.`);
+        }
+        if (!Number.isInteger(resolveLayer(route)) || resolveLayer(route) < UILayer.Background || resolveLayer(route) > UILayer.System) {
+            throw new Error(`UI route '${route.id}' has an invalid layer.`);
         }
         if (this.routes.has(route.id) || this.viewRoutes.has(route.id)) {
             throw new Error(`Duplicate UI route '${route.id}'.`);
@@ -162,9 +185,11 @@ export class UIRouter implements WindowLifecycleObserver {
         return route;
     }
 
-    show<TArgs>(route: UIRoute<TArgs>, args: NoInfer<TArgs>, options?: UIShowOptions): Promise<BaseGameWindow<TArgs>>;
-    show<TArgs>(routeId: string, args: TArgs, options?: UIShowOptions): Promise<BaseGameWindow<TArgs>>;
-    show<TArgs>(
+    public show<TArgs>(route: UIRoute<TArgs>, args: NoInfer<TArgs>, options?: UIShowOptions): Promise<BaseGameWindow<TArgs>>;
+
+    public show<TArgs>(routeId: string, args: TArgs, options?: UIShowOptions): Promise<BaseGameWindow<TArgs>>;
+
+    public show<TArgs>(
         routeOrId: string | UIRoute<TArgs>, args: TArgs, options: UIShowOptions = {},
     ): Promise<BaseGameWindow<TArgs>> {
         this.requireActive();
@@ -173,9 +198,14 @@ export class UIRouter implements WindowLifecycleObserver {
         if (typeof routeOrId !== "string" && route !== (routeOrId as unknown as UnknownRoute)) {
             throw new Error(`UI route '${routeId}' is not the registered route object.`);
         }
-        if (options.signal?.aborted) return Promise.reject(new BindingCancelledError());
-        if (route.multiplicity === "singleton") this.requests.cancel(routeId);
+        if (options.signal?.aborted) {
+            return Promise.reject(new BindingCancelledError());
+        }
+        if (route.multiplicity === "singleton") {
+            this.requests.cancel(routeId);
+        }
         const request = this.requests.begin(routeId, options.signal);
+        this.requestOrders.set(request, ++this.sequence);
         const operation = this.showRoute(routeId, args, request)
             .finally(() => this.requests.finish(request));
         this.pendingLoads.add(operation);
@@ -186,7 +216,7 @@ export class UIRouter implements WindowLifecycleObserver {
         return operation;
     }
 
-    tip(message: string): void {
+    public tip(message: string): void {
         this.requireActive();
         if (!this.tips) {
             throw new Error("UI tip presentation is not configured.");
@@ -194,7 +224,7 @@ export class UIRouter implements WindowLifecycleObserver {
         this.tips.show(message);
     }
 
-    close(routeId: string, target?: UnknownWindow): void {
+    public close(routeId: string, target?: UnknownWindow): void {
         this.requireActive();
         const route = this.requireRoute(routeId);
         if (route.multiplicity === "singleton") {
@@ -224,7 +254,7 @@ export class UIRouter implements WindowLifecycleObserver {
         }
     }
 
-    closeTop(layer?: UILayer): boolean {
+    public closeTop(layer?: UILayer): boolean {
         this.requireActive();
         const info = this.getTop(layer);
         if (!info) {
@@ -234,34 +264,36 @@ export class UIRouter implements WindowLifecycleObserver {
         return true;
     }
 
-    getTop(layer?: UILayer): UIWindowInfo | undefined {
+    public getTop(layer?: UILayer): UIWindowInfo | undefined {
         const visible = this.listVisible(layer);
         return visible[visible.length - 1];
     }
 
-    getBottom(layer?: UILayer): UIWindowInfo | undefined {
+    public getBottom(layer?: UILayer): UIWindowInfo | undefined {
         return this.listVisible(layer)[0];
     }
 
-    listVisible(layer?: UILayer): readonly UIWindowInfo[] {
+    public listVisible(layer?: UILayer): readonly UIWindowInfo[] {
         return this.listManaged(layer)
             .filter((info) => info.state === "visible")
             .sort(compareVisibleWindows);
     }
 
-    listManaged(layer?: UILayer): readonly UIWindowInfo[] {
+    public listManaged(layer?: UILayer): readonly UIWindowInfo[] {
         return Array.from(this.records.values())
             .filter((record) => layer === undefined || resolveLayer(record.route) === layer)
             .map(toWindowInfo)
             .sort((left, right) => left.layer - right.layer || compareVisibleWindows(left, right));
     }
 
-    snapshot(): UIRouterSnapshot {
+    public snapshot(): UIRouterSnapshot {
         const visible = this.listVisible();
         const pendingRequests = this.requests.snapshot();
         const loading: Record<string, number> = {};
         for (const request of pendingRequests) {
-            if (request.phase === "loading") loading[request.routeId] = (loading[request.routeId] ?? 0) + 1;
+            if (request.phase === "loading") {
+                loading[request.routeId] = (loading[request.routeId] ?? 0) + 1;
+            }
         }
         return Object.freeze({
             scenes: [...this.scenes].map(scene => scene.snapshot()),
@@ -277,12 +309,12 @@ export class UIRouter implements WindowLifecycleObserver {
         });
     }
 
-    cleanupDiagnostics(): readonly UIWindowCleanupDiagnostic[] {
+    public cleanupDiagnostics(): readonly UIWindowCleanupDiagnostic[] {
         return Array.from(this.records.values(), getWindowCleanupDiagnostic)
             .filter((entry): entry is UIWindowCleanupDiagnostic => entry !== undefined);
     }
 
-    dispose(): void {
+    public dispose(): void {
         const errors: unknown[] = [];
         if (!this.disposed) {
             this.disposed = true;
@@ -299,7 +331,11 @@ export class UIRouter implements WindowLifecycleObserver {
             this.requests.cancel();
         }
         for (const scene of [...this.scenes]) {
-            try { scene.dispose(); } catch (error) { errors.push(error); }
+            try {
+                scene.dispose();
+            } catch (error) {
+                errors.push(error);
+            }
         }
         for (const record of Array.from(this.records.values())) {
             try {
@@ -316,7 +352,7 @@ export class UIRouter implements WindowLifecycleObserver {
         this.syncModalLayer();
     }
 
-    async waitForPendingLoads(): Promise<void> {
+    public async waitForPendingLoads(): Promise<void> {
         while (this.pendingLoads.size > 0 || this.nativeLoads.size > 0) {
             await Promise.allSettled([...this.pendingLoads, ...this.nativeLoads]);
         }
@@ -324,7 +360,7 @@ export class UIRouter implements WindowLifecycleObserver {
         await Promise.all([...this.scenes].map(scene => scene.waitForPendingLoads()));
     }
 
-    onHidden(window: UnknownWindow): void {
+    public onHidden(window: UnknownWindow): void {
         const record = this.records.get(window);
         if (record?.route.retention === "destroy") {
             this.pendingHiddenDestructions.add(window);
@@ -333,52 +369,68 @@ export class UIRouter implements WindowLifecycleObserver {
         this.syncModalLayer();
     }
 
-    onDestroyed(window: UnknownWindow): void {
+    public onDestroyed(window: UnknownWindow): void {
         this.pendingHiddenDestructions.delete(window);
         const record = this.records.get(window);
         if (record) {
-            if (!window.destructionComplete) throw window.destructionFailure
+            if (!window.destructionComplete) {
+                throw window.destructionFailure
                 ?? new Error("Cannot untrack a UI window before destruction completes.");
+            }
             this.untrackWindow(record);
         }
     }
 
-    onOrderChanged(): void {
+    public onOrderChanged(window: UnknownWindow): void {
+        const record = this.records.get(window);
+        if (record && record.presenting === undefined) {
+            record.order = ++this.sequence;
+        }
         this.syncModalLayer();
     }
 
-    onBinding(operation: Promise<void>): void {
+    public onBinding(operation: Promise<void>): void {
         this.pendingLoads.add(operation);
         operation.then(() => this.pendingLoads.delete(operation), () => this.pendingLoads.delete(operation));
     }
 
     private async showRoute<TArgs>(routeId: string, args: TArgs, request: UIRequest): Promise<BaseGameWindow<TArgs>> {
         const route = this.requireRoute(routeId) as UIRoute<TArgs>;
-        if (request.controller.signal.aborted) throw new BindingCancelledError();
+        if (request.controller.signal.aborted) {
+            throw new BindingCancelledError();
+        }
         if (route.multiplicity === "singleton") {
             const cached = this.singletonWindows.get(routeId) as BaseGameWindow<TArgs> | undefined;
             if (cached && this.pendingHiddenDestructions.delete(cached as unknown as UnknownWindow)) {
                 const record = this.records.get(cached as unknown as UnknownWindow);
-                if (record) this.destroyWindow(record);
+                if (record) {
+                    this.destroyWindow(record);
+                }
             }
             if (cached?.isPopupHiding) {
                 const record = this.records.get(cached as unknown as UnknownWindow);
                 if (route.retention === "destroy") {
-                    if (record) this.destroyWindow(record);
+                    if (record) {
+                        this.destroyWindow(record);
+                    }
                 } else {
                     cached.finishPopupHideImmediately();
                 }
             }
             if (cached?.destroyed) {
                 const record = this.records.get(cached as unknown as UnknownWindow);
-                if (record) this.destroyWindow(record);
+                if (record) {
+                    this.destroyWindow(record);
+                }
             } else if (cached && this.records.has(cached as unknown as UnknownWindow)) {
                 return this.presentWindow(route, cached, args, request);
             }
         }
 
         const prefab = await awaitBinding(this.loadPrefab(route), request.controller.signal);
-        if (request.controller.signal.aborted || this.disposed) throw new BindingCancelledError();
+        if (request.controller.signal.aborted || this.disposed) {
+            throw new BindingCancelledError();
+        }
         if (!prefab) {
             throw new Error(`UI asset '${route.url}' did not load as a Prefab.`);
         }
@@ -430,10 +482,12 @@ export class UIRouter implements WindowLifecycleObserver {
         request.phase = "binding";
         request.window = window;
         const layout = resolveWindowLayout(route);
+        const record = this.records.get(unknownWindow)!;
+        record.order = this.requestOrders.get(request)!;
+        record.presenting = version;
         try {
             window.configureBindings(this.bindingStore);
             window.modal = route.modal ?? layout === "center-popup";
-            window.zOrder = resolveLayer(route) * 1000;
             window.configurePopupTransition(layout === "center-popup");
             window.configureDestroyWhenHidden(route.retention === "destroy");
             window.updateLayout(() => this.layoutService?.apply(window, layout));
@@ -448,11 +502,18 @@ export class UIRouter implements WindowLifecycleObserver {
             if (this.presentationVersions.get(unknownWindow) === version) {
                 const record = this.records.get(unknownWindow);
                 if (record) {
-                    if (error instanceof BindingCancelledError && !this.disposed) this.closeWindow(route, unknownWindow);
-                    else this.destroyWindow(record);
+                    if (error instanceof BindingCancelledError && !this.disposed) {
+                        this.closeWindow(route, unknownWindow);
+                    } else {
+                        this.destroyWindow(record);
+                    }
                 }
             }
             throw error;
+        } finally {
+            if (record.presenting === version) {
+                record.presenting = undefined;
+            }
         }
     }
 
@@ -465,6 +526,7 @@ export class UIRouter implements WindowLifecycleObserver {
         this.records.set(unknownWindow, {
             route: route as unknown as UnknownRoute,
             window: unknownWindow,
+            order: 0,
         });
         if (route.multiplicity === "singleton") {
             this.singletonWindows.set(route.id, unknownWindow);
@@ -522,7 +584,9 @@ export class UIRouter implements WindowLifecycleObserver {
     }
 
     private destroyHiddenWindow(window: UnknownWindow): void {
-        if (!this.pendingHiddenDestructions.delete(window)) return;
+        if (!this.pendingHiddenDestructions.delete(window)) {
+            return;
+        }
         const record = this.records.get(window);
         if (record?.route.retention === "destroy" && !window.isShowing) {
             this.destroyWindow(record);
@@ -540,6 +604,8 @@ export class UIRouter implements WindowLifecycleObserver {
         if (!root) {
             return;
         }
+        applyLayerOrder([...this.records.values()].filter(record => record.window.parent === root)
+            .map(record => ({ view: record.window, layer: resolveLayer(record.route), order: record.order })));
         syncModalOrder(root);
         if (!this.disposed && !this.mask) {
             this.mask = root.modalLayer;
@@ -552,14 +618,20 @@ export class UIRouter implements WindowLifecycleObserver {
         const top = Array.from(root.children).reverse().find(child => child instanceof Laya.GWindow);
         const record = top && this.records.get(top as UnknownWindow);
         if (!record || this.disposed || !record.window.modal || !record.window.mouseEnabled
-            || record.window.isPopupHiding || !root.modalLayer.parent) return;
-        if (!(record.route.closeOnMaskClick ?? resolveWindowLayout(record.route) === "center-popup")) return;
+            || record.window.isPopupHiding || !root.modalLayer.parent) {
+            return;
+        }
+        if (!(record.route.closeOnMaskClick ?? resolveWindowLayout(record.route) === "center-popup")) {
+            return;
+        }
         event.stopPropagation();
         this.close(record.route.id, record.window);
     }
 
     private layoutManagedWindows(): void {
-        if (this.disposed || !this.layoutService) return;
+        if (this.disposed || !this.layoutService) {
+            return;
+        }
         for (const record of this.records.values()) {
             if (!record.window.destroyed) {
                 record.window.updateLayout(() => this.layoutService?.apply(record.window, resolveWindowLayout(record.route)));

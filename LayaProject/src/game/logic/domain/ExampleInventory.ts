@@ -18,7 +18,7 @@ export interface ExampleInventoryPatch {
 
 export type InventoryApplyResult = "applied" | "stale" | "invalid" | "base-mismatch";
 
-/** One account's example state. UI selection and scrolling never enter this model. */
+/** 单个账号的示例状态；不保存 UI 选中项和滚动位置。 */
 export class ExampleInventory {
     private entries: readonly ExampleItem[] = Object.freeze([]);
     private revision = 0;
@@ -63,7 +63,7 @@ export class ExampleInventory {
         return "applied";
     }
 
-    /** Logout/account replacement only. Server snapshots supply inventory contents and versions. */
+    /** 仅用于登出或更换账号；背包内容与版本由服务端快照提供。 */
     clear(): void {
         this.entries = Object.freeze([]);
         this.revision = 0;

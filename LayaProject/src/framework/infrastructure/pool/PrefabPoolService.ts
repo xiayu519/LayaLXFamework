@@ -23,13 +23,13 @@ export interface PrefabPoolCleanupDiagnostic {
     readonly poolId: string;
     readonly nodeName: string;
     readonly attempts: number;
-    /** False means native destroy already set destroyed before throwing; retry cannot prove recovery. */
+    /** false 表示原生 destroy 在抛错前已设置 destroyed；重试不能证明清理恢复。 */
     readonly retryable: boolean;
     readonly error: unknown;
 }
 
 export class PrefabPoolCleanupError extends Error {
-    constructor(readonly errors: readonly unknown[]) {
+    public constructor(public readonly errors: readonly unknown[]) {
         super(`${errors.length} prefab pool operation(s) failed to clean up.`);
         this.name = "PrefabPoolCleanupError";
     }
@@ -59,7 +59,7 @@ export class PrefabPoolService {
     private disposed = false;
     private disposing = false;
 
-    register<TNode extends Laya.Node>(definition: PrefabPoolDefinition<TNode>): void {
+    public register<TNode extends Laya.Node>(definition: PrefabPoolDefinition<TNode>): void {
         this.requireActive();
         if (!definition.id || !definition.url) {
             throw new Error("Prefab pool id and url are required.");
@@ -83,11 +83,13 @@ export class PrefabPoolService {
         });
     }
 
-    /** Cancellation ends only this acquisition; shared native loading continues for other owners. */
-    async acquire<TNode extends Laya.Node>(id: string, options: { readonly signal?: AbortSignal } = {}): Promise<TNode> {
+    /** 取消只结束本次获取；其他持有者仍可等待共享的原生加载。 */
+    public async acquire<TNode extends Laya.Node>(id: string, options: { readonly signal?: AbortSignal } = {}): Promise<TNode> {
         this.requireActive();
         const { signal } = options;
-        if (signal?.aborted) throw new BindingCancelledError();
+        if (signal?.aborted) {
+            throw new BindingCancelledError();
+        }
         const pool = this.requirePool(id);
         const limit = pool.definition.maxActive;
         if (limit !== undefined && pool.active.size + pool.pendingAcquires >= limit) {
@@ -100,7 +102,9 @@ export class PrefabPoolService {
                 const loading = this.loadPrefab(pool);
                 const prefab = await (signal ? awaitBinding(loading, signal) : loading);
                 this.requireActive();
-                if (signal?.aborted) throw new BindingCancelledError();
+                if (signal?.aborted) {
+                    throw new BindingCancelledError();
+                }
                 const created: unknown = pool.definition.create?.(prefab) ?? prefab.create();
                 if (!(created instanceof Laya.Node)) {
                     throw new Error(`Prefab pool '${id}' factory must create a Laya.Node.`);
@@ -120,8 +124,12 @@ export class PrefabPoolService {
                 node.active = true;
                 pool.definition.onAcquire?.(node);
                 this.requireActive();
-                if (signal?.aborted) throw new BindingCancelledError();
-                if (node.destroyed) throw new Error(`Prefab pool '${id}' onAcquire destroyed its node.`);
+                if (signal?.aborted) {
+                    throw new BindingCancelledError();
+                }
+                if (node.destroyed) {
+                    throw new Error(`Prefab pool '${id}' onAcquire destroyed its node.`);
+                }
             } catch (error) {
                 pool.active.delete(node);
                 owner.active = false;
@@ -135,7 +143,7 @@ export class PrefabPoolService {
         }
     }
 
-    release(id: string, node: Laya.Node): void {
+    public release(id: string, node: Laya.Node): void {
         this.requireActive();
         const pool = this.requirePool(id);
         const owner = this.ownership.get(node);
@@ -166,7 +174,7 @@ export class PrefabPoolService {
         Laya.Pool.recover(pool.sign, node);
     }
 
-    drain(id: string): void {
+    public drain(id: string): void {
         this.requireActive();
         const pool = this.requirePool(id);
         if (pool.active.size > 0 || pool.pendingAcquires > 0) {
@@ -180,7 +188,7 @@ export class PrefabPoolService {
         this.throwCleanupErrors(pool);
     }
 
-    snapshot(): readonly PrefabPoolSnapshot[] {
+    public snapshot(): readonly PrefabPoolSnapshot[] {
         return Array.from(this.pools.values())
             .map((pool) => Object.freeze({
                 id: pool.definition.id,
@@ -193,18 +201,20 @@ export class PrefabPoolService {
             .sort((left, right) => left.id.localeCompare(right.id));
     }
 
-    cleanupDiagnostics(): readonly PrefabPoolCleanupDiagnostic[] {
+    public cleanupDiagnostics(): readonly PrefabPoolCleanupDiagnostic[] {
         return Array.from(this.pools.values()).flatMap((pool) => Array.from(pool.cleanupFailures.values()));
     }
 
-    async waitForPendingLoads(): Promise<void> {
+    public async waitForPendingLoads(): Promise<void> {
         while (this.pendingLoads.size > 0) {
             await Promise.allSettled(Array.from(this.pendingLoads));
         }
     }
 
-    dispose(): void {
-        if (this.disposing) return;
+    public dispose(): void {
+        if (this.disposing) {
+            return;
+        }
         this.disposed = true;
         this.disposing = true;
         try {
@@ -213,14 +223,20 @@ export class PrefabPoolService {
                 for (const node of Array.from(pool.active)) {
                     this.destroyNode(pool, node);
                     const owner = this.ownership.get(node);
-                    if (owner) owner.active = false;
+                    if (owner) {
+                        owner.active = false;
+                    }
                 }
                 pool.active.clear();
                 this.destroyIdle(pool);
-                if (pool.cleanupFailures.size === 0) this.pools.delete(pool.definition.id);
+                if (pool.cleanupFailures.size === 0) {
+                    this.pools.delete(pool.definition.id);
+                }
             }
             const errors = this.cleanupDiagnostics().map((diagnostic) => diagnostic.error);
-            if (errors.length > 0) throw new PrefabPoolCleanupError(errors);
+            if (errors.length > 0) {
+                throw new PrefabPoolCleanupError(errors);
+            }
         } finally {
             this.disposing = false;
         }
@@ -253,7 +269,8 @@ export class PrefabPoolService {
             if (pool.loading === operation) {
                 pool.loading = undefined;
             }
-        }).catch(() => {});
+        }).catch(() => {
+        });
         return operation;
     }
 
@@ -268,19 +285,27 @@ export class PrefabPoolService {
 
     private retryCleanup(pool: PoolRecord): void {
         for (const [node, diagnostic] of Array.from(pool.cleanupFailures)) {
-            if (diagnostic.retryable) this.destroyNode(pool, node);
+            if (diagnostic.retryable) {
+                this.destroyNode(pool, node);
+            }
         }
     }
 
     private destroyNode(pool: PoolRecord, node: Laya.Node): void {
         const previous = pool.cleanupFailures.get(node);
-        if (previous && !previous.retryable) return;
+        if (previous && !previous.retryable) {
+            return;
+        }
         try {
             if (node.destroyed && previous) {
                 throw new Error("Node became destroyed after an incomplete cleanup; recovery cannot be verified.");
             }
-            if (!node.destroyed) node.destroy();
-            if (!node.destroyed) throw new Error("Node.destroy() returned without destroying the node.");
+            if (!node.destroyed) {
+                node.destroy();
+            }
+            if (!node.destroyed) {
+                throw new Error("Node.destroy() returned without destroying the node.");
+            }
             pool.cleanupFailures.delete(node);
         } catch (error) {
             this.pools.set(pool.definition.id, pool);
@@ -295,9 +320,13 @@ export class PrefabPoolService {
     }
 
     private throwCleanupErrors(pool: PoolRecord, initialErrors: unknown[] = []): void {
-        if (pool.cleanupFailures.size === 0) return;
+        if (pool.cleanupFailures.size === 0) {
+            return;
+        }
         const errors = [...initialErrors, ...Array.from(pool.cleanupFailures.values(), (failure) => failure.error)];
-        if (errors.length > 0) throw new PrefabPoolCleanupError(errors);
+        if (errors.length > 0) {
+            throw new PrefabPoolCleanupError(errors);
+        }
     }
 
     private requirePool(id: string): PoolRecord {

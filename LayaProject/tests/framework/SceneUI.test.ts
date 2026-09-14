@@ -16,7 +16,7 @@ function flushComponentDestruction(): unknown[] {
     for (const component of pendingComponentDestruction.splice(0)) {
         try { component.onDestroy?.(); } catch (error) { errors.push(error); }
     }
-    return errors; // ComponentDriver catches each error and continues the remaining callbacks.
+    return errors; // ComponentDriver 捕获每个错误后，会继续执行剩余回调。
 }
 
 class FakeWidget {
@@ -80,6 +80,7 @@ class FakeWidget {
         return child;
     }
     removeSelf(): this { this.parent?.removeChild(this); return this; }
+    getChildAt(index: number): FakeWidget { return this.children[index]; }
     getChildIndex(child: FakeWidget): number { return this.children.indexOf(child); }
     setChildIndex(child: FakeWidget, index: number): void {
         this.children.splice(this.getChildIndex(child), 1);
@@ -198,7 +199,7 @@ const { RedDotStore } = await import("../../src/framework/presentation/ui/RedDot
 const { UIViewLifecycle } = await import("../../src/framework/presentation/ui/UIViewLifecycle");
 class TestView extends Laya.GWidget {
     value = "";
-    constructor() { super(); this.addComponent(UIViewLifecycle); } // Simulates the authored prefab component.
+    constructor() { super(); this.addComponent(UIViewLifecycle); } // 模拟预制体中配置的组件。
 }
 class TestWindow extends BaseGameWindow<string> {
     value = "";
@@ -233,7 +234,7 @@ describe("SceneUI", () => {
         expect(load).not.toHaveBeenCalled();
         const view = new NativeView();
         Object.assign(view.getComponent(UIViewLifecycle)!, {
-            layer: UILayer.HUD, navigation: "overlay", modal: true, closeOnMaskClick: false, retention: "hide",
+            layer: UILayer.HUD, openMode: "stack", modal: true, closeOnMaskClick: false, retention: "hide",
         });
         load.mockResolvedValueOnce(new FakePrefab(() => view));
         const scope = router.createSceneUI(new TestView());
@@ -284,7 +285,7 @@ describe("SceneUI", () => {
         const bind = vi.fn((view: TestView, args: string) => { view.value = args; });
         const route = router.registerView(viewRoute("concurrent", bind));
         const waiting = deferred<FakePrefab>();
-        load.mockReturnValue(waiting.promise); // Native Loader coalesces requests for the same resource.
+        load.mockReturnValue(waiting.promise); // 原生 Loader 会合并同一资源的请求。
         const prefab = new FakePrefab(() => {
             const view = new TestView();
             view.getComponent(UIViewLifecycle)!.multiplicity = multiplicity;
@@ -389,7 +390,7 @@ describe("SceneUI", () => {
         otherBind.resolve();
         expect((await unrelated).destroyed).toBe(false);
         const replacement = router.registerView(viewRoute(route.id));
-        await router.unregisterView(route); // Old World cleanup cannot remove the replacement.
+        await router.unregisterView(route); // 旧 World 的清理不能移除替代它的新定义。
         expect((await scopes[0].show(replacement, "replacement")).value).toBe("replacement");
         router.dispose();
     });
@@ -755,7 +756,7 @@ describe("SceneUI", () => {
         router.dispose();
     });
 
-    it("pauses covered Screen pages and restores their state while leaving HUD active", async () => {
+    it("closes replaced Screen pages without automatic restoration and leaves higher HUD active", async () => {
         const { router } = createRouter();
         const bindFirst = vi.fn((view: TestView, args: string) => { view.value = args; });
         const first = router.registerView(viewRoute("first", bindFirst));
@@ -766,16 +767,18 @@ describe("SceneUI", () => {
         const firstView = await scene.show(first, "selection=42");
         const hudView = await scene.show(hud, "health=100");
         const secondView = await scene.show(second, "inventory");
-        expect(firstView.active).toBe(false);
-        expect(firstView.parent).toBe(root);
+        expect(firstView.destroyed).toBe(true);
+        expect(firstView.parent).toBeUndefined();
         expect(hudView.active).toBe(true);
         expect(secondView.active).toBe(true);
         expect(scene.snapshot().views.filter(view => view.visible).map(view => view.routeId)).toEqual(["second", "hud"]);
         scene.close(second.id);
         expect(secondView.destroyed).toBe(true);
-        expect(firstView.active).toBe(true);
-        expect(firstView.value).toBe("selection=42");
-        expect(bindFirst).toHaveBeenCalledOnce();
+        expect(scene.snapshot().views.map(view => view.routeId)).toEqual(["hud"]);
+        const reopened = await scene.show(first, "selection=24");
+        expect(reopened).not.toBe(firstView);
+        expect(reopened.value).toBe("selection=24");
+        expect(bindFirst).toHaveBeenCalledTimes(2);
         expect(hudView.active).toBe(true);
         router.dispose();
     });
@@ -825,6 +828,160 @@ describe("SceneUI", () => {
 });
 
 describe("SceneUI owner and cleanup boundaries", () => {
+    it("waits for successful binding before replacing and keeps the old page on failure", async () => {
+        const { router } = createRouter();
+        const scene = router.createSceneUI(new TestView());
+        const lower = router.registerView(viewRoute("lower"));
+        const ready = deferred<void>();
+        const next = router.registerView(viewRoute("next", () => ready.promise));
+        const view = await scene.show(lower, "old");
+        const opening = scene.show(next, "next");
+        await Promise.resolve(); await Promise.resolve();
+        expect(view.parent).toBe(scene.root);
+        expect(view.destroyed).toBe(false);
+        ready.resolve();
+        const newView = await opening;
+        expect(view.destroyed).toBe(true);
+        const failed = router.registerView(viewRoute("failed", () => { throw new Error("bind failed"); }));
+        await expect(scene.show(failed, "bad")).rejects.toThrow("bind failed");
+        expect(newView.parent).toBe(scene.root);
+        router.dispose();
+    });
+
+    it("unlinks a successful show from its source page before replacing that page", async () => {
+        const { router } = createRouter();
+        const scene = router.createSceneUI(new TestView());
+        let source!: UIViewSession, destination!: UIViewSession;
+        const first = router.registerView(viewRoute("source", (_v, _a, session) => { source = session; }));
+        const second = router.registerView(viewRoute("destination", (_v, _a, session) => { destination = session; }));
+        const old = await scene.show(first, "old");
+        const view = await scene.show(second, "new", { signal: source.token.signal });
+        expect(old.destroyed).toBe(true);
+        expect(source.token.isCurrent()).toBe(false);
+        expect(destination.token.commit(() => { view.value = "live"; })).toBe(true);
+        expect(view.value).toBe("live");
+        router.dispose();
+    });
+
+    it("rejects older fullscreen completions even after the newer replacement closes", async () => {
+        const { router } = createRouter();
+        const scene = router.createSceneUI(new TestView());
+        const delayed = deferred<FakePrefab>();
+        const first = router.registerView(viewRoute("slow-page"));
+        const second = router.registerView(viewRoute("fast-page"));
+        load.mockReturnValueOnce(delayed.promise);
+        const opening = scene.show(first, "old");
+        const cancelled = expect(opening).rejects.toThrow("cancelled");
+        await scene.show(second, "new");
+        scene.close(second.id);
+        delayed.resolve(new FakePrefab(() => new TestView()));
+        await cancelled;
+        await scene.waitForPendingLoads();
+        expect(scene.snapshot().views).toHaveLength(0);
+        expect(scene.root.numChildren).toBe(0);
+        router.dispose();
+    });
+
+    it("keeps newer pending pages alive when an older page finishes binding", async () => {
+        const { router } = createRouter();
+        const scene = router.createSceneUI(new TestView());
+        const a = deferred<void>(), b = deferred<void>();
+        const first = router.registerView(viewRoute("first-pending", () => a.promise));
+        const second = router.registerView(viewRoute("second-pending", () => b.promise));
+        const one = scene.show(first, "a"), two = scene.show(second, "b");
+        await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+        a.resolve();
+        const old = await one;
+        b.resolve();
+        const next = await two;
+        expect(old.destroyed).toBe(true);
+        expect(next.parent).toBe(scene.root);
+        router.dispose();
+    });
+
+    it("orders stack windows by request time, supports bringToFront, and respects layer ranges", async () => {
+        const { router } = createRouter();
+        const scene = router.createSceneUI(new TestView());
+        const delayed = deferred<void>();
+        const first = router.registerView(configured(viewRoute("older-stack", () => delayed.promise), { openMode: "stack" }));
+        const second = router.registerView(configured(viewRoute("newer-stack"), { openMode: "stack" }));
+        const system = router.registerView(configured(viewRoute("system"), { layer: UILayer.System, openMode: "stack" }));
+        const pending = scene.show(first, "a");
+        const newer = await scene.show(second, "b");
+        const upper = await scene.show(system, "system");
+        delayed.resolve();
+        const older = await pending;
+        expect(scene.root.children).toEqual([older, newer, upper]);
+        expect([older.zOrder, newer.zOrder, upper.zOrder]).toEqual([1000, 1001, 6000]);
+        const bind = vi.spyOn(first, "bind");
+        scene.bringToFront(older);
+        expect(scene.root.children).toEqual([newer, older, upper]);
+        expect(older.zOrder).toBe(1001);
+        expect(bind).not.toHaveBeenCalled();
+        scene.close(first.id);
+        expect(newer.zOrder).toBe(1000);
+        expect(() => scene.bringToFront(older)).toThrow("not an open window");
+        router.dispose();
+    });
+
+    it("keeps stacking subscriptions running and does not restore closed pages automatically", async () => {
+        const store = new RedDotStore();
+        const { router } = createRouter(store);
+        const scene = router.createSceneUI(new TestView());
+        const first = router.registerView(viewRoute("subscribed", (view, _args, session) => {
+            session.bindData(store, "mail", () => { view.value = String(store.get("mail")); });
+        }));
+        const overlay = router.registerView(configured(viewRoute("stack"), { openMode: "stack" }));
+        const view = await scene.show(first, "first");
+        await scene.show(overlay, "stack");
+        store.set("mail", 9); timer.flush();
+        expect(view.active).toBe(true);
+        expect(view.value).toBe("9");
+        scene.close(overlay.id);
+        expect(view.parent).toBe(scene.root);
+        router.dispose();
+    });
+
+    it("forces popup openMode to stack independently of its configured layer", () => {
+        const policy = new UIViewLifecycle();
+        policy.layout = "center-popup";
+        policy.layer = UILayer.System;
+        policy.openMode = "replace";
+        expect(policy.settings().openMode).toBe("stack");
+    });
+
+    it("preserves the committed replacement and reports an old page cleanup failure", async () => {
+        const output = vi.spyOn(console, "error").mockImplementation(() => {});
+        const { router } = createRouter();
+        const scene = router.createSceneUI(new TestView());
+        const first = router.registerView(viewRoute("bad-cleanup", (_view, _args, session) => {
+            session.lifetime.defer(() => { throw new Error("old cleanup failed"); });
+        }));
+        const next = router.registerView(viewRoute("good-replacement"));
+        try {
+            const old = await scene.show(first, "old");
+            const view = await scene.show(next, "new");
+            expect(old.destroyed).toBe(true);
+            expect(view.parent).toBe(scene.root);
+            expect(scene.snapshot().views.find(entry => entry.view === old)?.cleanupFailed).toBe(true);
+            expect(output).toHaveBeenCalledExactlyOnceWith("[UI] replaced pages failed to clean up", expect.any(Error));
+            expect(() => router.dispose()).toThrow();
+        } finally { output.mockRestore(); }
+    });
+
+    it("rejects a replacing fullscreen child without closing its parent", async () => {
+        const { router } = createRouter();
+        const scene = router.createSceneUI(new TestView());
+        let session!: UIViewSession;
+        const parent = router.registerView(viewRoute("parent-page", (_view, _args, value) => { session = value; }));
+        const child = router.registerView(viewRoute("child-page"));
+        const view = await scene.show(parent, "parent");
+        await expect(session.show(child, "child")).rejects.toThrow("session.ui.show");
+        expect(session.token.isCurrent()).toBe(true);
+        expect(view.parent).toBe(scene.root);
+        router.dispose();
+    });
+
     it("cancels child loading when its parent closes and rejects the old session after reopen", async () => {
         const { router } = createRouter();
         const sessions: UIViewSession[] = [];
@@ -885,7 +1042,7 @@ describe("SceneUI owner and cleanup boundaries", () => {
     it("reuses singleton children within one owner and isolates the same route across owners", async () => {
         const { router } = createRouter();
         const sessions = new Map<string, UIViewSession>();
-        const parent = router.registerView(configured(viewRoute("parent", (_view, args, session) => { sessions.set(args, session); }), { multiplicity: "multiple" }));
+        const parent = router.registerView(configured(viewRoute("parent", (_view, args, session) => { sessions.set(args, session); }), { multiplicity: "multiple", openMode: "stack" }));
         const child = router.registerView(popupRoute("child"));
         const scene = router.createSceneUI(new TestView());
         const first = await scene.show(parent, "a");
@@ -907,7 +1064,7 @@ describe("SceneUI owner and cleanup boundaries", () => {
         router.dispose();
     });
 
-    it("pauses all subscriptions of a covered page and restores same-key badges from the latest snapshot", async () => {
+    it("releases replaced page subscriptions and rebinds cached badges only on explicit reopen", async () => {
         const store = new RedDotStore();
         store.set("mail", 4);
         const { router } = createRouter(store);
@@ -915,11 +1072,11 @@ describe("SceneUI owner and cleanup boundaries", () => {
         const texts = [{ text: "", destroyed: false }, { text: "", destroyed: false }];
         let detachFirst = (): void => {};
         const render = vi.fn();
-        const first = router.registerView(viewRoute("first", (view, _args, session) => {
+        const first = router.registerView(configured(viewRoute("first", (view, _args, session) => {
             session.bindData(store, "mail", () => { render(); view.value = String(store.get("mail")); });
             detachFirst = session.bindRedDot(badges[0] as unknown as Laya.Sprite, "mail", { countText: texts[0] as Laya.GTextField });
             session.bindRedDot(badges[1] as unknown as Laya.Sprite, "mail", { countText: texts[1] as Laya.GTextField });
-        }));
+        }), { retention: "hide" }));
         const second = router.registerView(viewRoute("second"));
         const scene = router.createSceneUI(new TestView());
         const view = await scene.show(first, "first");
@@ -934,6 +1091,8 @@ describe("SceneUI owner and cleanup boundaries", () => {
         store.set("mail", 8); timer.flush();
         expect(view.value).toBe("4");
         scene.close(second.id);
+        expect(view.parent).toBeUndefined();
+        expect(await scene.show(first, "again")).toBe(view);
         expect(view.value).toBe("8");
         expect(texts.map(text => text.text)).toEqual(["8", "8"]);
         expect(events.listenerCount("mail")).toBe(3);
@@ -1023,11 +1182,12 @@ describe("SceneUI owner and cleanup boundaries", () => {
         const { router } = createRouter();
         let session!: UIViewSession;
         const parent = router.registerView(viewRoute("parent", (_view, _args, current) => { session = current; }));
-        const covering = router.registerView(viewRoute("covering"));
+        const covering = router.registerView(configured(viewRoute("covering"), { openMode: "stack" }));
         const child = router.registerView(popupRoute("child"));
         const scene = router.createSceneUI(new TestView());
         const view = await scene.show(parent, "parent");
         const top = await scene.show(covering, "covering");
+        view.active = false;
         expect(view.active).toBe(false);
         const delayed = deferred<FakePrefab>();
         load.mockReturnValueOnce(delayed.promise);
@@ -1053,7 +1213,7 @@ describe("SceneUI owner and cleanup boundaries", () => {
         const { router } = createRouter();
         const route = router.registerView(configured(viewRoute("multiple", (_view, args, session) => {
             if (args === "bad") session.lifetime.defer(() => { throw new Error("cleanup failed"); });
-        }), { multiplicity: "multiple" }));
+        }), { multiplicity: "multiple", openMode: "stack" }));
         const scene = router.createSceneUI(new TestView());
         const bad = await scene.show(route, "bad");
         const good = await scene.show(route, "good");
@@ -1107,16 +1267,16 @@ describe("SceneUI owner and cleanup boundaries", () => {
         } finally { logging.mockRestore(); }
     });
 
-    it("restores the lower page and removes the mask after a modal page closes with a cleanup error", async () => {
+    it("preserves the stacked lower page and removes the mask after a modal page cleanup error", async () => {
         const { router } = createRouter();
         const lowerRoute = router.registerView(viewRoute("lower-page"));
         const upperRoute = router.registerView(configured(viewRoute("bad-modal-page", (_view, _args, session) => {
             session.lifetime.defer(() => { throw new Error("cleanup failed"); });
-        }), { modal: true }));
+        }), { modal: true, openMode: "stack" }));
         const scene = router.createSceneUI(new TestView());
         const lower = await scene.show(lowerRoute, "lower");
         const upper = await scene.show(upperRoute, "upper");
-        expect(lower.active).toBe(false);
+        expect(lower.active).toBe(true);
         expect(scene.modalLayer!.parent).toBe(scene.root);
         expect(() => scene.close(upperRoute.id)).toThrow();
         expect(upper.destroyed).toBe(true);
@@ -1164,7 +1324,7 @@ function viewRoute(id: string, bind: (view: TestView, args: string, session: UIV
 }
 
 function popupRoute(id: string): UIViewRoute<string, TestView> {
-    return configured(viewRoute(id), { layer: UILayer.Popup, modal: true, navigation: "overlay" });
+    return configured(viewRoute(id), { layer: UILayer.Popup, modal: true, openMode: "stack" });
 }
 
 function deferred<T>() {
@@ -1175,6 +1335,6 @@ function deferred<T>() {
 
 function configured<TArgs, TView extends Laya.GWidget>(route: UIViewRoute<TArgs, TView>, settings: Partial<UIViewSettings>): UIViewRoute<TArgs, TView> {
     prefabSettings.set(route.url, { ...prefabSettings.get(route.url), ...settings,
-        ...(settings.layer !== undefined && settings.navigation === undefined ? { navigation: settings.layer === UILayer.Screen ? "page" : "overlay" } : {}) });
+        ...(settings.layer !== undefined && settings.openMode === undefined ? { openMode: settings.layer === UILayer.Screen ? "replace" : "stack" } : {}) });
     return route;
 }

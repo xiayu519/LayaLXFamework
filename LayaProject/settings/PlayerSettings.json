@@ -15,6 +15,10 @@
     "laya.ui": "ui2"
   },
   "spineVersion": "3.8",
+  "splash": {
+    "enabled": false,
+    "enabledInPreview": false
+  },
   "UI": {
     "alwaysIncludeDefaultSkin": false,
     "horizontalScrollBar": null,

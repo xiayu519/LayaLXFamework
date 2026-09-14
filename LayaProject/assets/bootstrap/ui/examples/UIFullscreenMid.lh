@@ -13,7 +13,7 @@
       "scriptPath": "../src/framework/presentation/ui/UIViewLifecycle.ts",
       "layout": "fullscreen",
       "layer": 1,
-      "navigation": "page",
+      "openMode": "stack",
       "modal": false,
       "closeOnMaskClick": true,
       "multiplicity": "singleton",

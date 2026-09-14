@@ -176,6 +176,27 @@ function prefab(content: FakeGWidget = new FakeGWidget()): Laya.Prefab {
 }
 
 describe("UIRouter", () => {
+    it("orders late application windows by request time and promotes within their layer", async () => {
+        let release!: () => void;
+        const pending = new Promise<void>(resolve => { release = resolve; });
+        loaderLoad.mockImplementation(() => Promise.resolve(prefab()));
+        const router = new UIRouter();
+        const first = router.register({ ...route("first-order", p => new TestWindow(p, () => pending)), layer: UILayer.Popup });
+        const second = router.register({ ...route("second-order", p => new TestWindow(p)), layer: UILayer.Popup });
+        const system = router.register({ ...route("system-order", p => new TestWindow(p)), layer: UILayer.System });
+        const opening = router.show(first, "older");
+        const b = await router.show(second, "newer");
+        const c = await router.show(system, "system");
+        release();
+        const a = await opening;
+        expect([a.zOrder, b.zOrder, c.zOrder]).toEqual([3000, 3001, 6000]);
+        a.bringToFront();
+        root.flushZOrder();
+        expect([b.zOrder, a.zOrder, c.zOrder]).toEqual([3000, 3001, 6000]);
+        expect(router.listVisible().map(info => info.routeId)).toEqual([second.id, first.id, system.id]);
+        router.dispose();
+    });
+
     it("closes only the mask owner, honors opt-out, and detaches its listener on disposal", async () => {
         loaderLoad.mockImplementation(() => Promise.resolve(prefab()));
         const router = new UIRouter();
@@ -481,9 +502,9 @@ describe("UIRouter", () => {
         const registered = router.register(route("typed", (pane) => new TestWindow(pane)));
         expect(await router.show(registered, "valid")).toBeInstanceOf(TestWindow);
         function typeAssertions(): void {
-            // @ts-expect-error A typed route must reject unrelated argument types.
+            // @ts-expect-error 具备类型约束的路由必须拒绝无关的参数类型。
             void router.show(registered, { unrelated: 1 });
-            // @ts-expect-error A typed route does not accept a number instead of its string args.
+            // @ts-expect-error 此路由参数为字符串，不接受数字。
             void router.show(registered, 1);
         }
         void typeAssertions;
@@ -554,7 +575,7 @@ describe("UIRouter", () => {
         const content = partial.contentPane;
         const nativeDestroy = vi.spyOn(FakeGWindow.prototype, "destroy").mockImplementationOnce(function (this: FakeGWindow) {
             this.hide();
-            // Laya Node.destroy sets its destroyed flag before components and children finish.
+            // Laya Node.destroy 在组件与子节点销毁完成前就会设置 destroyed 标记。
             this.destroyed = true;
             throw new Error("native onDisable failed before destroying children");
         });

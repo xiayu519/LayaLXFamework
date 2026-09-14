@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-// Opt-in integration test: reuse a successful current-input build, never nest in Vitest.
+// 按需运行的集成测试：复用与当前输入一致的成功构建，不在 Vitest 内嵌套执行。
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const cases = [
     { name: "network", args: ["--suite", "network"], completed: "network", forbidden: ["runFrameworkProbes:"] },

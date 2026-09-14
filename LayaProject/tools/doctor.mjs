@@ -187,7 +187,7 @@ const requiredPaths = [
     "settings/LayaSourceBaseline.json",
     "src/framework/lx.ts",
     "src/framework/bootstrap/AppBootstrap.ts",
-    "src/game/bootstrap/createApplication.ts",
+    "src/game/bootstrap/GameStartup.ts",
     "tools/test-headless.mjs",
     "tools/python-runtime.mjs",
     "tools/run-python.mjs",
@@ -202,14 +202,14 @@ const requiredPaths = [
 if (configuredLogicRoot) {
     requiredPaths.push(
         configuredLogicRoot,
-        `${configuredLogicRoot}/bootstrap/createGameApplication.ts`,
+        `${configuredLogicRoot}/bootstrap/GameApplication.ts`,
     );
 }
 if (configuredGameRoot) {
     requiredPaths.push(
         configuredGameRoot,
         `${configuredGameRoot}/AGENTS.md`,
-        `${configuredGameRoot}/bootstrap/createGameApplication.ts`,
+        `${configuredGameRoot}/bootstrap/GameApplication.ts`,
     );
 }
 for (const path of [

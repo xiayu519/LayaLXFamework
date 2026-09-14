@@ -3,7 +3,7 @@ export interface PreparedHttpPayload {
     readonly headers: string[];
 }
 
-/** Snapshot once so retries cannot silently send different JSON or binary data. */
+/** 只生成一次快照，防止重试时悄然发送不同的 JSON 或二进制数据。 */
 export function prepareHttpPayload(
     body: unknown,
     headers: Readonly<Record<string, string>> | undefined,
@@ -59,7 +59,9 @@ export function prepareHttpPayload(
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
-    if (!value || typeof value !== "object") return false;
+    if (!value || typeof value !== "object") {
+        return false;
+    }
     const prototype = Object.getPrototypeOf(value);
     return prototype === Object.prototype || prototype === null;
 }

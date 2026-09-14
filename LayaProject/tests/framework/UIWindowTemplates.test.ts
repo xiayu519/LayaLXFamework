@@ -12,8 +12,8 @@ interface AssetNode {
 const asset = (path: string): AssetNode => JSON.parse(readFileSync(
     path.startsWith("assets/") ? path : `assets/bootstrap/${path}`, "utf8",
 ));
-// Standalone GWidget UI assets are windows. Tip is the sole pooled notification component.
-// GButton/GLabel/GList assets are child components rather than route content panes.
+// 独立 GWidget UI 资源属于窗口；Tip 是唯一使用对象池的通知组件。
+// GButton/GLabel/GList 资源是子组件，不是路由内容面板。
 const windows = readdirSync("assets", { recursive: true }).map(String)
     .filter(path => path.endsWith(".lh")).map(path => `assets/${path.split("\\").join("/")}`)
     .filter(path => asset(path)._$type === "GWidget" && path !== "assets/bootstrap/ui/UITip.lh");
@@ -39,7 +39,7 @@ describe("window authoring contract", () => {
         const settings = components.find(component => component._$type === uuid)!;
         expect(["fullscreen", "center-popup"]).toContain(settings.layout);
         expect([0, 1, 2, 3, 4, 5, 6]).toContain(settings.layer);
-        expect(["page", "overlay"]).toContain(settings.navigation);
+        expect(["replace", "stack"]).toContain(settings.openMode);
         expect(typeof settings.modal).toBe("boolean");
         expect(typeof settings.closeOnMaskClick).toBe("boolean");
         expect(["singleton", "multiple"]).toContain(settings.multiplicity);
@@ -48,9 +48,9 @@ describe("window authoring contract", () => {
     });
 
     it.each([
-        ["ui/examples/UIConfirmation.lh", { layout: "center-popup", layer: 3, navigation: "overlay", modal: true, closeOnMaskClick: true, multiplicity: "multiple", retention: "destroy" }],
-        ["ui/examples/UIInventory.lh", { layout: "fullscreen", layer: 1, navigation: "page", modal: false, multiplicity: "singleton", retention: "hide" }],
-        ["ui/examples/UIFullscreenMid.lh", { layout: "fullscreen", layer: 1, navigation: "page", modal: false, multiplicity: "singleton", retention: "destroy" }],
+        ["ui/examples/UIConfirmation.lh", { layout: "center-popup", layer: 3, openMode: "stack", modal: true, closeOnMaskClick: true, multiplicity: "multiple", retention: "destroy" }],
+        ["ui/examples/UIInventory.lh", { layout: "fullscreen", layer: 1, openMode: "replace", modal: false, multiplicity: "singleton", retention: "hide" }],
+        ["ui/examples/UIFullscreenMid.lh", { layout: "fullscreen", layer: 1, openMode: "stack", modal: false, multiplicity: "singleton", retention: "destroy" }],
     ] as const)("keeps the intended example policy in %s", (path, expected) => {
         const { uuid } = JSON.parse(readFileSync("src/framework/presentation/ui/UIViewLifecycle.ts.meta", "utf8"));
         const components = asset(path)._$comp as Record<string, unknown>[];

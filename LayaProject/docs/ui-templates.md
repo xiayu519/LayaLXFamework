@@ -40,7 +40,7 @@ Root（所有窗口共用）
    └─ bottom（空槽位高度 0）
 ```
 
-所有窗口和窗口模板都保留以上节点与顺序；不用就留空，空 top/bottom 高度为 0，空容器通过 mouseThrough 避免遮挡点击。填入内容时设置所需设计尺寸与 Relation。骨架已静态挂载 UIViewLifecycle，不绑定业务脚本或创建业务路由；复制到当前游戏后分配新 UUID 并设置 Runtime，保留并启用生命周期组件，在 IDE 配置 layer/navigation/modal/retention 等参数；注册只提供 id/url 和可选 bind。Popup 默认 modal:true、closeOnMaskClick:true；细节见 [Mask 与关闭后处理](ui-layout.md#通用-mask-与关闭后处理)。
+所有窗口和窗口模板都保留以上节点与顺序；不用就留空，空 top/bottom 高度为 0，空容器通过 mouseThrough 避免遮挡点击。填入内容时设置所需设计尺寸与 Relation。骨架已静态挂载 UIViewLifecycle，不绑定业务脚本或创建业务路由；复制到当前游戏后分配新 UUID 并设置 Runtime，保留并启用生命周期组件，在 IDE 配置 layer/openMode/modal/retention 等参数；注册只提供 id/url 和可选 bind。Popup 默认 modal:true、closeOnMaskClick:true；细节见 [Mask 与关闭后处理](ui-layout.md#通用-mask-与关闭后处理)。
 
 ## 功能模板
 
@@ -93,7 +93,7 @@ session.lifetime.defer(() => list.off(Laya.UIEvent.ClickItem, view, select));
 | Battle | [UIBattle](../src/game/logic/presentation/ui/examples/UIBattle.ts)，由战斗 Scene 拥有 |
 | Confirmation | [UIConfirmation](../src/game/logic/presentation/ui/examples/UIConfirmation.ts)，由打开它的展示拥有 |
 
-所有场景示例经 `registerView()` 注册，由 scene.ui 或当前 session 打开；navigation:page 参与覆盖，下层组件通过 active=false 暂停，恢复时重读数据。确认弹窗通过 session.show 归父展示；场景退出销毁全部所属实例、隐藏缓存和待加载。红点与业务计数见 [红点使用](ui-red-dots.md)。
+所有场景示例经 `registerView()` 注册，由 scene.ui 或当前 session 打开；replace 成功后关闭下层全屏；stack 保留下层及其订阅，弹窗强制叠加。确认弹窗通过 session.show 归父展示；场景退出销毁全部所属实例、隐藏缓存和待加载。红点与业务计数见 [红点使用](ui-red-dots.md)。
 
 ## 可重复验收
 
@@ -106,3 +106,8 @@ session.lifetime.defer(() => list.off(Laya.UIEvent.ClickItem, view, select));
 2026-09-10 固定骨架验证（原生页面与场景归属改造前的历史基线）：扫描全部 8 个窗口及窗口模板，节点完整且顺序一致。typecheck、67 项相关单测、架构/资源布局检查和 16 个层级资产的官方解析通过；Skill 静态检查、5 个路由案例和独立制作 FullscreenMid 的执行检查通过。LayaAir 3.4.1 原地构建、100 次 UI/Pool 循环、8 种浏览器分辨率 × 4 组安全区均通过。背包列表实例化 6–13 个显示项，行高始终为 88、标题字号为 22；通用列表和三列网格随 full 视口分别实例化 11–18、21–36 个显示项。全屏 mid 在同一实例上居中、缩小并恢复，空槽位不阻挡原生点击。覆盖 Mask 堆叠/关闭开关、弹窗 mid 动画、关闭钩子、池回收及动画期间 resize，无 404、运行时错误或停机 owner 残留。
 
 另通过 CDP 连续切换实际 CSS 视口 390×844 → 600×800 → 320×568 → 390×844，验证同一全屏 mid 窗口的布局与按钮点击，并检查背包、中央面板和弹窗截图。以上为 Windows Headless Chromium / SwiftShader 结果；刘海与胶囊数据为模拟输入，未代替小游戏真机、macOS 或目标 GPU 验收。
+## 编辑器配置显示
+
+UIViewLifecycle 的选项以中文显示，资产仍保存原有字符串或数值：窗口布局为“全屏 / 居中弹窗”，层级为“背景层 / 页面层 / 常驻信息层 / 弹窗层 / 引导层 / 提示层 / 系统层”，实例为“单实例 / 多实例”，关闭处理为“销毁 / 隐藏并缓存”。
+
+原“页面导航/下层页面处理”已改为“打开方式”，选项为“关闭下层”（replace）和“叠加下层”（stack），只对全屏生效；弹窗隐藏该项并强制叠加。显示层级选项标明各自 zOrder 范围。同层新窗口靠前，关闭会回收顺序。详见 [UI 层级与打开方式](ui-navigation.md)。

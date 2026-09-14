@@ -27,6 +27,34 @@ function service(name: string, events: string[], failStart = false, failStop = f
 }
 
 describe("AppBootstrap", () => {
+    it("reports completed services without advancing while a service is pending", async () => {
+        const progress = vi.fn();
+        let finish!: () => void;
+        const bootstrap = new AppBootstrap([
+            { name: "platform", start() {}, stop() {} },
+            { name: "tables", start: () => new Promise<void>(resolve => { finish = resolve; }), stop() {} },
+        ], { onProgress: progress });
+        const start = bootstrap.start();
+        await vi.waitFor(() => expect(progress).toHaveBeenLastCalledWith({ serviceName: "tables", completed: 1, total: 2 }));
+        expect(bootstrap.state).toBe("starting");
+        finish();
+        await start;
+        expect(progress.mock.calls.map(([value]) => value.completed)).toEqual([0, 1, 1, 2]);
+        progress.mockClear();
+        await bootstrap.stop();
+        expect(progress).not.toHaveBeenCalled();
+    });
+
+    it("rolls back when the startup progress observer fails", async () => {
+        const events: string[] = [];
+        const bootstrap = new AppBootstrap([service("one", events)], {
+            onProgress(progress) { if (progress.completed) throw new Error("progress view failed"); },
+        });
+        await expect(bootstrap.start()).rejects.toThrow("progress view failed");
+        expect(events).toEqual(["start:one", "stop:one"]);
+        expect(bootstrap.state).toBe("stopped");
+    });
+
     it("publishes shared tasks before synchronous service re-entry", async () => {
         let nestedStart: Promise<void> | undefined;
         let nestedStop: Promise<void> | undefined;

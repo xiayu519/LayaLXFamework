@@ -32,7 +32,7 @@ export function parseBrowserOptions(args) {
     return options;
 }
 
-/** Startup, error collection and shutdown stay outside this optional probe selection. */
+/** 启动、错误收集和关闭检查独立于此处的可选探针筛选。 */
 export async function runSelectedBrowserProbes(options, probes) {
     const selected = suites[options.suite];
     if (!selected || (options.suite === "targeted" && !options.probe)) {

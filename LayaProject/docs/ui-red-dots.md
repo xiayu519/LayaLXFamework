@@ -1,6 +1,8 @@
 # UI 红点
 
-业务更新 `lx.ui.redDots`，UI 使用 session.bindRedDot 或原生 RedDotBinding 组件显示结果。框架只负责计数聚合和展示期绑定；任务是否完成、奖励能否领取等判断保留在独立业务模型/服务中，窗口关闭不停止业务计数更新。
+业务更新 `lx.ui.redDots`，基础 Runtime 示例默认使用 `session.bindRedDot` 显示结果；`RedDotBinding` 是适合 IDE 配置的可选组件。两者是并行消费方式，同一节点选择一种即可。框架只负责计数聚合和展示期绑定；任务是否完成、奖励能否领取等判断保留在独立业务模型/服务中，窗口关闭不停止业务计数更新。
+
+红点存储、服务端红点状态及业务计算规则都由框架根 World 初始化并持有；规则的业务实现仍在 game，由根组合处登记。小 World/UI 只负责表现绑定，不重复创建红点系统，也不因退出清空全局计数。首次全局数据与红点同步完成后，根才 Ready 并进入 LobbyWorld；网络接入暂列 TODO，见 [World 生命周期设计](world-lifecycle-design.md)。
 
 ```ts
 lx.ui.redDots.setMany({
@@ -13,9 +15,13 @@ lx.ui.redDots.get("bag"); // 3
 lx.ui.redDots.set("bag/equipment", 0); // bag 自动变为 1
 ```
 
-## 在 IDE 中使用
+## 默认 Runtime 绑定
 
 节点引用已由 Runtime/IDE 生成时，可直接在 `bind(view,args,session)` 内调用 `session.bindRedDot(view.badge, "bag", { countText: view.badgeCount, maxCount: 99 })`。同一 key 支持多个独立 badge，首次同步显示、后续 callLater 合并、页面暂停与关闭时清理，详见 [数据绑定](ui-data-binding.md)。应用 BaseGameWindow 提供同名 protected 方法。
+
+现有 `UILobby` 和 `UIInventory` 已采用此方式；使用这条路径无需给红点节点额外挂组件，也无需配置 defaultStore。
+
+## 可选 IDE 组件
 
 1. 在 `.lh/.ls` 中制作红点和可选的数字文本，按窗口现有骨架放在对应按钮或内容区域。
 2. 给按钮或其他稳定节点挂 `RedDotBinding`，将 `badge` 指向红点节点；需要数字时将 `countText` 指向现有 `GTextField`。

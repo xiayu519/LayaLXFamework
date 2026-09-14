@@ -272,7 +272,7 @@ async function syncFramework(root, parsed) {
         const oldLock = existsSync(oldLockPath) ? readJson(oldLockPath) : undefined;
         const nextFiles = new Set(sourceFiles);
         for (const entry of oldLock?.files ?? []) {
-            // Released visual assets belong to the game even if an old lock managed them.
+            // 已发布的可视资源归游戏持有，即使旧 lock 曾管理这些资源。
             if (!nextFiles.has(entry.path) && !isGameResource(entry.path)) {
                 const stale = safeResolve(root, entry.path);
                 if (existsSync(stale) && statSync(stale).isFile()) {

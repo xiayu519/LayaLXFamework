@@ -10,7 +10,7 @@ export class AsyncBindingGuard {
     private disposed = false;
     private controller: AbortController | undefined;
 
-    next(parentSignal?: AbortSignal): BindingToken {
+    public next(parentSignal?: AbortSignal): BindingToken {
         if (this.disposed) {
             throw new Error("Cannot create a binding token after disposal.");
         }
@@ -20,8 +20,9 @@ export class AsyncBindingGuard {
         this.controller = controller;
         if (parentSignal) {
             const abort = (): void => controller.abort();
-            if (parentSignal.aborted) abort();
-            else {
+            if (parentSignal.aborted) {
+                abort();
+            } else {
                 parentSignal.addEventListener("abort", abort, { once: true });
                 controller.signal.addEventListener("abort", () => {
                     parentSignal.removeEventListener("abort", abort);
@@ -44,7 +45,7 @@ export class AsyncBindingGuard {
         };
     }
 
-    invalidate(): void {
+    public invalidate(): void {
         if (!this.disposed) {
             this.revision += 1;
         }
@@ -53,7 +54,7 @@ export class AsyncBindingGuard {
         controller?.abort();
     }
 
-    dispose(): void {
+    public dispose(): void {
         this.disposed = true;
         this.revision += 1;
         this.invalidate();
@@ -61,24 +62,33 @@ export class AsyncBindingGuard {
 }
 
 export class BindingCancelledError extends Error {
-    constructor() {
+    public constructor() {
         super("Request was cancelled or superseded.");
         this.name = "BindingCancelledError";
     }
 }
 
-/** Stops waiting on cancellation; handlers remain attached to consume late failures. */
+/** 取消时结束等待，但保留回调以处理之后才返回的失败。 */
 export function awaitBinding<T>(operation: T | PromiseLike<T>, signal: AbortSignal): Promise<T> {
     return new Promise<T>((resolve, reject) => {
         const abort = (): void => {
             signal.removeEventListener("abort", abort);
             reject(new BindingCancelledError());
         };
-        if (signal.aborted) abort();
-        else signal.addEventListener("abort", abort, { once: true });
+        if (signal.aborted) {
+            abort();
+        } else {
+            signal.addEventListener("abort", abort, { once: true });
+        }
         Promise.resolve(operation).then(
-            (value) => { signal.removeEventListener("abort", abort); resolve(value); },
-            (error: unknown) => { signal.removeEventListener("abort", abort); reject(error); },
+            (value) => {
+                signal.removeEventListener("abort", abort);
+                resolve(value);
+            },
+            (error: unknown) => {
+                signal.removeEventListener("abort", abort);
+                reject(error);
+            },
         );
     });
 }

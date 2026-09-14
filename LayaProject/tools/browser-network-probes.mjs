@@ -1,4 +1,18 @@
-/** Deterministic local endpoints: no external service or game backend required. */
+import { WebSocketServer } from "ws";
+
+/** 仅供原生引擎集成探针使用的本地回显连接。 */
+export function attachWebSocketProbe(server) {
+    const sockets = new WebSocketServer({ server, path: "/__lx_ws" });
+    sockets.on("connection", client => {
+        client.on("message", (data, isBinary) => client.send(data, { binary: isBinary }));
+    });
+    return () => {
+        for (const client of sockets.clients) client.terminate();
+        sockets.close();
+    };
+}
+
+/** 提供结果确定的本地端点，无需外部服务或游戏后端。 */
 export function handleNetworkProbe(request, response, pathname) {
     if (!pathname.startsWith("/__lx_http/")) return false;
     const send = (status, data) => {
@@ -22,35 +36,35 @@ export function handleNetworkProbe(request, response, pathname) {
     return true;
 }
 
-/** Self-contained browser function, executed against lx.net and the real Laya engine. */
+/** 可独立执行的浏览器函数，直接验证 lx.http 与真实 Laya 引擎。 */
 export async function runNetworkProbes() {
-    const net = globalThis.lx.net;
+    const http = globalThis.lx.http;
     const assert = (condition, label) => { if (!condition) throw new Error(`Network probe: ${label}`); };
     for (const status of [201, 202, 204, 205]) {
-        const result = await net.request(`__lx_http/${status}`);
+        const result = await http.request(`__lx_http/${status}`);
         assert(result.status === status && (status < 204 ? result.data.ok : result.data === null), `status ${status}`);
         assert(result.headers["x-lx-probe"] === "engine", "response headers");
     }
-    const head = await net.request("__lx_http/200", { method: "HEAD" });
+    const head = await http.request("__lx_http/200", { method: "HEAD" });
     assert(head.data === null, "HEAD empty JSON");
     const expectError = async (operation, kind) => {
         let error;
         try { await operation; } catch (caught) { error = caught; }
         assert(error?.kind === kind && error.attempt === 1, `${kind} classification`);
     };
-    await expectError(net.request("__lx_http/invalid", { retry: { maxAttempts: 3 } }), "parse");
-    await expectError(net.request("__lx_http/200", { validate: () => false, retry: { maxAttempts: 3 } }), "schema");
-    const json = await net.request("__lx_http/echo", {
+    await expectError(http.request("__lx_http/invalid", { retry: { maxAttempts: 3 } }), "parse");
+    await expectError(http.request("__lx_http/200", { validate: () => false, retry: { maxAttempts: 3 } }), "schema");
+    const json = await http.request("__lx_http/echo", {
         method: "POST", body: { value: "世界" }, headers: { "content-type": "application/json" },
     });
     assert(json.data.contentType === "application/json"
         && new TextDecoder().decode(new Uint8Array(json.data.bytes)) === JSON.stringify({ value: "世界" }), "JSON payload/header");
     const bytes = new Uint8Array([9, 1, 2, 9]);
-    const binary = await net.request("__lx_http/echo", { method: "POST", body: bytes.subarray(1, 3) });
+    const binary = await http.request("__lx_http/echo", { method: "POST", body: bytes.subarray(1, 3) });
     assert(JSON.stringify(binary.data.bytes) === "[1,2]" && binary.data.contentType === "application/octet-stream", "binary byteOffset");
-    await expectError(net.request("__lx_http/delay", { timeoutMs: 20 }), "timeout");
+    await expectError(http.request("__lx_http/delay", { timeoutMs: 20 }), "timeout");
     const controller = new AbortController();
-    const operation = net.request("__lx_http/delay", { signal: controller.signal });
+    const operation = http.request("__lx_http/delay", { signal: controller.signal });
     controller.abort();
     await expectError(operation, "abort");
     const render = globalThis.lx.performance.capture();

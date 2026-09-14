@@ -3,24 +3,42 @@ import type { ExampleInventory, InventoryApplyResult } from "../../domain/Exampl
 
 export const EXAMPLE_INVENTORY_RED_DOT = "examples/inventory";
 
-/** Account data exists before login, independently of services, Worlds and consumers. */
+/** 账号数据在登录前即存在，独立于服务、World 和消费者。 */
 export class ExampleInventoryData extends Laya.EventDispatcher implements ExampleInventoryQuery {
-    static readonly CHANGED = "example-inventory:changed";
+    public static readonly CHANGED = "example-inventory:changed";
     private generation = 0;
 
-    constructor(private readonly model: ExampleInventory) { super(); }
-    get items() { return this.model.items; }
-    get version(): number { return this.model.version; }
-    get totalQuantity(): number { return this.model.totalQuantity; }
-    snapshot() { return this.model.snapshot(); }
+    public constructor(private readonly model: ExampleInventory) {
+        super();
+    }
 
-    /** The connection keeps this capability; late packets from a previous account become invalid. */
-    createReceiver(): ExampleInventoryReceiver {
+    public get items() {
+        return this.model.items;
+    }
+
+    public get version(): number {
+        return this.model.version;
+    }
+
+    public get totalQuantity(): number {
+        return this.model.totalQuantity;
+    }
+
+    public snapshot() {
+        return this.model.snapshot();
+    }
+
+    /** 由连接持有此能力；旧账号之后才到达的数据包将失效。 */
+    public createReceiver(): ExampleInventoryReceiver {
         const generation = this.generation;
         const apply = (action: () => InventoryApplyResult): InventoryApplyResult => {
-            if (generation !== this.generation) return "invalid";
+            if (generation !== this.generation) {
+                return "invalid";
+            }
             const result = action();
-            if (result === "applied") this.event(ExampleInventoryData.CHANGED);
+            if (result === "applied") {
+                this.event(ExampleInventoryData.CHANGED);
+            }
             return result;
         };
         return {
@@ -29,10 +47,14 @@ export class ExampleInventoryData extends Laya.EventDispatcher implements Exampl
         };
     }
 
-    clear(): void {
+    public clear(): void {
         ++this.generation;
         this.model.clear();
         this.event(ExampleInventoryData.CHANGED);
     }
-    dispose(): void { this.clear(); this.offAll(); }
+
+    public dispose(): void {
+        this.clear();
+        this.offAll();
+    }
 }

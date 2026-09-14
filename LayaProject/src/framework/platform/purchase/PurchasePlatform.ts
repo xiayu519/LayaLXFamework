@@ -16,7 +16,7 @@ export interface PurchasePlatform {
 }
 
 export class PurchaseUnsupportedError extends Error {
-    constructor(readonly operation: "purchase" | "restore") {
+    public constructor(public readonly operation: "purchase" | "restore") {
         super(`Purchase operation '${operation}' is not supported on this platform.`);
         this.name = "PurchaseUnsupportedError";
     }

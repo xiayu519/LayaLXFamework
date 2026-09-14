@@ -24,7 +24,7 @@
     {"id":"ui_reference_ambiguous_bag","request":"按背包示意图制作界面，图中只有物品格和详情，没说明全屏还是弹窗，请按现有流程处理。","expected":["laya-ui2"]},
     {"id":"native_ui_scene_owner","request":"大厅里的全屏背包需要使用 IDE 生成的节点引用，并在切到战斗时清理隐藏页面和打开中的弹窗；按项目现有 UI 归属接入并验证。","expected":["laya-ui2"]},
     {"id":"red_dot","request":"背包按钮显示装备和道具的红点总数，列表项显示各自数量；接入现有红点组件，验证物品变化、行复用与页面关闭重开后的显示。","expected":["laya-ui2"]},
-    { "id": "unchanged_workflow_review", "request": "只读审查 AGENTS.md 是否准确区分单人维护、约 2–3 人使用和 Codex 默认单代理，不修改或重新设计任何工作流。", "expected": ["codex-workflow"] },
+    { "id": "unchanged_workflow_review", "request": "只读审查 AGENTS.md 是否准确体现单人开发、单人维护和 Codex 默认单代理，不修改或重新设计任何工作流。", "expected": ["codex-workflow"] },
     { "id": "negative_arithmetic", "request": "只回答 12 乘以 7 等于多少，不操作项目。", "expected": [] },
     { "id": "negative_translation", "request": "把这句话译成英文：欢迎回来。不读取或修改文件。", "expected": [] },
     { "id": "negative_term", "request": "用一句话解释什么是纯函数，不审查项目代码。", "expected": [] },

@@ -28,7 +28,7 @@ export interface UILayoutRect {
 export interface UILayoutSnapshot {
     readonly viewport: UILayoutRect;
     readonly safeArea: UILayoutRect;
-    /** Starts below reserved top host UI such as the WeChat menu capsule. */
+    /** 从宿主顶部保留 UI 的下方开始，例如微信菜单胶囊下方。 */
     readonly topSafeArea: UILayoutRect;
 }
 
@@ -41,6 +41,7 @@ export const UI_LAYOUT_NODE_NAMES = Object.freeze({
 });
 
 const EMPTY_RECT: UILayoutRect = Object.freeze({ x: 0, y: 0, width: 0, height: 0 });
+
 const EMPTY_LAYOUT: UILayoutSnapshot = Object.freeze({
     viewport: EMPTY_RECT,
     safeArea: EMPTY_RECT,
@@ -48,13 +49,13 @@ const EMPTY_LAYOUT: UILayoutSnapshot = Object.freeze({
 });
 
 export class UILayoutService {
-    readonly name = "ui-layout";
+    public readonly name = "ui-layout";
     private readonly listeners = new Set<(snapshot: UILayoutSnapshot) => void>();
     private readonly intrinsicSizes = new WeakMap<Laya.GWidget, Readonly<{ width: number; height: number }>>();
     private currentValue = EMPTY_LAYOUT;
     private started = false;
 
-    constructor(
+    public constructor(
         private readonly platform: UIHostViewportProvider,
         private readonly topAvoidanceGap = 8,
     ) {
@@ -63,31 +64,39 @@ export class UILayoutService {
         }
     }
 
-    start(): void {
-        if (this.started) return;
+    public start(): void {
+        if (this.started) {
+            return;
+        }
         this.started = true;
         void Laya.GRoot?.inst;
         const stage = Laya.stage;
         const resizeEvent = Laya.Event?.RESIZE;
-        if (stage && resizeEvent) stage.on(resizeEvent, this, this.refresh);
+        if (stage && resizeEvent) {
+            stage.on(resizeEvent, this, this.refresh);
+        }
         this.refresh();
     }
 
-    stop(): void {
-        if (!this.started) return;
+    public stop(): void {
+        if (!this.started) {
+            return;
+        }
         this.started = false;
         const stage = Laya.stage;
         const resizeEvent = Laya.Event?.RESIZE;
-        if (stage && resizeEvent) stage.off(resizeEvent, this, this.refresh);
+        if (stage && resizeEvent) {
+            stage.off(resizeEvent, this, this.refresh);
+        }
         this.listeners.clear();
     }
 
-    snapshot(): UILayoutSnapshot {
+    public snapshot(): UILayoutSnapshot {
         return this.currentValue;
     }
 
-    /** Clip platform safe areas to a screen-space host and express them in its local coordinates. */
-    snapshotForHost(host: UIHostRect): UILayoutSnapshot {
+    /** 将平台安全区裁剪到屏幕空间宿主内，并转换为宿主局部坐标。 */
+    public snapshotForHost(host: UIHostRect): UILayoutSnapshot {
         const clip = (area: UILayoutRect): UILayoutRect => {
             const x = clamp(area.x - host.x, 0, host.width);
             const y = clamp(area.y - host.y, 0, host.height);
@@ -95,11 +104,13 @@ export class UILayoutService {
             const bottom = clamp(area.y + area.height - host.y, y, host.height);
             return freezeRect(x, y, right - x, bottom - y);
         };
-        return Object.freeze({ viewport: freezeRect(0, 0, host.width, host.height),
-            safeArea: clip(this.currentValue.safeArea), topSafeArea: clip(this.currentValue.topSafeArea) });
+        return Object.freeze({
+            viewport: freezeRect(0, 0, host.width, host.height),
+            safeArea: clip(this.currentValue.safeArea), topSafeArea: clip(this.currentValue.topSafeArea)
+        });
     }
 
-    subscribe(listener: (snapshot: UILayoutSnapshot) => void): () => void {
+    public subscribe(listener: (snapshot: UILayoutSnapshot) => void): () => void {
         this.listeners.add(listener);
         if (this.currentValue.viewport.width > 0 && this.currentValue.viewport.height > 0) {
             listener(this.currentValue);
@@ -107,54 +118,75 @@ export class UILayoutService {
         return () => this.listeners.delete(listener);
     }
 
-    refresh = (): void => {
+    public refresh = (): void => {
         const next = createLayoutSnapshot(this.platform.viewport, this.topAvoidanceGap);
-        if (sameLayout(this.currentValue, next)) return;
+        if (sameLayout(this.currentValue, next)) {
+            return;
+        }
         this.currentValue = next;
         for (const listener of this.listeners) listener(next);
     };
 
-    apply(window: Laya.GWindow, mode: UIWindowLayout): void {
+    public apply(window: Laya.GWindow, mode: UIWindowLayout): void {
         this.refresh();
         const layout = this.currentValue;
-        if (layout.viewport.width <= 0 || layout.viewport.height <= 0) return;
+        if (layout.viewport.width <= 0 || layout.viewport.height <= 0) {
+            return;
+        }
         const target = mode === "safe-screen" ? layout.topSafeArea : layout.viewport;
         setRect(window, target);
         this.applyView(window.contentPane, mode, true);
     }
 
-    /** Layout a native Runtime prefab directly under a scene's screen-space uiRoot. */
-    applyView(pane: Laya.GWidget, mode: UIWindowLayout = "fullscreen", inWindow = false,
+    /** 直接在场景的屏幕空间 uiRoot 下布局原生 Runtime 预制体。 */
+    public applyView(pane: Laya.GWidget, mode: UIWindowLayout = "fullscreen", inWindow = false,
         hostLayout?: UILayoutSnapshot): void {
         this.refresh();
         const layout = hostLayout ?? this.currentValue;
-        if (layout.viewport.width <= 0 || layout.viewport.height <= 0) return;
+        if (layout.viewport.width <= 0 || layout.viewport.height <= 0) {
+            return;
+        }
         const target = mode === "safe-screen" ? layout.topSafeArea : layout.viewport;
         setRect(pane, freezeRect(0, 0, target.width, target.height));
-        if (!inWindow) { pane.x = target.x; pane.y = target.y; }
-        if (mode === "fullscreen" || mode === "center-popup") this.applyFullScreenShell(pane, layout);
+        if (!inWindow) {
+            pane.x = target.x;
+            pane.y = target.y;
+        }
+        if (mode === "fullscreen" || mode === "center-popup") {
+            this.applyFullScreenShell(pane, layout);
+        }
         if (mode === "center-popup") {
             const full = childWidget(pane, UI_LAYOUT_NODE_NAMES.full);
-            if (full) setRect(full, layout.viewport);
+            if (full) {
+                setRect(full, layout.viewport);
+            }
             const safe = childWidget(pane, UI_LAYOUT_NODE_NAMES.safeContent);
             const mid = safe && childWidget(safe, UI_LAYOUT_NODE_NAMES.mid);
-            if (!safe || !mid) throw new Error("center-popup requires safeContent/mid under its fullscreen root.");
+            if (!safe || !mid) {
+                throw new Error("center-popup requires safeContent/mid under its fullscreen root.");
+            }
             setRect(safe, layout.safeArea);
             this.fitContent(mid, freezeRect(0, layout.topSafeArea.y - layout.safeArea.y,
                 layout.topSafeArea.width, layout.topSafeArea.height));
-            // Empty fullscreen containers pass input to GRoot.modalLayer; the card absorbs interior clicks.
+            // 空白全屏容器将输入传给 GRoot.modalLayer；卡片内部自行接收点击。
             pane.mouseThrough = safe.mouseThrough = true;
             mid.mouseThrough = false;
             mid.mouseEnabled = true;
-            if (full) full.mouseThrough = true;
+            if (full) {
+                full.mouseThrough = true;
+            }
         }
     }
 
     private applyFullScreenShell(pane: Laya.GWidget, layout: UILayoutSnapshot): void {
         const full = childWidget(pane, UI_LAYOUT_NODE_NAMES.full);
-        if (full) setRect(full, layout.viewport);
+        if (full) {
+            setRect(full, layout.viewport);
+        }
         const safe = childWidget(pane, UI_LAYOUT_NODE_NAMES.safeContent);
-        if (!safe) return;
+        if (!safe) {
+            return;
+        }
         setRect(safe, layout.safeArea);
         const top = childWidget(safe, UI_LAYOUT_NODE_NAMES.top);
         if (top) {
@@ -174,9 +206,8 @@ export class UILayoutService {
             const height = Math.min(size.height, layout.safeArea.height);
             setRect(bottom, freezeRect(0, layout.safeArea.height - height, layout.safeArea.width, height));
         }
-
-        // Scrollable content fills the remaining safe area at its original scale.
-        // This scoped full slot is distinct from pane/full, which covers the entire screen.
+        // 可滚动内容保持原始缩放，填满剩余安全区。
+        // 此处的 full 槽位只覆盖当前区域，pane/full 则覆盖整个屏幕。
         const contentFull = childWidget(safe, UI_LAYOUT_NODE_NAMES.full);
         if (contentFull) {
             const start = top ? top.y + top.height : layout.topSafeArea.y - layout.safeArea.y;
@@ -187,8 +218,8 @@ export class UILayoutService {
 
         const mid = childWidget(safe, UI_LAYOUT_NODE_NAMES.mid);
         if (mid) {
-            // Preserve the safe-area center, including when the capsule moves only the top slot.
-            // Reserve equal space on both sides of that center so the slots cannot overlap.
+            // 保留安全区中心，即使胶囊只推动了顶部槽位也不改变中心。
+            // 在中心两侧预留等量空间，防止槽位重叠。
             const reservedHeight = Math.max(top && top.height > 0 ? top.y + top.height : 0, bottom?.height ?? 0);
             const availableHeight = Math.max(0, layout.safeArea.height - 2 * reservedHeight);
             this.fitContent(mid, freezeRect(0, reservedHeight,
@@ -222,7 +253,9 @@ function createLayoutSnapshot(
     const stage = Laya.stage;
     const width = finiteSize(stage?.width) || finiteSize(root?.width);
     const height = finiteSize(stage?.height) || finiteSize(root?.height);
-    if (width <= 0 || height <= 0) return EMPTY_LAYOUT;
+    if (width <= 0 || height <= 0) {
+        return EMPTY_LAYOUT;
+    }
 
     const viewport = freezeRect(0, 0, width, height);
     const safeArea = mapPlatformRect(platformViewport.safeArea, platformViewport.width, platformViewport.height, viewport)
@@ -247,7 +280,9 @@ function mapPlatformRect(
     platformHeight: number,
     viewport: UILayoutRect,
 ): UILayoutRect | undefined {
-    if (!source || platformWidth <= 0 || platformHeight <= 0) return undefined;
+    if (!source || platformWidth <= 0 || platformHeight <= 0) {
+        return undefined;
+    }
     const left = clamp(source.x / platformWidth * viewport.width, 0, viewport.width);
     const top = clamp(source.y / platformHeight * viewport.height, 0, viewport.height);
     const right = clamp((source.x + source.width) / platformWidth * viewport.width, left, viewport.width);

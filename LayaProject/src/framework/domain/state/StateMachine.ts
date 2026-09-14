@@ -19,7 +19,7 @@ export interface StateMachineSnapshot<TState> {
 }
 
 export class InvalidStateTransitionError extends Error {
-    constructor(readonly state: unknown, readonly event: unknown) {
+    public constructor(public readonly state: unknown, public readonly event: unknown) {
         super(`No state transition accepts event '${String(event)}' from '${String(state)}'.`);
         this.name = "InvalidStateTransitionError";
     }
@@ -30,22 +30,22 @@ export class StateMachine<TState, TEvent, TPayload = void> {
     private sequenceValue = 0;
     private dispatching = false;
 
-    constructor(
+    public constructor(
         initialState: TState,
         private readonly transitions: readonly StateTransition<TState, TEvent, TPayload>[],
     ) {
         this.currentState = initialState;
     }
 
-    get state(): TState {
+    public get state(): TState {
         return this.currentState;
     }
 
-    get sequence(): number {
+    public get sequence(): number {
         return this.sequenceValue;
     }
 
-    can(event: TEvent, payload: TPayload): boolean {
+    public can(event: TEvent, payload: TPayload): boolean {
         this.beginOperation();
         try {
             return this.findCandidates(event, payload).length === 1;
@@ -54,7 +54,7 @@ export class StateMachine<TState, TEvent, TPayload = void> {
         }
     }
 
-    dispatch(event: TEvent, payload: TPayload): StateTransitionResult<TState, TEvent> {
+    public dispatch(event: TEvent, payload: TPayload): StateTransitionResult<TState, TEvent> {
         this.beginOperation();
         try {
             const candidates = this.findCandidates(event, payload);
@@ -81,7 +81,7 @@ export class StateMachine<TState, TEvent, TPayload = void> {
         }
     }
 
-    snapshot(): StateMachineSnapshot<TState> {
+    public snapshot(): StateMachineSnapshot<TState> {
         return Object.freeze({ state: this.currentState, sequence: this.sequenceValue });
     }
 

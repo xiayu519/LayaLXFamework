@@ -6,34 +6,47 @@ export interface PendingServiceOperation {
 }
 
 export class ServiceOperationError extends Error {
-    constructor(readonly serviceName: string, readonly phase: "start" | "stop",
-        readonly reason: "timeout" | "cancelled", readonly timeoutMs: number) {
+    public constructor(public readonly serviceName: string, public readonly phase: "start" | "stop",
+        public readonly reason: "timeout" | "cancelled", public readonly timeoutMs: number) {
         super(`Service '${serviceName}' ${phase} ${reason} (deadline ${timeoutMs}ms).`);
         this.name = "ServiceOperationError";
     }
 }
 
 class LateServiceCleanupError extends Error {
-    constructor(readonly serviceName: string, readonly cause: unknown) {
+    public constructor(public readonly serviceName: string, public readonly cause: unknown) {
         super(`Service '${serviceName}' late cleanup failed: ${cause instanceof Error ? cause.message : String(cause)}`);
         this.name = "LateServiceCleanupError";
     }
 }
 
-/** Tracks the actual promises even after the caller's bounded wait has ended. */
+/** 即使调用方的限时等待已经结束，仍跟踪实际 Promise。 */
 export class ServiceOperations {
     private sequence = 0;
     private readonly pending = new Map<number, {
         serviceName: string; phase: "start" | "stop"; startedAt: number; abandoned: boolean;
     }>();
-    readonly lateErrors: unknown[] = [];
+    public readonly lateErrors: unknown[] = [];
+    private readonly idleWaiters = new Set<() => void>();
 
-    snapshot(): readonly PendingServiceOperation[] {
+    public waitForIdle(): Promise<void> {
+        return this.pending.size ? new Promise(resolve => this.idleWaiters.add(resolve)) : Promise.resolve();
+    }
+
+    private complete(id: number): void {
+        this.pending.delete(id);
+        if (!this.pending.size) {
+            for (const resolve of this.idleWaiters) resolve();
+            this.idleWaiters.clear();
+        }
+    }
+
+    public snapshot(): readonly PendingServiceOperation[] {
         return Array.from(this.pending.values(), ({ startedAt, ...entry }) =>
             Object.freeze({ ...entry, elapsedMs: Math.max(0, Date.now() - startedAt) }));
     }
 
-    run(serviceName: string, phase: "start" | "stop", timeoutMs: number,
+    public run(serviceName: string, phase: "start" | "stop", timeoutMs: number,
         action: (signal: AbortSignal) => void | Promise<void>,
         signal?: AbortSignal, compensateLate?: () => Promise<void>,
         onLateSettled?: (failed: boolean, cause?: unknown) => void): Promise<void> {
@@ -51,7 +64,9 @@ export class ServiceOperations {
                 signal?.removeEventListener("abort", cancel);
             };
             const abandon = (reason: "timeout" | "cancelled"): void => {
-                if (settled) return;
+                if (settled) {
+                    return;
+                }
                 settled = true;
                 record.abandoned = true;
                 cleanup();
@@ -75,11 +90,11 @@ export class ServiceOperations {
                     try {
                         onLateSettled?.(failed, error);
                         if (compensateLate) {
-                            // Keep the original operation visible until compensation
-                            // synchronously registers its own actual pending work.
+                            // 保留原始操作记录，直到补偿流程
+                            // 同步登记其实际尚未完成的工作。
                             void compensateLate().catch((cause: unknown) => {
-                                // A deadline only abandons waiting. The actual stop
-                                // will report success/failure through onLateSettled.
+                                // 超过时限只结束等待；实际停止的
+                                // 成功或失败仍由 onLateSettled 报告。
                                 if (!(cause instanceof ServiceOperationError)) {
                                     this.lateErrors.push(new LateServiceCleanupError(serviceName, cause));
                                 }
@@ -88,15 +103,18 @@ export class ServiceOperations {
                     } catch (cause) {
                         this.lateErrors.push(new LateServiceCleanupError(serviceName, cause));
                     } finally {
-                        this.pending.delete(id);
+                        this.complete(id);
                     }
                     return;
                 }
-                this.pending.delete(id);
+                this.complete(id);
                 settled = true;
                 cleanup();
-                if (failed) reject(error);
-                else resolve();
+                if (failed) {
+                    reject(error);
+                } else {
+                    resolve();
+                }
             };
             operation.then(() => finish(), (error: unknown) => finish(error, true));
         });

@@ -10,7 +10,7 @@ class FakeWidget {
     height = 300;
     scaleX = 1;
     scaleY = 1;
-    // Native GWindow starts in auto mode, whose public boolean getter returns false.
+    // 原生 GWindow 初始使用自动模式，其公开布尔属性读取为 false。
     mouseEnabled = false;
 
     readonly children = new Map<string, FakeWidget>();
@@ -149,7 +149,7 @@ describe("BaseGameWindow popup transition", () => {
         window.hide(); window.hide();
         expect(window.closedCount).toBe(0);
         tweens[1].complete(); tweens[1].fireLateCallback();
-        expect(window.closedCount).toBe(0); // Native UNDISPLAY bookkeeping has not returned yet.
+        expect(window.closedCount).toBe(0); // 原生 UNDISPLAY 的内部记录更新尚未返回。
         await Promise.resolve();
         expect(window.closedCount).toBe(1);
         await window.present("second"); tweens[2].complete();

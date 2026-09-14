@@ -1,4 +1,4 @@
-/** Read only root scalar fields used by evaluation; do not attempt to reimplement TOML. */
+/** 只读取评测使用的根级标量字段，不重新实现 TOML 解析器。 */
 export function evaluationPolicy(config, environment = {}) {
     const root = config.split(/^\s*\[/m, 1)[0];
     const field = (name) => {
@@ -44,7 +44,7 @@ export function validateEvaluationSettings(settings) {
     return settings;
 }
 
-/** A routing classifier must not read its expected answers or perform any task actions. */
+/** 路由分类器不得读取预期答案，也不得执行任务操作。 */
 export function assertToolFreeTranscript(events) {
     const completed = events.filter((event) => event.type === "turn.completed");
     if (completed.length !== 1) throw new Error("Expected exactly one completed evaluation turn.");

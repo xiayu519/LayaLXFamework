@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 
-// Opt-in integration check: ordinary unit/workflow tests must not recursively run verify.
+// 按需运行的集成检查：普通单元测试和工作流测试不得递归执行 verify。
 const npmCli = process.env.npm_execpath;
 if (!npmCli) throw new Error("Run through npm run test:verification.");
 const result = spawnSync(process.execPath, [npmCli, "run", "verify"], {

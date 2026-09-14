@@ -1,7 +1,7 @@
 export type Cleanup = () => void;
 
 export class LifetimeCleanupError extends Error {
-    constructor(readonly errors: readonly unknown[]) {
+    public constructor(public readonly errors: readonly unknown[]) {
         super(`${errors.length} cleanup operation(s) failed.`);
         this.name = "LifetimeCleanupError";
     }
@@ -11,15 +11,15 @@ export class LifetimeScope {
     private cleanups: Cleanup[] = [];
     private disposedValue = false;
 
-    get disposed(): boolean {
+    public get disposed(): boolean {
         return this.disposedValue;
     }
 
-    get size(): number {
+    public get size(): number {
         return this.cleanups.length;
     }
 
-    defer(cleanup: Cleanup): Cleanup {
+    public defer(cleanup: Cleanup): Cleanup {
         if (this.disposedValue) {
             cleanup();
             return cleanup;
@@ -28,7 +28,7 @@ export class LifetimeScope {
         return cleanup;
     }
 
-    dispose(): void {
+    public dispose(): void {
         if (this.disposedValue) {
             return;
         }

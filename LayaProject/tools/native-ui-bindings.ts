@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join, relative } from "node:path";
 
-/** Runs the IDE's RuntimeCodeGenerator through its public scene save workflow. */
+/** 通过 IDE 公开的场景保存流程调用其 RuntimeCodeGenerator。 */
 @IEditor.regClass()
 class NativeUIBindings {
     static async generate(...assetPaths: string[]): Promise<void> {
@@ -25,7 +25,7 @@ class NativeUIBindings {
             const sceneId = `native-ui-bindings-${asset.id}`;
             await Editor.sceneManager.openScene(sceneId, asset.id);
             try {
-                // Saving also applies the IDE's native asset serialization.
+                // 保存时也会应用 IDE 的原生资源序列化。
                 await Editor.sceneManager.saveScene(sceneId);
             } finally {
                 await Editor.sceneManager.closeScene(sceneId);

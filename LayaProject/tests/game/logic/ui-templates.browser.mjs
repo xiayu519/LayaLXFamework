@@ -109,7 +109,7 @@ async function runTemplates() {
         maskClick();
         assert(!lower.isPopupHiding, "duplicate mask click closed the lower popup");
         shellStable(upper);
-        // Resize while hiding: the previous Tween must never restore obsolete coordinates or fire twice.
+        // 隐藏期间调整尺寸：旧 Tween 不能恢复过期坐标，也不能重复触发回调。
         Object.defineProperty(platform, "viewport", { configurable: true, get: () => viewport });
         Laya.stage.event(Laya.Event.RESIZE);
         await wait(() => upper.destroyed, "upper destroy");
@@ -128,7 +128,7 @@ async function runTemplates() {
         maskBelow(lower);
         maskClick();
         assert(!lower.isPopupHiding && !custom.isPopupHiding, "nonmodal top allowed lower mask close");
-        // Test-only full-screen control, using the same native Size Relation documented for .lh.
+        // 仅供测试的全屏控件，使用 .lh 文档中相同的原生尺寸关联。
         const full = custom.contentPane.getChild("full");
         const button = new Laya.GButton(); full.addChild(button); button.size(full.width, full.height);
         button.addRelation(full, Laya.RelationType.Size);

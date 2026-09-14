@@ -24,16 +24,15 @@ export interface SceneTransitionPauseContext {
 }
 
 /**
- * Base class for scenes opened through SceneFlow.
+ * 通过 SceneFlow 打开的场景基类。
  *
- * The hierarchy declared by the .ls file is loaded before describeResources is
- * called. Extra resources must therefore describe only runtime-selected content
- * that is not already a hierarchy dependency.
+ * 调用 describeResources 前，.ls 声明的节点层级已加载完成。
+ * 额外资源只应声明运行时选择的内容，
+ * 不要重复声明已有的层级依赖。
  */
 export abstract class BaseGameScene<TArgs = void> extends Laya.Scene {
-    /** Native Runtime export variable uiRoot, or assign an exported node before first accessing ui. */
-    uiRoot: Laya.GWidget | null = null;
-
+    /** 使用原生 Runtime 导出变量 uiRoot，或在首次访问 ui 前赋值为已导出的节点。 */
+    public uiRoot: Laya.GWidget | null = null;
     private readonly sceneLifetime = new LifetimeScope();
     private readonly sceneController = new AbortController();
     private transitionLoadingCompletion: (() => void) | undefined;
@@ -42,132 +41,164 @@ export abstract class BaseGameScene<TArgs = void> extends Laya.Scene {
     private uiFactory: (() => SceneUI) | undefined;
     private uiValue: SceneUI | undefined;
 
-    /** Cancel scene-owned async acquisitions; unlike transition context.signal this spans the whole scene. */
-    get signal(): AbortSignal { return this.sceneController.signal; }
+    /** 取消场景持有的异步获取；与切换过程的 context.signal 不同，此信号覆盖场景完整生命周期。 */
+    public get signal(): AbortSignal {
+        return this.sceneController.signal;
+    }
 
-    /** This scene instance's UI; never implicitly redirects to SceneFlow.current. */
-    get ui(): SceneUI {
-        if (this.destroyed || this.transitionLeaving && !this.uiValue) throw new Error("Scene UI is no longer available.");
+    /** 当前场景实例持有的 UI，不会隐式转向 SceneFlow.current。 */
+    public get ui(): SceneUI {
+        if (this.destroyed || this.transitionLeaving && !this.uiValue) {
+            throw new Error("Scene UI is no longer available.");
+        }
         if (!this.uiValue) {
-            if (!this.uiFactory) throw new Error("Scene UI is not configured; open this scene through lx.scenes.");
+            if (!this.uiFactory) {
+                throw new Error("Scene UI is not configured; open this scene through lx.scenes.");
+            }
             this.uiValue = this.uiFactory();
         }
         return this.uiValue;
     }
 
-    /** @internal Configured before preparation; scenes that have no UI allocate no UI context. */
-    configureUI(factory: () => SceneUI): void {
-        if (this.uiFactory) throw new Error("Scene UI was already configured.");
+    /** @internal 在准备阶段前配置；没有 UI 的场景不分配 UI 上下文。 */
+    public configureUI(factory: () => SceneUI): void {
+        if (this.uiFactory) {
+            throw new Error("Scene UI was already configured.");
+        }
         this.uiFactory = factory;
     }
 
-    /** @internal Pending native loads must settle before Scene.gc can collect old hierarchy dependencies. */
-    async waitForUI(): Promise<void> { await this.uiValue?.waitForPendingLoads(); }
+    /** @internal 必须等待原生加载结束，Scene.gc 才能回收旧层级依赖。 */
+    public async waitForUI(): Promise<void> {
+        await this.uiValue?.waitForPendingLoads();
+    }
 
-    constructor() {
+    public constructor() {
         super();
         this.autoDestroyAtClosed = true;
     }
 
-    /** Extra, runtime-selected resources required before this scene is opened. */
+    /** 场景打开前需要加载的额外资源，由运行时选择。 */
     protected describeResources(_args: TArgs): readonly SceneResourceRequest[] {
         return [];
     }
 
-    /** Runs after all declared resources load and before the scene is opened. */
-    protected onPrepare(_context: ScenePhaseContext<TArgs>): void | Promise<void> {}
+    /** 所有声明资源加载完成后、场景打开前执行。 */
+    protected onPrepare(_context: ScenePhaseContext<TArgs>): void | Promise<void> {
+    }
 
-    /** Runs after open while the loading overlay still covers the scene. */
-    protected onWaitUntilReady(_context: ScenePhaseContext<TArgs>): void | Promise<void> {}
+    /** 场景打开后执行，此时 Loading 仍覆盖场景。 */
+    protected onWaitUntilReady(_context: ScenePhaseContext<TArgs>): void | Promise<void> {
+    }
 
-    /** Pauses outgoing side effects after Loading is visible and before destructive release. */
-    protected onTransitionPause(_context: SceneTransitionPauseContext): void | Promise<void> {}
+    /** Loading 可见后、开始销毁资源前，暂停旧场景的副作用。 */
+    protected onTransitionPause(_context: SceneTransitionPauseContext): void | Promise<void> {
+    }
 
-    /** Resumes only when transition failure happens before destructive release starts. */
-    protected onTransitionResume(): void | Promise<void> {}
+    /** 仅在切换失败且尚未开始销毁资源时恢复。 */
+    protected onTransitionResume(): void | Promise<void> {
+    }
 
-    /** Runs once immediately before this scene is destroyed and its resources are collected. */
-    protected onTransitionLeaving(): void | Promise<void> {}
+    /** 场景销毁和资源回收前执行一次。 */
+    protected onTransitionLeaving(): void | Promise<void> {
+    }
 
-    /** Registers scene-owned UI handles, timers, tweens or other synchronous cleanup. */
+    /** 登记场景持有的 UI 句柄、timer、Tween 或其他同步清理操作。 */
     protected own(cleanup: Cleanup): Cleanup {
         return this.sceneLifetime.defer(cleanup);
     }
 
     /**
-     * Completes this scene's request-owned loading session when autoCloseLoading is false.
-     * Calls from a stale or destroyed scene are ignored by SceneFlow.
+     * autoCloseLoading 为 false 时，结束本场景请求持有的 Loading 展示。
+     * SceneFlow 会忽略失效或已销毁场景发起的调用。
      */
     protected completeTransitionLoading(): void {
         this.transitionLoadingCompletion?.();
     }
 
-    /** @internal Called only by SceneFlow. */
-    getTransitionResources(args: TArgs): readonly SceneResourceRequest[] {
+    /** @internal 仅由 SceneFlow 调用。 */
+    public getTransitionResources(args: TArgs): readonly SceneResourceRequest[] {
         return this.describeResources(args);
     }
 
-    /** @internal Called only by SceneFlow. */
-    prepareForTransition(context: ScenePhaseContext<TArgs>): void | Promise<void> {
+    /** @internal 仅由 SceneFlow 调用。 */
+    public prepareForTransition(context: ScenePhaseContext<TArgs>): void | Promise<void> {
         return this.onPrepare(context);
     }
 
-    /** @internal Called only by SceneFlow. */
-    waitUntilTransitionReady(context: ScenePhaseContext<TArgs>): void | Promise<void> {
+    /** @internal 仅由 SceneFlow 调用。 */
+    public waitUntilTransitionReady(context: ScenePhaseContext<TArgs>): void | Promise<void> {
         return this.onWaitUntilReady(context);
     }
 
-    /** @internal Called only by SceneFlow. */
-    async pauseForTransition(context: SceneTransitionPauseContext): Promise<void> {
-        if (this.transitionPaused || this.transitionLeaving) return;
+    /** @internal 仅由 SceneFlow 调用。 */
+    public async pauseForTransition(context: SceneTransitionPauseContext): Promise<void> {
+        if (this.transitionPaused || this.transitionLeaving) {
+            return;
+        }
         await this.onTransitionPause(context);
         this.transitionPaused = true;
     }
 
-    /** @internal Called only by SceneFlow. */
-    async resumeAfterTransitionFailure(): Promise<void> {
-        if (!this.transitionPaused || this.transitionLeaving || this.destroyed) return;
+    /** @internal 仅由 SceneFlow 调用。 */
+    public async resumeAfterTransitionFailure(): Promise<void> {
+        if (!this.transitionPaused || this.transitionLeaving || this.destroyed) {
+            return;
+        }
         await this.onTransitionResume();
         this.transitionPaused = false;
     }
 
-    /** @internal Called only by SceneFlow. */
-    async leaveForTransition(): Promise<void> {
-        if (this.transitionLeaving || this.destroyed) return;
+    /** @internal 仅由 SceneFlow 调用。 */
+    public async leaveForTransition(): Promise<void> {
+        if (this.transitionLeaving || this.destroyed) {
+            return;
+        }
         this.transitionLeaving = true;
         this.sceneController.abort();
         await this.onTransitionLeaving();
     }
 
-    /** @internal Called only by SceneFlow. */
-    bindTransitionLoadingCompletion(completion: () => void): void {
+    /** @internal 仅由 SceneFlow 调用。 */
+    public bindTransitionLoadingCompletion(completion: () => void): void {
         this.transitionLoadingCompletion = completion;
     }
 
-    override destroy(destroyChild = true): void {
-        if (this.destroyed) return;
+    public override destroy(destroyChild = true): void {
+        if (this.destroyed) {
+            return;
+        }
         this.sceneController.abort();
         this.transitionLoadingCompletion = undefined;
         this.uiFactory = undefined;
         const errors: unknown[] = [];
-        try { this.uiValue?.dispose(); } catch (error) { errors.push(error); }
+        try {
+            this.uiValue?.dispose();
+        } catch (error) {
+            errors.push(error);
+        }
         try {
             this.sceneLifetime.dispose();
         } catch (error) {
-            if (error instanceof LifetimeCleanupError) errors.push(...error.errors);
-            else errors.push(error);
+            if (error instanceof LifetimeCleanupError) {
+                errors.push(...error.errors);
+            } else {
+                errors.push(error);
+            }
         }
         try {
             super.destroy(destroyChild);
         } catch (error) {
             errors.push(error);
         }
-        if (errors.length > 0) throw new SceneLifecycleCleanupError(errors);
+        if (errors.length > 0) {
+            throw new SceneLifecycleCleanupError(errors);
+        }
     }
 }
 
 export class SceneLifecycleCleanupError extends Error {
-    constructor(readonly errors: readonly unknown[]) {
+    public constructor(public readonly errors: readonly unknown[]) {
         super(`${errors.length} scene cleanup operation(s) failed.`);
         this.name = "SceneLifecycleCleanupError";
     }

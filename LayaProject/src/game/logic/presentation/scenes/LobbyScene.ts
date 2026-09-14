@@ -3,7 +3,7 @@ import type { ExampleSceneArgs } from "../../application/ExampleWorlds";
 
 const { regClass } = Laya;
 
-/** Scene owned by the lobby World; its native uiRoot owns the lobby page and opened windows. */
+/** 大厅 World 持有此场景；原生 uiRoot 持有大厅页面及其打开的窗口。 */
 @regClass()
 export class LobbyScene extends BaseGameScene<ExampleSceneArgs> {
     protected override async onWaitUntilReady(context: ScenePhaseContext<ExampleSceneArgs>): Promise<void> {

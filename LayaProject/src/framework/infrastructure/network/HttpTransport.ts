@@ -2,7 +2,9 @@ import { createEngineHttpRequest } from "./EngineHttpRequest";
 import { prepareHttpPayload, type PreparedHttpPayload } from "./HttpPayload";
 
 export type HttpMethod = "GET" | "POST" | "HEAD";
+
 export type HttpResponseType = "text" | "json" | "arraybuffer";
+
 export type HttpErrorKind =
     | "validation"
     | "initialization"
@@ -15,11 +17,11 @@ export type HttpErrorKind =
     | "dispatch";
 
 export interface HttpRetryPolicy {
-    /** Total attempts, including the initial request. Range: 1..5. */
+    /** 包含首次请求在内的总尝试次数，范围为 1..5。 */
     readonly maxAttempts: number;
-    /** Range: 0..2_147_483_647. */
+    /** 取值范围为 0..2_147_483_647。 */
     readonly baseDelayMs?: number;
-    /** Range: baseDelayMs..2_147_483_647. */
+    /** 取值范围为 baseDelayMs..2_147_483_647。 */
     readonly maxDelayMs?: number;
     readonly jitterRatio?: number;
     readonly statusCodes?: readonly number[];
@@ -28,17 +30,17 @@ export interface HttpRetryPolicy {
 export interface HttpRequestOptions {
     readonly method?: HttpMethod;
     readonly headers?: Readonly<Record<string, string>>;
-    /** String, plain JSON object/array, ArrayBuffer, or ArrayBufferView. */
+    /** 支持字符串、普通 JSON 对象或数组、ArrayBuffer 和 ArrayBufferView。 */
     readonly body?: unknown;
     readonly responseType?: HttpResponseType;
-    /** Runs after decoding, including null for JSON HEAD/204/205 responses. */
+    /** 解码后执行；JSON 格式的 HEAD/204/205 响应会传入 null。 */
     readonly validate?: (value: unknown) => boolean;
-    /** Range: 0..2_147_483_647. Zero disables the request timeout. */
+    /** 取值范围为 0..2_147_483_647；设为 0 时禁用请求超时。 */
     readonly timeoutMs?: number;
     readonly signal?: AbortSignal;
-    /** Required before POST retries are allowed. Also sent as Idempotency-Key. */
+    /** POST 重试前必须提供，同时通过 Idempotency-Key 请求头发送。 */
     readonly idempotencyKey?: string;
-    /** Retries are disabled unless this policy is present with maxAttempts > 1. */
+    /** 仅在提供此策略且 maxAttempts > 1 时启用重试。 */
     readonly retry?: HttpRetryPolicy;
 }
 
@@ -46,7 +48,7 @@ export interface HttpResponse<T> {
     readonly url: string;
     readonly status: number;
     readonly data: T;
-    /** Lowercase names; only headers exposed by the platform/CORS are available. */
+    /** 名称统一小写；只能读取平台或 CORS 允许暴露的响应头。 */
     readonly headers: Readonly<Record<string, string>>;
 }
 
@@ -55,15 +57,15 @@ export interface HttpTransport {
 }
 
 export class HttpTransportError extends Error {
-    constructor(
+    public constructor(
         message: string,
-        readonly url: string,
-        readonly status: number,
-        readonly kind: HttpErrorKind,
-        readonly retryable: boolean,
-        readonly attempt: number,
-        readonly maxAttempts: number,
-        readonly cause?: unknown,
+        public readonly url: string,
+        public readonly status: number,
+        public readonly kind: HttpErrorKind,
+        public readonly retryable: boolean,
+        public readonly attempt: number,
+        public readonly maxAttempts: number,
+        public readonly cause?: unknown,
     ) {
         super(message);
         this.name = "HttpTransportError";
@@ -79,10 +81,11 @@ interface ResolvedRetryPolicy {
 }
 
 const DEFAULT_RETRY_STATUSES = [408, 425, 429, 500, 502, 503, 504] as const;
+
 const MAX_TIMER_DELAY_MS = 2_147_483_647;
 
 export class LayaHttpTransport implements HttpTransport {
-    async request<T>(url: string, options: HttpRequestOptions = {}): Promise<HttpResponse<T>> {
+    public async request<T>(url: string, options: HttpRequestOptions = {}): Promise<HttpResponse<T>> {
         const method = options.method ?? "GET";
         const timeoutMs = options.timeoutMs ?? 15_000;
         const retry = resolveRetryPolicy(options.retry);
@@ -210,7 +213,7 @@ export class LayaHttpTransport implements HttpTransport {
                             ? null
                             : JSON.parse(data as string);
                     } catch {
-                        // Native SyntaxError messages can contain response content.
+                        // 原生 SyntaxError 消息可能包含响应正文。
                         fail("HTTP response is not valid JSON.", "parse", status);
                         return;
                     }
@@ -220,14 +223,16 @@ export class LayaHttpTransport implements HttpTransport {
                     try {
                         valid = options.validate(data) === true;
                     } catch {
-                        // Validator errors must not leak the response into diagnostics.
+                        // 校验器错误不能将响应正文泄露到诊断信息中。
                     }
                     if (!valid) {
                         fail("HTTP response failed schema validation.", "schema", status);
                         return;
                     }
                 }
-                if (settled) return;
+                if (settled) {
+                    return;
+                }
                 settled = true;
                 const headers = readResponseHeaders(request);
                 cleanup();
@@ -386,7 +391,9 @@ function readResponseHeaders(request: Laya.HttpRequest): Readonly<Record<string,
     }
     for (const line of raw.split(/\r?\n/)) {
         const separator = line.indexOf(":");
-        if (separator < 1) continue;
+        if (separator < 1) {
+            continue;
+        }
         const name = line.slice(0, separator).trim().toLowerCase();
         const value = line.slice(separator + 1).trim();
         headers[name] = headers[name] ? `${headers[name]}, ${value}` : value;

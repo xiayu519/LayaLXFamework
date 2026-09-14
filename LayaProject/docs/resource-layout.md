@@ -26,7 +26,7 @@ assets/
 ## 放置规则
 
 - `bootstrap` 不表示框架归属，也不再划分 framework/game。Startup、Loading、Tip、首个业务 UI、配置和 Tables 均由游戏维护；默认资源随项目模板提供，框架同步不覆盖这些文件。
-- `src/framework` 保留通用流程；应用组合根通过 `ApplicationDefinition.tipPrefabUrl` 选择提示 Prefab，通过已有 `createSceneLoadingPresenter` 提供 Loading。示例的 Loading Runtime、原生生成绑定与展示实现位于 `src/game/logic/presentation/ui/`，修改界面不需要编辑框架文件。
+- `src/framework` 保留通用流程；游戏配置通过 `ApplicationConfig.tipPrefabUrl` 选择提示 Prefab，通过 `createSceneLoadingPresenter` 提供场景切换 Loading。启动 Loading 由 AppEntry 先直接打开。具体 Runtime、原生生成绑定与展示实现位于 `src/game/logic/presentation/`，修改界面不需要编辑框架文件。
 - JSON 按用途放进 `config/data/maps/levels`；扩展名不决定目录。Luban 二进制只进入 `tables`，与 JSON 分开。
 - 新业务 UI 放入 `assets/packages/<feature>/ui/<Name>.lh`；业务 Scene 放入 `scenes/<Name>.ls`；普通 Prefab 放入 `prefabs/<Name>.lh`。
 - Spine Prefab 与骨骼、图集、纹理放入同一 `spine/<name>/`，不得拆到全局类型目录。

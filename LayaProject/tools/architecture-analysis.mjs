@@ -16,7 +16,7 @@ export function readArchitectureCompilerOptions(projectRoot, host = ts.sys) {
     return { options: parsed.options, diagnostics: parsed.errors.map(formatDiagnostic) };
 }
 
-/** Analyze real syntax; type edges still constrain ownership, but never form runtime cycles. */
+/** 按实际语法分析；类型依赖仍约束归属边界，但不形成运行时循环。 */
 export function analyzeModuleDependencies(fileName, source, compilerOptions, host = ts.sys) {
     const sourceFile = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true);
     const dependencies = [];

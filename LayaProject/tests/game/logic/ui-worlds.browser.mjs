@@ -1,4 +1,4 @@
-/** Real buttons exercise World registration teardown; account queries remain outside both Worlds. */
+/** 通过真实按钮验证 World 注册项清理；账号查询始终独立于两个 World。 */
 export default function uiWorldsProbe() {
     return `(${verifyUIWorlds.toString()})()`;
 }
@@ -54,7 +54,14 @@ async function verifyUIWorlds() {
     for (let cycle = 0; cycle < 4; cycle++) {
         const lobby = lx.scenes.get("examples.lobby"), oldScope = lobby.ui;
         const oldWorld = lx.worlds.get("examples.lobby"), status = lobbyView();
-        assert(!("ui" in oldWorld) && !('scene' in oldWorld), "World is owning presentation or Scene objects");
+        assert(oldWorld.events instanceof Laya.EventDispatcher && typeof oldWorld.registerScene === "function",
+            "World is missing native events or automatic registration ownership");
+        assert(oldWorld.events.hasListener("lobby:enter-battle")
+            && !lx.events.hasListener("lobby:enter-battle") && !lx.events.hasListener("battle:return-lobby"),
+            "World navigation events were registered on the root dispatcher");
+        lx.events.event("lobby:enter-battle");
+        await frame();
+        assert(lx.worlds.get("examples.lobby") === oldWorld, "root event entered a child-only request handler");
         const oldViews = oldScope.snapshot().views.map(entry => entry.view);
         assert(oldViews.some(view => !view.parent && !view.destroyed), "lobby must contain a retained UI before exiting");
         const rewardStarted = performance.now();
@@ -65,7 +72,8 @@ async function verifyUIWorlds() {
         const staleLobbyButton = status.battleButton;
         click(staleLobbyButton);
         await wait(() => lx.worlds.get("examples.battle") && battleView(), `battle World ${cycle} did not initialize`);
-        const battle = lx.scenes.get("examples.battle"), battlePage = battleView();
+        const battle = lx.scenes.get("examples.battle");
+        let battlePage = battleView();
         assert(oldWorld.signal.aborted && !lx.worlds.get("examples.lobby") && !lx.scenes.get("examples.lobby"),
             `lobby World ${cycle} or Scene remained registered`);
         assert(lobby.destroyed && oldScope.root.destroyed && oldScope.snapshot().views.length === 0
@@ -74,6 +82,8 @@ async function verifyUIWorlds() {
         assert(lx.scenes.snapshot().registeredRoutes.join(",") === "examples.battle", "lobby Scene registration was not removed");
         await missingRoute(battle.ui, "lx.status");
         staleLobbyButton.event(Laya.Event.CLICK);
+        assert(!oldWorld.events.hasListener("lobby:enter-battle"), "exited lobby retained its local listener");
+        oldWorld.events.event("lobby:enter-battle");
         await frame();
         assert(lx.scenes.get("examples.battle") === battle, "a destroyed lobby button still switched Worlds");
         if (cycle === 0) {
@@ -89,8 +99,12 @@ async function verifyUIWorlds() {
         assert(battleInventory.parent === battle.ui.root && battleInventory.summaryText.text.includes("共 305 件"),
             "shared inventory definition was removed with the lobby World");
         battle.ui.close("lx.examples.inventory", battleInventory);
+        assert(battlePage.destroyed, "replacing inventory kept the old battle page");
+        battlePage = await battle.ui.show("lx.examples.battle", { status: "BATTLE", detail: "Battle resumed" });
         await wait(() => !battleInventory.parent && battlePage.active, "shared inventory did not close in battle");
         const oldBattleWorld = lx.worlds.get("examples.battle"), battleScope = battle.ui;
+        assert(oldBattleWorld.events.hasListener("battle:return-lobby")
+            && !oldBattleWorld.events.hasListener("lobby:enter-battle"), "battle uses another World's event registration");
         const staleBattleButton = battlePage.actionButton;
         click(staleBattleButton);
         await wait(() => lx.worlds.get("examples.lobby") && lobbyView(), `lobby World ${cycle} did not reinitialize`);
@@ -105,6 +119,8 @@ async function verifyUIWorlds() {
             && lobbyView().inventoryBadgeCount.text === "305", "new lobby did not restore account data and badge subscriptions");
         const freshLobby = lx.scenes.get("examples.lobby");
         staleBattleButton.event(Laya.Event.CLICK);
+        assert(!oldBattleWorld.events.hasListener("battle:return-lobby"), "exited battle retained its local listener");
+        oldBattleWorld.events.event("battle:return-lobby");
         await frame();
         assert(lx.scenes.get("examples.lobby") === freshLobby, "a destroyed battle button still switched Worlds");
         await lx.ui.waitForPendingLoads();
@@ -121,7 +137,7 @@ async function verifyUIWorlds() {
     await wait(() => account.totalQuantity === 300, "final account reset failed");
     await closeInventory(inventory);
 
-    // Independent World entry can coexist; explicit UI ownership stays with each original Scene.
+    // 多个 World 可独立进入并共存；UI 始终由各自原始 Scene 明确持有。
     const keptWorld = lx.worlds.get("examples.lobby"), keptScene = lx.scenes.get("examples.lobby");
     const keptStatus = lobbyView(), keptScope = keptScene.ui;
     await lx.worlds.enter("examples.battle");
@@ -163,5 +179,6 @@ async function verifyUIWorlds() {
         closedWorldRewardDelivered: true, nativeButtonNavigation: true, worldUIRegistrationsRemoved: true,
         commonUIRegistrationsPreserved: true, commonInstancesSceneOwned: true, globalBadgesWithoutLobby: true,
         sceneRegistrationsRemoved: true, cachedViewsDestroyed: true, staleButtonsDetached: true,
-        concurrentWorlds: true, survivingSceneIdentity: true, survivingNativeSubscriptions: true };
+        concurrentWorlds: true, survivingSceneIdentity: true, survivingNativeSubscriptions: true,
+        worldLocalNavigationEvents: true, rootEventIsolation: true, exitedLocalListenersRemoved: true };
 }

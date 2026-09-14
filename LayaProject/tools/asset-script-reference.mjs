@@ -1,6 +1,6 @@
 import { dirname, resolve } from "node:path";
 
-/** Native IDE scriptPath values are relative to assets; legacy assets used their own directory. */
+/** 原生 IDE 的 scriptPath 相对 assets 解析；旧资源曾使用自身目录。 */
 export function resolveComponentScript(assetsRoot, hierarchyPath, scriptPath, uuid, readScriptUuid) {
     const candidates = new Set([
         resolve(assetsRoot, scriptPath),

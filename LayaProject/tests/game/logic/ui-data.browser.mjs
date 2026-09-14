@@ -1,4 +1,4 @@
-/** Drives the account example through authored native buttons; no service is exposed to the probe. */
+/** 通过资源中配置的原生按钮操作账号示例，不向探针暴露服务。 */
 export default function uiDataProbe() {
     return `(${verifyUIData.toString()})()`;
 }
@@ -15,7 +15,12 @@ async function verifyUIData() {
     const wait = async (predicate, label, timeout = 2000) => {
         const until = performance.now() + timeout;
         while (!predicate()) {
-            assert(performance.now() < until, `timed out waiting for ${label}`);
+            if (performance.now() >= until) assert(false, `timed out waiting for ${label}; ${JSON.stringify({
+                loading: Laya.loader.loading, pending: scope().snapshot().pendingRequests,
+                views: scope().snapshot().views.map(entry => ({ id: entry.routeId, visible: entry.visible,
+                    active: entry.view.activeInHierarchy, parent: !!entry.view.parent, destroyed: entry.view.destroyed,
+                    items: entry.view.itemList?.numItems, rows: entry.view.itemList?.numChildren })),
+            })}`);
             await new Promise(resolve => setTimeout(resolve, 10));
         }
     };
@@ -35,7 +40,7 @@ async function verifyUIData() {
     const totalText = (view, quantity) => view.summaryText.text.includes(`共 ${quantity} 件`);
     const statusTotal = (view, quantity) => view.inventoryText.text.includes(`共 ${quantity} 件`);
     const click = button => {
-        // Native auto input can report mouseEnabled=false while dispatching button events normally.
+        // 原生自动输入模式下，mouseEnabled 可能读取为 false，但按钮事件仍正常派发。
         assert(button && !button.destroyed && !button.grayed, "button must be live and enabled");
         const point = Laya.SpriteUtils.getTransformRelativeToWindow(button, button.width / 2, button.height / 2);
         const canvas = document.querySelector("canvas");
@@ -51,9 +56,11 @@ async function verifyUIData() {
         await wait(() => find(inventoryId)?.itemList.numChildren > 0, "inventory and virtual rows");
         return find(inventoryId);
     };
+    let status;
     const closeInventory = async inventory => {
         click(inventory.frame.getChild("closeButton"));
         await wait(() => !inventory.parent && find("lx.status")?.active, "return to status");
+        status = find("lx.status");
         assert(!inventory.destroyed, "inventory must retain only its view state while hidden");
     };
     const openConfirmation = async inventory => {
@@ -79,11 +86,11 @@ async function verifyUIData() {
     let rewardElapsedMs = 0;
     let cleanupReady = false;
     try {
-        // Earlier integration stages may have left retained example pages.
+        // 此前的集成步骤可能留下隐藏保留的示例页面。
         for (const entry of [...scope().snapshot().views]) {
             if (entry.routeId.startsWith("lx.examples.")) entry.view.destroy();
         }
-        const status = find("lx.status");
+        status = find("lx.status");
         assert(status && status.active, "native status page is missing");
         let inventory = await openInventory();
         cleanupReady = true;
@@ -93,9 +100,9 @@ async function verifyUIData() {
         await closeInventory(inventory);
         await wait(() => statusTotal(status, 300) && countText(status) === "300", "status reads reset data");
 
-        // A second visible Runtime observes the same path without gaining access to the service.
+        // 第二个可见 Runtime 监听同一路径，但不获得服务访问权限。
         const observerRoute = lx.ui.registerView({ id: observerId,
-            url: "__lx_resource_prefab.lh?ui=1&source=status&navigation=overlay",
+            url: "__lx_resource_prefab.lh?ui=1&source=status&openMode=stack&layer=2",
             bind(view, _args, session) {
                 view.mouseEnabled = false;
                 view.getChild("full").visible = false;
@@ -112,7 +119,7 @@ async function verifyUIData() {
         await wait(() => !status.rewardButton.mouseEnabled && status.feedbackText.text.includes("6 秒"),
             "reward request feedback");
         inventory = await openInventory();
-        assert(!status.active && inventory.active, "covered status page did not pause");
+        assert(status.destroyed && inventory.active, "replaced status page was not destroyed");
         await closeInventory(inventory);
         const closedSummary = inventory.summaryText.text;
         const closedBadge = countText(inventory);
@@ -143,8 +150,7 @@ async function verifyUIData() {
             "confirmation must commit business data before the deferred view render");
         await wait(() => totalText(inventory, 304) && countText(inventory) === "304"
             && inventory.selectionText.text.includes("剩余 7 件"), "confirmation binding update");
-        assert(!status.active && statusTotal(status, 305) && countText(status) === "305",
-            "covered status page kept rendering instead of pausing its bindings");
+        assert(status.destroyed, "replaced status page kept its presentation");
         await wait(() => confirmation.destroyed, "confirmation close animation");
         await closeInventory(inventory);
         assert(statusTotal(status, 304) && countText(status) === "304", "resumed status did not read current data");
@@ -187,7 +193,7 @@ async function verifyUIData() {
             && totalText(inventory, 305), "new scene view did not reconstruct from retained account data");
         return { passed: true, rewardElapsedMs, quantities: [300, 305, 304, 305],
             closedViewPaused: true, reopenedSnapshot: true, independentBadges: true,
-            coveredViewResumed: true, modelBeforeRender: true, snapshotRebuilt: true,
+            replacedViewRecreated: true, modelBeforeRender: true, snapshotRebuilt: true,
             staleResponseIgnored: true, selectionAndScrollRetained: true,
             accountSurvivesScene: true, oldSceneViewsDestroyed: true, staleChildCancelled: true };
     } finally {
@@ -201,9 +207,10 @@ async function verifyUIData() {
             if (cleanupReady) {
                 const existing = currentScope.snapshot().views.find(entry => entry.routeId === inventoryId && entry.visible)?.view;
                 const cleanupInventory = existing ?? await currentScope.show(inventoryId, { title: "旅行背包" });
-                // Native button cleanup also cancels a pending simulated reward after a failed assertion.
+                // 断言失败后，原生按钮的清理也会取消尚未完成的模拟奖励。
                 cleanupInventory.resetButton.fireClick();
                 cleanupInventory.destroy();
+                await currentScope.show("lx.status", { status: "READY", detail: "Data probe cleanup" });
                 await frame();
                 assert(store.get(key) === 300, "cleanup failed to reset the example account");
             }

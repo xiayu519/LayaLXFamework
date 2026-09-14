@@ -1,4 +1,4 @@
-/** Verifies authored scripts and native Runtime field assignment, including nested prefab variables. */
+/** 验证资源中配置的脚本与原生 Runtime 字段赋值，包括嵌套预制体变量。 */
 export default function nativeUIBindingsProbe() {
     return `(${verifyNativeUIBindings.toString()})()`;
 }
@@ -8,17 +8,17 @@ async function verifyNativeUIBindings() {
     const assert = (condition, message) => {
         if (!condition) throw new Error(`Native UI bindings: ${message}`);
     };
-    // Published class IDs are compressed by the IDE; read its output instead of using source UUIDs.
+    // 发布的类 ID 由 IDE 压缩；读取发布结果，不使用源码 UUID。
     const authored = await (await fetch("bootstrap/ui/UISceneLoading.lh")).json();
     const Lifecycle = Laya.ClassUtils.getClass(authored._$comp[0]._$type);
     assert(typeof Lifecycle === "function", "authored lifecycle script was not registered");
     const settingsByAsset = {
-        UISceneLoading: { layout: "fullscreen", layer: 6, navigation: "overlay", modal: true, closeOnMaskClick: false, multiplicity: "singleton", retention: "hide" },
-        UILobby: { layout: "fullscreen", layer: 1, navigation: "page", modal: false, closeOnMaskClick: true, multiplicity: "singleton", retention: "destroy" },
-        UIConfirmation: { layout: "center-popup", layer: 3, navigation: "overlay", modal: true, closeOnMaskClick: true, multiplicity: "multiple", retention: "destroy" },
-        UIInventory: { layout: "fullscreen", layer: 1, navigation: "page", modal: false, closeOnMaskClick: true, multiplicity: "singleton", retention: "hide" },
-        UIFullscreenMid: { layout: "fullscreen", layer: 1, navigation: "page", modal: false, closeOnMaskClick: true, multiplicity: "singleton", retention: "destroy" },
-        UIBattle: { layout: "fullscreen", layer: 1, navigation: "page", modal: false, closeOnMaskClick: true, multiplicity: "singleton", retention: "destroy" },
+        UISceneLoading: { layout: "fullscreen", layer: 6, openMode: "stack", modal: true, closeOnMaskClick: false, multiplicity: "singleton", retention: "hide" },
+        UILobby: { layout: "fullscreen", layer: 1, openMode: "replace", modal: false, closeOnMaskClick: true, multiplicity: "singleton", retention: "destroy" },
+        UIConfirmation: { layout: "center-popup", layer: 3, openMode: "stack", modal: true, closeOnMaskClick: true, multiplicity: "multiple", retention: "destroy" },
+        UIInventory: { layout: "fullscreen", layer: 1, openMode: "replace", modal: false, closeOnMaskClick: true, multiplicity: "singleton", retention: "hide" },
+        UIFullscreenMid: { layout: "fullscreen", layer: 1, openMode: "stack", modal: false, closeOnMaskClick: true, multiplicity: "singleton", retention: "destroy" },
+        UIBattle: { layout: "fullscreen", layer: 1, openMode: "replace", modal: false, closeOnMaskClick: true, multiplicity: "singleton", retention: "destroy" },
     };
     const definitions = [
         { asset: "UISceneLoading", url: "bootstrap/ui/UISceneLoading.lh", fields: {

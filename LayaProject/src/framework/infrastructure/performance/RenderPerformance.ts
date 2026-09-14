@@ -2,11 +2,11 @@ export interface RenderSnapshot {
     readonly drawCalls2D: number;
     readonly drawCalls: number;
     readonly triangles: number;
-    /** Resource-accounted CPU bytes, not the JavaScript heap or process memory. */
+    /** 资源统计的 CPU 字节数，不代表 JavaScript 堆或进程内存。 */
     readonly cpuBytes: number;
-    /** Render-driver GPU allocation estimate in bytes; not physical device VRAM. */
+    /** 渲染驱动估算的 GPU 分配字节数，不代表设备实际显存占用。 */
     readonly gpuBytes: number;
-    /** CT counters are window averages. False until the engine publishes its first window. */
+    /** CT 计数器使用统计窗口的平均值；引擎发布首个窗口前为 false。 */
     readonly statisticsReady?: boolean;
 }
 
@@ -19,14 +19,14 @@ export interface RenderBudget {
 }
 
 export class RenderBudgetError extends Error {
-    constructor(readonly violations: readonly string[]) {
+    public constructor(public readonly violations: readonly string[]) {
         super(`Render budget exceeded: ${violations.join(", ")}.`);
         this.name = "RenderBudgetError";
     }
 }
 
 export class RenderPerformance {
-    capture(): RenderSnapshot {
+    public capture(): RenderSnapshot {
         const stats = Laya.LayaGL.statAgent;
         return Object.freeze({
             drawCalls2D: stats.getElementData(Laya.StatElement.CT_2DDrawCall),
@@ -38,7 +38,7 @@ export class RenderPerformance {
         });
     }
 
-    assertBudget(budget: RenderBudget, snapshot = this.capture()): RenderSnapshot {
+    public assertBudget(budget: RenderBudget, snapshot = this.capture()): RenderSnapshot {
         if (snapshot.statisticsReady === false) {
             throw new Error("Laya statistics window is not ready; wait for a rendered sampling window.");
         }

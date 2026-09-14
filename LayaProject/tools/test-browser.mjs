@@ -14,7 +14,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { WebSocket } from "ws";
 import { runFrameworkProbes } from "./browser-framework-probes.mjs";
 import { handleResourceFixture } from "./browser-resource-fixtures.mjs";
-import { handleNetworkProbe, runNetworkProbes } from "./browser-network-probes.mjs";
+import { attachWebSocketProbe, handleNetworkProbe, runNetworkProbes } from "./browser-network-probes.mjs";
 import { parseBrowserOptions, runSelectedBrowserProbes } from "./browser-probe-plan.mjs";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -85,6 +85,8 @@ const server = createServer((request, response) => {
     response.writeHead(200, { "Content-Type": contentType(filePath) });
     createReadStream(filePath).pipe(response);
 });
+
+const closeWebSocketProbe = attachWebSocketProbe(server);
 
 try {
     if (!existsSync(join(releaseRoot, "index.html"))) {
@@ -255,14 +257,18 @@ try {
                 audio: globalThis.lx.audio,
             };
             await globalThis.lx.stop();
-            const deadline = performance.now() + 5000;
-            const isAttached = () => { try { globalThis.lx.snapshot(); return true; } catch { return false; } };
-            while (isAttached() && performance.now() < deadline) {
-                await new Promise((resolve) => setTimeout(resolve, 20));
-            }
+            const state = globalThis.lx.snapshot();
+            let networkStopped = false;
+            try { globalThis.lx.network.socket; } catch { networkStopped = true; }
             return {
                 ready: globalThis.lx.ready,
-                attached: isAttached(),
+                rootStopped: state.bootstrap.state === "stopped",
+                worlds: state.worlds.worlds.length,
+                pending: state.bootstrap.pending.length + state.pendingCleanup.length
+                    + state.worlds.pendingLoads + state.scenes.pendingTransitions + state.ui.nativeLoads,
+                cleanupErrors: state.bootstrap.failedStops.length + state.bootstrap.lateCleanupErrors
+                    + state.worlds.cleanupFailures + state.scenes.cleanupFailures + state.ui.cleanupFailures,
+                networkStopped,
                 configReady: services.config.ready,
                 tablesReady: services.tables.ready,
                 managedUI: services.ui.snapshot().managed.length,
@@ -283,7 +289,11 @@ try {
     const shutdownState = shutdown.result?.value;
     if (shutdown.exceptionDetails
         || shutdownState?.ready !== false
-        || shutdownState?.attached !== false
+        || shutdownState?.rootStopped !== true
+        || shutdownState?.worlds !== 0
+        || shutdownState?.pending !== 0
+        || shutdownState?.cleanupErrors !== 0
+        || shutdownState?.networkStopped !== true
         || shutdownState?.configReady !== false
         || shutdownState?.tablesReady !== false
         || shutdownState?.managedUI !== 0
@@ -303,6 +313,7 @@ try {
         + `status=${runtimeState.statusText}, suite=${probeOptions.suite}, probes=${completedProbes.join(",")} passed, clean application shutdown, no errors.`,
     );
 } finally {
+    closeWebSocketProbe();
     socket?.close();
     if (browser && !browser.killed) {
         browser.kill();
@@ -438,10 +449,13 @@ async function runEngineLifecycleProbes(cdp) {
             const sceneUI = globalThis.lx.scenes.get("examples.lobby")?.ui;
             const statusInfo = sceneUI?.snapshot().views
                 .find((entry) => entry.routeId === validation.uiProbe.baseRouteId);
-            const loadingInfo = globalThis.lx.ui.snapshot().managed
-                .find((entry) => entry.routeId === "lx.scene-loading");
-            if (!statusInfo || !loadingInfo) throw new Error("Scene status view or system loading window was not available for the UI probe.");
-            const BaseWindow = Object.getPrototypeOf(loadingInfo.window.constructor);
+            if (!statusInfo) throw new Error("Scene status view was not available for the UI probe.");
+            // 启动流程持有独立进度界面；此测试显式加载已注册的应用窗口。
+            const loadingWindow = globalThis.lx.ui.snapshot().managed
+                .find((entry) => entry.routeId === "lx.scene-loading")?.window
+                ?? await globalThis.lx.ui.show("lx.scene-loading", { phase: "ready", scene: 1, resources: 1, overall: 1 });
+            globalThis.lx.ui.close("lx.scene-loading", loadingWindow);
+            const BaseWindow = Object.getPrototypeOf(loadingWindow.constructor);
             const ProbeWindow = class extends BaseWindow { onBind() {} };
             const routeId = "__lx_headless_modal";
             globalThis.lx.ui.register({
@@ -524,7 +538,7 @@ async function runEngineLifecycleProbes(cdp) {
         || result?.modalOrdered !== true
         || result?.popupAnimating !== true
         || result?.uiDestroyed !== true) {
-        throw new Error(`engine lifecycle probes failed: ${JSON.stringify(result)}`);
+        throw new Error(`engine lifecycle probes failed: ${JSON.stringify({ result, exception: evaluation.exceptionDetails })}`);
     }
     return result;
 }

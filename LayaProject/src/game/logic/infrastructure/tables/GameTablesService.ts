@@ -6,21 +6,22 @@ import { Tables } from "../../generated/tables/schema";
 const TABLES_ROOT = "bootstrap/tables";
 
 export class GameTablesService implements AppService {
-    readonly name = "game-tables";
+    public readonly name = "game-tables";
     private readonly loadedUrls = new Set<string>();
     private tables: Tables | undefined;
     private startTask: Promise<void> | undefined;
 
-    constructor(private readonly registry: TablesRegistry) {}
+    public constructor(private readonly registry: TablesRegistry) {
+    }
 
-    start(): Promise<void> {
+    public start(): Promise<void> {
         if (this.tables) {
             return Promise.resolve();
         }
         return this.startTask ??= this.load();
     }
 
-    stop(): void {
+    public stop(): void {
         if (this.tables) {
             this.registry.clear(this.tables);
             this.tables = undefined;

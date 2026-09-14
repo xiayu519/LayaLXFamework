@@ -11,7 +11,7 @@
 | 启动 | AppEntry.ts 导出原生 async main，CompilerSettings.mainScript 指向它；lx.stop() 显式停止应用，Startup 场景销毁不再停止应用 |
 | 场景 UI | BaseGameScene.ui 按需创建上下文；全屏页面直接使用原生 Runtime GWidget，显示于场景 uiRoot |
 | 弹窗 | 继续使用原生 GWindow/GRoot、模态遮罩及 mid 动画，但实例、隐藏缓存和待打开请求归所属场景 |
-| 页面覆盖 | 同一 Screen 层的新页面暂停下层原生组件；关闭后恢复原实例及状态，HUD 独立 |
+| 页面打开方式 | 全屏 replace 成功后关闭下层全屏，stack 保留下层运行；独立弹窗不参与替换，返回流程显式打开 |
 | 节点绑定 | 6 个 Runtime 使用 IDE 自动生成的 24 个节点字段；删除窗口 requireChild 辅助方法，生成文件不手改 |
 | 红点 | lx.ui.redDots 使用原生 EventDispatcher，按路径增量汇总；RedDotBinding 使用原生 Script/@property，自动订阅、刷新和解绑 |
 | 清理 | 离场销毁可见及隐藏 UI，取消旧异步回写；等待原生加载收尾后回收。晚到清理失败保留诊断并阻止不安全的 GC |
@@ -33,7 +33,7 @@ Root
 
 ## 建议手动复测顺序
 
-在 LayaAir 3.4.1 IDE 选择**启动场景预览**，或使用 `npm run preview`。原生 main 只在启动入口预览/发布时生效；直接预览任意“当前场景”不会自动执行应用启动。
+在 LayaAir 3.4.1 IDE 顶部选择**启动场景**运行模式，或使用 `npm run preview`。原生 main 主动打开 Startup.ls，在其静态 UISceneLoading 进度 UI 展示期间初始化框架，再进入 Lobby；大厅 UI 就绪后才销毁 Startup。随后通过大厅/战斗按钮重复 `Lobby → Battle → Lobby`。直接预览任意“当前场景”不会自动执行应用启动。
 
 | 操作 | 预期 |
 | --- | --- |

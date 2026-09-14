@@ -15,16 +15,19 @@ export interface UIRequest {
     window?: object;
 }
 
-/** Owns request cancellation and diagnostics, not native Loader cache ownership. */
+/** 负责请求取消与诊断，不接管原生 Loader 缓存。 */
 export class UIRequestTracker {
     private readonly requests = new Map<number, UIRequest>();
     private sequence = 0;
 
-    begin(routeId: string, signal?: AbortSignal): UIRequest {
+    public begin(routeId: string, signal?: AbortSignal): UIRequest {
         const controller = new AbortController();
         const abort = (): void => controller.abort();
-        if (signal?.aborted) abort();
-        else signal?.addEventListener("abort", abort, { once: true });
+        if (signal?.aborted) {
+            abort();
+        } else {
+            signal?.addEventListener("abort", abort, { once: true });
+        }
         const request: UIRequest = {
             id: ++this.sequence, routeId, startedAt: Date.now(), controller, phase: "loading",
             unlink: () => signal?.removeEventListener("abort", abort),
@@ -33,12 +36,12 @@ export class UIRequestTracker {
         return request;
     }
 
-    finish(request: UIRequest): void {
+    public finish(request: UIRequest): void {
         request.unlink();
         this.requests.delete(request.id);
     }
 
-    cancel(routeId?: string, window?: object): void {
+    public cancel(routeId?: string, window?: object): void {
         for (const request of this.requests.values()) {
             if ((routeId === undefined || request.routeId === routeId)
                 && (window === undefined || request.window === window)) {
@@ -47,7 +50,7 @@ export class UIRequestTracker {
         }
     }
 
-    snapshot(): readonly UIRequestInfo[] {
+    public snapshot(): readonly UIRequestInfo[] {
         const now = Date.now();
         return Array.from(this.requests.values(), (request) => Object.freeze({
             id: request.id, routeId: request.routeId, phase: request.phase,

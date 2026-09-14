@@ -5,7 +5,6 @@
 ## Problems
 
 - [Laya statistics readiness](problems/laya-statistics-readiness.md)：未发布的统计窗口不能用零值通过预算，GPU 取 driver 计量。
-- [Runtime quarantine reference release](problems/runtime-quarantine-reference-release.md)：clean unbind 立即释放；settling 隔离在清理完成后主动解除强引用。
 - [HTTP timer overflow](problems/http-timer-overflow.md)：timer 参数限制为 32-bit 上限，retry jitter 最终 cap 到 `maxDelayMs`。
 
 - [Codex routing eval isolation v2](problems/codex-routing-eval-isolation-v2.md)：固定 Codex CLI 由 Node 跨平台隔离执行并检查 token 预算。
@@ -32,5 +31,5 @@
 
 - [GPT-6 effort compatibility](feedback/gpt6-effort-compatibility.md)：各标准档位共用工作流，Medium 只是可覆盖的个人选择。
 - [Risk-scoped validation](feedback/risk-scoped-validation.md)：按影响选最小充分验收，保留原地 Headless 与可追溯构建复用。
-- [Single-maintainer collaboration](feedback/single-maintainer-collaboration.md)：框架单人维护；Codex 默认单代理，团队规模不决定委派数量。
+- [Single-maintainer collaboration](feedback/single-maintainer-collaboration.md)：项目单人开发与维护；Codex 默认单代理，潜在使用者数量不决定委派策略。
 - [Laya-focused documentation](feedback/laya-focused-documentation.md)：只记录已验证的 LayaAir 规则。

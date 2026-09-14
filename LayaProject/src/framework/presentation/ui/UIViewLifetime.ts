@@ -27,9 +27,10 @@ export interface UIViewRecord {
     readonly owner: UIViewOwner;
     readonly guard: AsyncBindingGuard;
     readonly transition?: UIPopupTransition;
+    order: number;
     presentation?: UIViewPresentation;
     args?: unknown;
-    /** Metadata discovery may prepare a singleton for a newer first-open request. */
+    /** 读取元数据时，可能为更新的首次打开请求准备单例。 */
     initializing: boolean;
     shown: boolean;
     closing: boolean;

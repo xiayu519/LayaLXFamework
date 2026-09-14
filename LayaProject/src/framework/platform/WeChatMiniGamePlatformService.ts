@@ -25,19 +25,21 @@ interface WeChatApi {
 }
 
 export class WeChatMiniGamePlatformService implements PlatformService {
-    readonly name = "platform:wechat-mini-game";
-    readonly kind = "mini-game" as const;
+    public readonly name = "platform:wechat-mini-game";
+    public readonly kind = "mini-game" as const;
 
-    static isSupported(): boolean {
+    public static isSupported(): boolean {
         const api = resolveWeChatApi();
         return Boolean(api && (typeof api.getWindowInfo === "function"
             || typeof api.getSystemInfoSync === "function"));
     }
 
-    get viewport(): PlatformViewport {
+    public get viewport(): PlatformViewport {
         const api = this.requireApi();
         const info = tryCall(api.getWindowInfo, api) ?? tryCall(api.getSystemInfoSync, api);
-        if (!info) return Object.freeze({ width: 0, height: 0 });
+        if (!info) {
+            return Object.freeze({ width: 0, height: 0 });
+        }
         const width = finiteSize(info.windowWidth || info.screenWidth || 0);
         const height = finiteSize(info.windowHeight || info.screenHeight || 0);
         const screenTop = finiteCoordinate(info.screenTop);
@@ -54,23 +56,26 @@ export class WeChatMiniGamePlatformService implements PlatformService {
         });
     }
 
-    start(): void {
+    public start(): void {
         this.requireApi();
     }
 
-    stop(): void {}
+    public stop(): void {
+    }
 
-    nowMs(): number {
+    public nowMs(): number {
         return Laya.Browser?.window?.performance?.now?.() ?? globalThis.performance?.now?.() ?? Date.now();
     }
 
-    openExternalUrl(_url: string): void {
+    public openExternalUrl(_url: string): void {
         throw new Error("Opening arbitrary external URLs is unsupported in WeChat Mini Game.");
     }
 
     private requireApi(): WeChatApi {
         const api = resolveWeChatApi();
-        if (!api) throw new Error("WeChat Mini Game API is unavailable.");
+        if (!api) {
+            throw new Error("WeChat Mini Game API is unavailable.");
+        }
         return api;
     }
 }
@@ -86,7 +91,9 @@ function normalizeRect(
     viewportHeight: number,
     screenTop: number,
 ): PlatformRect | undefined {
-    if (!value || viewportWidth <= 0 || viewportHeight <= 0) return undefined;
+    if (!value || viewportWidth <= 0 || viewportHeight <= 0) {
+        return undefined;
+    }
     const left = clamp(value.left, 0, viewportWidth);
     const top = clamp(value.top - screenTop, 0, viewportHeight);
     const right = clamp(value.right ?? left + value.width, left, viewportWidth);
@@ -111,7 +118,9 @@ function clamp(value: number, minimum: number, maximum: number): number {
 }
 
 function tryCall<TResult>(method: (() => TResult) | undefined, owner: WeChatApi): TResult | undefined {
-    if (!method) return undefined;
+    if (!method) {
+        return undefined;
+    }
     try {
         return method.call(owner);
     } catch {

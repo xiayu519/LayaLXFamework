@@ -5,7 +5,7 @@ import type { ExampleInventoryContext, ExampleDeliveryContext } from "../present
 import type { UIInventory, UIInventoryArgs } from "../presentation/ui/examples/UIInventory";
 import type { UIFullscreenMid, UIFullscreenMidArgs } from "../presentation/ui/examples/UIFullscreenMid";
 
-/** Application-owned definitions only; each Scene still owns the instances it opens. */
+/** 只注册应用级定义；各 Scene 仍持有自己打开的 UI 实例。 */
 export function registerCommonUI(ui: UIRouter, inventory: ExampleInventoryContext,
     delivery: ExampleDeliveryContext): UIViewRoute<UIInventoryArgs, UIInventory> {
     const centered = ui.registerView<UIFullscreenMidArgs, UIFullscreenMid>({

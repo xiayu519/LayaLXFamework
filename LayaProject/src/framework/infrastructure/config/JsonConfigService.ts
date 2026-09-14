@@ -17,7 +17,7 @@ interface ConfigRecord {
 }
 
 export class JsonConfigValidationError extends Error {
-    constructor(readonly id: string) {
+    public constructor(public readonly id: string) {
         super(`JSON data '${id}' failed validation.`);
         this.name = "JsonConfigValidationError";
     }
@@ -28,19 +28,20 @@ export class JsonConfigService {
     private readonly pendingLoads = new Set<Promise<unknown>>();
     private disposed = false;
 
-    constructor(private readonly content: ContentCatalog) {}
+    public constructor(private readonly content: ContentCatalog) {
+    }
 
-    get ready(): boolean {
+    public get ready(): boolean {
         return Array.from(this.records.values()).some((record) => record.loaded);
     }
 
-    async load<T>(id: string, validate?: JsonValidator<T>): Promise<T> {
+    public async load<T>(id: string, validate?: JsonValidator<T>): Promise<T> {
         this.requireActive();
         const value = await this.loadRaw(id);
         return this.validate(id, value, validate);
     }
 
-    get<T>(id: string, validate?: JsonValidator<T>): T | undefined {
+    public get<T>(id: string, validate?: JsonValidator<T>): T | undefined {
         const record = this.records.get(id);
         if (!record?.loaded) {
             return undefined;
@@ -48,7 +49,7 @@ export class JsonConfigService {
         return this.validate(id, record.value, validate);
     }
 
-    require<T>(id: string, validate?: JsonValidator<T>): T {
+    public require<T>(id: string, validate?: JsonValidator<T>): T {
         const constValue = this.get(id, validate);
         if (constValue === undefined) {
             throw new Error(`JSON data '${id}' is not loaded.`);
@@ -56,7 +57,7 @@ export class JsonConfigService {
         return constValue;
     }
 
-    release(id: string): boolean {
+    public release(id: string): boolean {
         this.requireActive();
         const record = this.records.get(id);
         if (!record) {
@@ -67,7 +68,7 @@ export class JsonConfigService {
         return true;
     }
 
-    snapshot(): readonly JsonConfigSnapshot[] {
+    public snapshot(): readonly JsonConfigSnapshot[] {
         return Array.from(this.records.values())
             .map((record) => Object.freeze({
                 id: record.id,
@@ -77,13 +78,13 @@ export class JsonConfigService {
             .sort((left, right) => left.id.localeCompare(right.id));
     }
 
-    async waitForPendingLoads(): Promise<void> {
+    public async waitForPendingLoads(): Promise<void> {
         while (this.pendingLoads.size > 0) {
             await Promise.allSettled(Array.from(this.pendingLoads));
         }
     }
 
-    dispose(): void {
+    public dispose(): void {
         if (this.disposed) {
             return;
         }
@@ -143,7 +144,8 @@ export class JsonConfigService {
             if (record.pending === operation) {
                 record.pending = undefined;
             }
-        }).catch(() => {});
+        }).catch(() => {
+        });
         return operation;
     }
 

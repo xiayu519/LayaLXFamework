@@ -1,4 +1,4 @@
-/** Run against the built project with --suite targeted --probe <this file>. */
+/** 对已构建项目使用 --suite targeted --probe <当前文件> 运行。 */
 export default function uiExamplesProbe() {
     return `(${runUIExamples.toString()})()`;
 }
@@ -155,7 +155,7 @@ async function runUIExamples() {
             Laya.stage.event(Laya.Event.RESIZE);
             await frame();
             layouts.push({ profile: profile.name, ...checkLayout(window) });
-            // Covered pages still adapt their authored geometry; their data subscriptions stay paused.
+            // 被遮挡页面仍按资源配置调整布局，但保持数据订阅暂停。
             const statusArea = layoutService.snapshot().topSafeArea;
             for (const name of ["examplesButton", "rewardButton", "snapshotButton", "replayButton", "inventoryText", "feedbackText"]) {
                 within(rect(status[name]), statusArea, `status ${name}`);
@@ -176,7 +176,7 @@ async function runUIExamples() {
             assert(list.selection.index === 0, `${profile.name}: reset after reflow`);
         }
 
-        // The same fullscreen centered window survives every safe-area change, including scale restoration.
+        // 同一全屏居中窗口经历所有安全区变化后仍保留，包括恢复缩放。
         click(view.midExampleButton);
         await wait(() => visible(centeredId), "fullscreen centered example entry");
         const centered = visible(centeredId), centerPane = paneOf(centered);
@@ -253,7 +253,7 @@ async function runUIExamples() {
         const lateButton = ownedPopup.confirmButton;
         click(closeButtonOf(window));
         assert(!window.destroyed, "modal must block clicks on the underlying window");
-        ui.close(inventoryId); // Simulate the owner leaving while a modal is still open.
+        ui.close(inventoryId); // 模拟模态窗口尚未关闭时，其持有者先退出。
         lateButton.fireClick();
         await wait(() => !window.parent && ownedPopup.destroyed, "owner closes child popup");
         assert(activeExamples().length === 0 && !window.destroyed, "hidden parent must retain its view and close its child");

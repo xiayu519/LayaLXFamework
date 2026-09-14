@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 
-/** Local HTTP fixtures exercise native Loader completion/cancellation without mocking its methods. */
+/** 本地 HTTP 测试资源用于验证原生 Loader 的完成与取消，不替换其方法。 */
 export function handleResourceFixture(request, response, pathname) {
     if (!pathname.startsWith("/__lx_resource_")) return false;
     const url = new URL(request.url, "http://127.0.0.1");
@@ -10,7 +10,7 @@ export function handleResourceFixture(request, response, pathname) {
     if (pathname === "/__lx_resource_prefab.lh") {
         data = { _$ver: 1, _$id: "late_prefab", _$type: "GWidget", name: "LatePrefab", width: 48, height: 48 };
         if (url.searchParams.get("ui") === "1") {
-            // Use the IDE-published script ID, including its UUID compression.
+            // 使用 IDE 发布的脚本 ID，保留其 UUID 压缩格式。
             const sources = {
                 status: "ui/examples/UILobby.lh",
                 confirmation: "ui/examples/UIConfirmation.lh",
@@ -24,10 +24,10 @@ export function handleResourceFixture(request, response, pathname) {
             }
             else data._$comp = authored._$comp;
             const settings = data._$comp[0];
-            if (!source) Object.assign(settings, { layout: "fullscreen", layer: 1, navigation: "page",
+            if (!source) Object.assign(settings, { layout: "fullscreen", layer: 1, openMode: "replace",
                 modal: false, closeOnMaskClick: true, multiplicity: "singleton", retention: "destroy" });
-            // Probe policy variations remain serialized prefab inputs, exactly like an IDE-authored asset.
-            for (const key of ["layout", "navigation", "multiplicity", "retention"]) {
+            // 探针的策略变化仍写入序列化预制体，与 IDE 编辑的资源保持一致。
+            for (const key of ["layout", "openMode", "multiplicity", "retention"]) {
                 if (url.searchParams.has(key)) settings[key] = url.searchParams.get(key);
             }
             for (const key of ["modal", "closeOnMaskClick"]) {
@@ -48,7 +48,7 @@ export function handleResourceFixture(request, response, pathname) {
     return true;
 }
 
-/** Published nested-prefab URLs are relative to the original asset, not the fixture's HTTP route. */
+/** 发布后的嵌套预制体 URL 相对原始资源解析，不相对测试资源的 HTTP 路由。 */
 function resolvePrefabReferences(node, originalUrl) {
     if (!node || typeof node !== "object") return;
     for (const [key, value] of Object.entries(node)) {

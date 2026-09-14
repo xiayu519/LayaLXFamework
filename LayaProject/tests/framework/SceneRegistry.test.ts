@@ -368,7 +368,7 @@ describe("SceneRegistry", () => {
         const presenter: SceneLoadingPresenter = { show: vi.fn(), update: vi.fn(), fail: vi.fn(), hide: vi.fn() };
         const registry = setup({ loadingPresenter: presenter });
         const open = registry.open(lobby, undefined);
-        // The registry has entered SceneFlow.show, but its shared presenter task has not started yet.
+        // 注册表已进入 SceneFlow.show，但共享展示任务尚未开始。
         await Promise.resolve();
         const close = registry.close(lobby);
         await expect(open).rejects.toBeInstanceOf(SceneTransitionCancelledError);

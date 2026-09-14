@@ -45,7 +45,7 @@ Codex 对两类文件采用不同的官方发现顺序：`AGENTS.md` 从 Git 根
 
 新共享语义或高回滚成本变更按 [Change Contract](../LayaProject/.agents/skills/sdd-explore/references/alignment-contract.md) 对齐。用户明确指定共享变更与结果，或批准已列明方案后，继续完成实施与验证；保契约内部修复不因在 framework 目录重复审批。新增内容超出授权时只暂停该边界，独立工作继续。因 Skill 停顿时提供具体文件、条款和尚缺的决定。
 
-框架由一人维护，使用团队约 2–3 人。Codex 默认单代理；独立风险边界的委派需有收益与隔离的文件区域，子代理继承当前模型/强度。多人写入前复读目标，无法避开的同区域冲突停止报告。Git 写操作按用户授权执行。
+框架定位为单人开发、单人维护。Codex 默认单代理；用户要求或独立风险边界确有收益时才委派，并隔离写入区域，子代理继承当前模型/强度。修改前复读目标文件并保留已有改动。Git 写操作按用户授权执行。
 
 下游仓库存在 `.framework-lock.json` 时，manifest 管理内容为只读；框架缺口反馈上游，稳定消费等待验证后的 Tag，开发联调可按需同步已提交的 channel snapshot。目录所有权、启动扩展点和同步命令只在 [框架发行与下游同步](../LayaProject/docs/framework-distribution.md) 维护。
 

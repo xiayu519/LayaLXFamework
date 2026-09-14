@@ -26,7 +26,7 @@ async function verifyUIResources() {
     };
     const results = [];
     try {
-        // Already displayed images, shared owners, nested destruction, button icons and nine-grid commands.
+        // 覆盖已展示图片、共享持有者、嵌套销毁、按钮图标与九宫格绘制命令。
         for (const mode of ["plain", "button", "nine-grid", "animation"]) {
             const asset = await atlases(mode), row = own(await createItem()), image = row.itemImage;
             assert(image instanceof Laya.GLoader && image.constructor !== Laya.GLoader, "UIDynamicImage Runtime not assigned");
@@ -42,8 +42,8 @@ async function verifyUIResources() {
             for (let i = 0; i < 20; i++) { set(i % 2 === 0 ? urlB : urlA); await frame(); }
             set(urlB); await frame();
             assert(asset.a.referenceCount === 1 && asset.b.referenceCount === 1, `${mode}: references drift after replacement (${asset.a.referenceCount}/${asset.b.referenceCount})`);
-            dispose(row); image.destroy(); // Calling destroy again must not release a recovered graphics command twice.
-            await frame(); // FrameAnimation component destruction is completed by the native component driver.
+            dispose(row); image.destroy(); // 再次调用 destroy 不能重复释放已回收的绘制命令。
+            await frame(); // FrameAnimation 组件由原生组件驱动器完成销毁。
             assert(asset.a.referenceCount === 1 && asset.b.referenceCount === 0, `${mode}: nested destroy did not balance references`);
             await collect();
             assert(!asset.a.destroyed && !asset.bitmapA.destroyed && asset.b.destroyed && asset.bitmapB.destroyed,
@@ -53,7 +53,7 @@ async function verifyUIResources() {
             results.push(mode);
         }
 
-        // Native virtual and loop lists reuse actual prefab rows with nested dynamic images.
+        // 原生虚拟列表和循环列表复用真实预制体行，其中包含嵌套动态图片。
         for (const loop of [false, true]) {
             for (let cycle = 0; cycle < 3; cycle++) {
                 const asset = await atlases(`list-${loop}-${cycle}`), view = own(await createList());
@@ -82,7 +82,7 @@ async function verifyUIResources() {
             results.push(loop ? "loop-list" : "virtual-list");
         }
 
-        // A cancelled pool waiter does not instantiate a late prefab or cancel another consumer's load.
+        // 池获取请求取消后，不能实例化之后才加载好的预制体，也不能取消其他消费者的加载。
         const poolId = "__ui_resource_pool", url = "__lx_resource_prefab.lh?case=pool&slow=1";
         let created = 0;
         lx.pool.register({ id: poolId, url, maxIdle: 1, create(prefab) { created++; return prefab.create(); } });
@@ -97,7 +97,7 @@ async function verifyUIResources() {
         assert(lx.pool.snapshot().find(p => p.id === poolId).pending === 0, "pool pending capacity leaked");
         results.push("cancelled-shared-pool-load");
 
-        // Native src load is still pending when a nested owner is destroyed.
+        // 嵌套持有者销毁时，原生 src 加载仍未完成。
         const lateRow = own(await createItem()), lateUrl = "__lx_probe_slow.png?case=destroyed-image";
         lateRow.itemImage.src = lateUrl;
         const lateTexture = Laya.loader.load(lateUrl, Laya.Loader.IMAGE);
@@ -108,7 +108,7 @@ async function verifyUIResources() {
         assert(bitmap.destroyed, "late image bitmap was never collected");
         results.push("late-image-destruction");
 
-        // Row identity changes while the first native request is still in flight.
+        // 首个原生请求尚未完成时，行所对应的数据对象发生变化。
         const reused = own(await createItem()); Laya.stage.addChild(reused);
         const slowUrl = "__lx_probe_slow.png?case=reused-row";
         const stale = Laya.loader.load(slowUrl, Laya.Loader.IMAGE);
@@ -134,7 +134,7 @@ async function verifyUIResources() {
         assert(lateAtlas.destroyed && lateAtlasBitmap.destroyed, "late atlas animation survived its destroyed owner");
         results.push("late-atlas-destruction");
 
-        // Close during an async binder, after its native prefab has already been created.
+        // 原生预制体已创建、异步绑定仍在执行时关闭。
         const bindingScope = lx.scenes.get('examples.lobby').ui;
         let entered = false, wrote = false, cleaned = 0, loadedAtlas;
         const bindingRoute = lx.ui.registerView({ id: "__ui_resource_binding", url: "__lx_resource_prefab.lh?case=binder&ui=1",
@@ -155,7 +155,7 @@ async function verifyUIResources() {
             "closing during async binding leaked resources or ran a late write");
         results.push("close-during-async-binding");
 
-        // Keep the application alive while destroying a scene with a pending prefab UI and pool acquisition.
+        // 场景仍有未完成的预制体 UI 加载和池获取时将其销毁，同时保持应用运行。
         const old = lx.scenes.get('examples.lobby'), scope = old.ui;
         const scenePoolId = "__ui_resource_scene_pool";
         let lateCreates = 0;

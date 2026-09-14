@@ -11,7 +11,7 @@
       "scriptPath": "../src/framework/presentation/ui/UIViewLifecycle.ts",
       "layout": "center-popup",
       "layer": 3,
-      "navigation": "overlay",
+      "openMode": "stack",
       "modal": true,
       "closeOnMaskClick": true,
       "multiplicity": "singleton",

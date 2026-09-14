@@ -19,7 +19,7 @@ export class TransitionProgressReporter {
     private overall = 0;
     private value: SceneTransitionProgress;
 
-    constructor(
+    public constructor(
         private readonly requestId: number,
         private readonly routeId: string,
         private readonly isActive: () => boolean,
@@ -28,15 +28,21 @@ export class TransitionProgressReporter {
         this.value = progressSnapshot(requestId, routeId, "cleanup", 0, 0, 0, 0);
     }
 
-    get current(): SceneTransitionProgress {
+    public get current(): SceneTransitionProgress {
         return this.value;
     }
 
-    emit(phase: SceneTransitionPhase, rawProgress: number): void {
-        if (!this.isActive()) return;
+    public emit(phase: SceneTransitionPhase, rawProgress: number): void {
+        if (!this.isActive()) {
+            return;
+        }
         const phaseProgress = clampProgress(rawProgress);
-        if (phase === "scene") this.scene = Math.max(this.scene, phaseProgress);
-        if (phase === "resources") this.resources = Math.max(this.resources, phaseProgress);
+        if (phase === "scene") {
+            this.scene = Math.max(this.scene, phaseProgress);
+        }
+        if (phase === "resources") {
+            this.resources = Math.max(this.resources, phaseProgress);
+        }
         const [start, end] = PHASE_RANGE[phase];
         this.overall = Math.max(this.overall, start + (end - start) * phaseProgress);
         this.value = progressSnapshot(
@@ -73,6 +79,8 @@ function progressSnapshot(
 }
 
 function clampProgress(value: number): number {
-    if (!Number.isFinite(value)) return 0;
+    if (!Number.isFinite(value)) {
+        return 0;
+    }
     return Math.max(0, Math.min(1, value));
 }

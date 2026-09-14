@@ -5,7 +5,9 @@ export function validateResources(
 ): readonly SceneResourceRequest[] {
     const byUrl = new Map<string, SceneResourceRequest>();
     for (const resource of resources) {
-        if (!resource.url) throw new Error("Scene resource url is required.");
+        if (!resource.url) {
+            throw new Error("Scene resource url is required.");
+        }
         const previous = byUrl.get(resource.url);
         if (previous) {
             if (previous.type !== resource.type) {
@@ -35,5 +37,7 @@ export function validateResourceResults(
         throw new Error("Scene resource batch returned an invalid result.");
     }
     const failed = resources.filter((_, index) => results[index] == null).map((item) => item.url);
-    if (failed.length > 0) throw new Error(`Scene resources failed to load: ${failed.join(", ")}.`);
+    if (failed.length > 0) {
+        throw new Error(`Scene resources failed to load: ${failed.join(", ")}.`);
+    }
 }

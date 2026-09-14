@@ -10,8 +10,8 @@ export default function uiFrameworkProbe() {
             try { return await work; }
             finally { phaseMs[phase] = Math.round(performance.now() - started); }
         };
-        // Keep layout/multi-resolution assertions in ui-templates.browser.mjs; this probe covers ownership and data.
-        // Per-condition deadlines remain in each probe; the runner enforces the overall 30-second budget.
+        // 布局和多分辨率断言放在 ui-templates.browser.mjs；此探针验证持有关系与数据。
+        // 各探针分别限制条件等待时间；执行器限制总时长为 30 秒。
         const binding = await measured(${bindings()}, 'native binding');
         const viewport = await measured(${host()}, 'custom UI host');
         const scenes = await measured((${verifySceneOwnership.toString()})(), 'scene ownership');
@@ -40,7 +40,9 @@ async function verifySceneOwnership() {
     const badgeKey = "examples/inventory";
     assert(status.parent === scope.root && scope.root.parent === originalScene && !(status instanceof Laya.GWindow),
         "ordinary UI is not inside its native scene");
-    const loaderWindow = ui.listManaged().find(item => item.routeId === "lx.scene-loading").window;
+    const loaderWindow = ui.listManaged().find(item => item.routeId === "lx.scene-loading")?.window
+        ?? await ui.show("lx.scene-loading", { phase: "ready", scene: 1, resources: 1, overall: 1 });
+    ui.close("lx.scene-loading", loaderWindow);
     const popup = await scope.show("lx.examples.confirm", popupArgs);
     await wait(() => popup.mouseEnabled, "popup animation did not finish");
     assert(popup.parent === scope.root && scope.snapshot().views.some(item => item.view === popup),
@@ -52,10 +54,10 @@ async function verifySceneOwnership() {
     await wait(() => !hidden.parent, "retained popup hide");
     assert(!hidden.destroyed && !hidden.parent, "retained popup should be hidden before scene exit");
     const retainedView = ui.registerView({ id: "__scene_retained_view",
-        url: "__lx_resource_prefab.lh?ui=1&source=status&retention=hide", bind(view) { view.statusText.text = "CACHED"; } });
+        url: "__lx_resource_prefab.lh?ui=1&source=status&retention=hide&openMode=stack", bind(view) { view.statusText.text = "CACHED"; } });
     const hiddenView = await scope.show(retainedView, undefined);
     scope.close(retainedView.id);
-    assert(!hiddenView.destroyed && !hiddenView.parent && status.active, "closing a page must restore its predecessor");
+    assert(!hiddenView.destroyed && !hiddenView.parent && status.active, "closing a stacked page must preserve its predecessor");
 
     const texture = await Laya.loader.load("__lx_probe_shared.png", Laya.Loader.IMAGE);
     const sceneSprite = new Laya.Sprite(), sharedOwner = new Laya.Sprite();
@@ -96,7 +98,7 @@ async function verifySceneOwnership() {
                 inventory.midExampleButton.fireClick();
                 await wait(() => oldScope.snapshot().views.some(item => item.routeId === "lx.examples.fullscreen-mid"),
                     "nested page did not open before scene exit");
-                assert(!inventory.active, "covered fullscreen page must pause native components");
+                assert(inventory.active, "stacked fullscreen page must keep its parent active");
             }
             await oldScope.show("lx.examples.confirm", popupArgs);
             await lx.scenes.open("examples.lobby", args);

@@ -1,3 +1,4 @@
+import { logger as xlog } from "../../application/diagnostics/Logger";
 import { UILayer } from "./UILayer";
 import type { UILayoutService } from "./UILayoutService";
 
@@ -30,6 +31,7 @@ interface TipPool {
 }
 
 const TIP_POOL_ID = "lx.ui.tip";
+
 const DEFAULT_OPTIONS = Object.freeze({
     intervalMs: 500,
     riseDistance: 90,
@@ -48,7 +50,7 @@ export class TipQueue {
     private pumping = false;
     private disposed = false;
 
-    constructor(
+    public constructor(
         private readonly pool: TipPool,
         prefabUrl: string,
         options: TipQueueOptions = {},
@@ -66,7 +68,7 @@ export class TipQueue {
         });
     }
 
-    show(message: string): void {
+    public show(message: string): void {
         this.requireActive();
         const normalized = message.trim();
         if (!normalized) {
@@ -82,7 +84,7 @@ export class TipQueue {
         }
     }
 
-    snapshot(): TipQueueSnapshot {
+    public snapshot(): TipQueueSnapshot {
         return Object.freeze({
             queued: this.queue.length,
             active: this.active.size,
@@ -91,13 +93,13 @@ export class TipQueue {
         });
     }
 
-    async waitForPending(): Promise<void> {
+    public async waitForPending(): Promise<void> {
         while (this.pending.size > 0) {
             await Promise.allSettled(Array.from(this.pending));
         }
     }
 
-    dispose(): void {
+    public dispose(): void {
         if (this.disposed) {
             return;
         }
@@ -123,7 +125,7 @@ export class TipQueue {
         const operation = this.present(message);
         this.pending.add(operation);
         operation.catch((error: unknown) => {
-            console.error("[LX] tip presentation failed", error);
+            xlog.error("[LX] tip presentation failed", error);
         }).finally(() => {
             this.pending.delete(operation);
             if (!this.disposed) {

@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-// Reuse a successful current-input build. Each process keeps startup, errors and owner shutdown checks.
+// 复用与当前输入一致的成功构建；每个进程仍检查启动、错误与持有者关闭。
 const projectRoot = fileURLToPath(new URL("../../../", import.meta.url));
 const viewports = ["320x568", "360x640", "375x667", "390x844", "412x915", "600x800", "768x1024", "1280x720"];
 const pending = [...viewports];

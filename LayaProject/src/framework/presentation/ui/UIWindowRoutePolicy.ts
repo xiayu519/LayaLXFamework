@@ -32,8 +32,10 @@ export function toWindowInfo(record: UIWindowRouteRecord): UIWindowInfo {
 }
 
 export function compareVisibleWindows(left: UIWindowInfo, right: UIWindowInfo): number {
-    if (left.layer !== right.layer) return left.layer - right.layer;
-    return displayIndex(left.window) - displayIndex(right.window);
+    if (left.layer !== right.layer) {
+        return left.layer - right.layer;
+    }
+    return left.window.zOrder - right.window.zOrder || displayIndex(left.window) - displayIndex(right.window);
 }
 
 function displayIndex(window: BaseGameWindow<unknown>): number {

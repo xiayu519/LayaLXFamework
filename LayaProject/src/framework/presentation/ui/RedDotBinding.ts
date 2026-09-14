@@ -3,55 +3,55 @@ import { UIBindings } from "./UIBindings";
 
 const { regClass, property } = Laya;
 
-/** Attach to an existing UI node and assign references in the IDE; creates no display objects. */
+/** 挂到已有 UI 节点并在 IDE 中指定引用，不创建显示对象。 */
 @regClass()
 export class RedDotBinding extends Laya.Script {
     private static defaultValue: RedDotStore | undefined;
 
-    static get defaultStore(): RedDotStore | undefined { return this.defaultValue; }
+    public static get defaultStore(): RedDotStore | undefined {
+        return this.defaultValue;
+    }
 
-    /** Install before enabling UI; dispose its UI owners before replacing/removing this default. */
-    static setDefaultStore(store: RedDotStore | undefined): void {
+    /** 启用 UI 前安装默认实例；替换或移除前，先销毁使用它的 UI 持有者。 */
+    public static setDefaultStore(store: RedDotStore | undefined): void {
         this.defaultValue = store;
     }
 
     @property({ type: String, caption: "红点路径" })
-    key = "";
-
+    public key = "";
     @property({ type: Laya.Sprite, caption: "红点节点" })
-    badge: Laya.Sprite | null = null;
-
+    public badge: Laya.Sprite | null = null;
     @property({ type: Laya.GTextField, caption: "数量文本（可选）" })
-    countText: Laya.GTextField | null = null;
-
+    public countText: Laya.GTextField | null = null;
     @property({ type: Number, caption: "数量显示上限（0 为不限）", min: 0 })
-    maxCount = 99;
-
+    public maxCount = 99;
     private sourceOverride: RedDotStore | undefined;
     private bindings: UIBindings | undefined;
     private listening = false;
 
-    /** For scene-local stores or recycled GList rows. Undefined uses the application store. */
-    bind(store: RedDotStore | undefined, key = this.key): void {
-        // Reject an invalid binding before detaching the previous working one.
-        if (key) (store ?? RedDotBinding.defaultStore)?.get(key);
+    /** 用于场景局部红点状态或复用的 GList 行；未指定时使用应用级实例。 */
+    public bind(store: RedDotStore | undefined, key = this.key): void {
+        // 先拒绝无效绑定，再解除此前仍有效的绑定。
+        if (key) {
+            (store ?? RedDotBinding.defaultStore)?.get(key);
+        }
         this.sourceOverride = store;
         this.key = key;
         this.refreshBinding();
     }
 
-    override onEnable(): void {
+    public override onEnable(): void {
         this.listening = true;
         this.refreshBinding();
     }
 
-    override onDisable(): void {
+    public override onDisable(): void {
         this.listening = false;
         this.detach();
         this.clearBadge();
     }
 
-    override onDestroy(): void {
+    public override onDestroy(): void {
         this.onDisable();
         this.sourceOverride = undefined;
         this.badge = null;
@@ -83,7 +83,11 @@ export class RedDotBinding extends Laya.Script {
     }
 
     private clearBadge(): void {
-        if (this.badge && !this.badge.destroyed) this.badge.visible = false;
-        if (this.countText && !this.countText.destroyed) this.countText.text = "";
+        if (this.badge && !this.badge.destroyed) {
+            this.badge.visible = false;
+        }
+        if (this.countText && !this.countText.destroyed) {
+            this.countText.text = "";
+        }
     }
 }

@@ -128,7 +128,7 @@ function replaceGeneratedDirectory(source, destination) {
         throw new Error(`Generated destination escaped the project: ${destinationRoot}`);
     }
     const files = listFiles(source);
-    // Capture native asset identities before replacing the generated directory.
+    // 替换生成目录前，先保存原生资源标识。
     const metadata = new Map(files.map(file => {
         const target = join(destinationRoot, relative(source, file));
         return [file, metadataFor(target)];

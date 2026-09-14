@@ -1,4 +1,5 @@
 const TRANSITION_SCALE = 0.3;
+
 const TRANSITION_DURATION_MS = 200;
 
 type TransitionPhase = "idle" | "showing" | "hiding";
@@ -10,7 +11,7 @@ interface TransformSnapshot {
     readonly scaleY: number;
 }
 
-/** Animates the authored safeContent/mid while its owner retains show/close/destruction semantics. */
+/** 对资源中配置的 safeContent/mid 播放动画；显示、关闭与销毁仍由持有者负责。 */
 export class UIPopupTransition {
     private phaseValue: TransitionPhase = "idle";
     private version = 0;
@@ -19,13 +20,18 @@ export class UIPopupTransition {
     private inputBeforeTransition: boolean | undefined;
     private completed: (() => void) | undefined;
 
-    constructor(private readonly view: Laya.GWidget, private readonly pane: Laya.GWidget = view) {}
+    public constructor(private readonly view: Laya.GWidget, private readonly pane: Laya.GWidget = view) {
+    }
 
-    get phase(): TransitionPhase { return this.phaseValue; }
+    public get phase(): TransitionPhase {
+        return this.phaseValue;
+    }
 
-    show(completed?: () => void): void {
+    public show(completed?: () => void): void {
         this.cancel();
-        if (this.view.destroyed) return;
+        if (this.view.destroyed) {
+            return;
+        }
         const mid = this.mid;
         const baseline = captureTransform(mid);
         this.baseline = baseline;
@@ -44,8 +50,10 @@ export class UIPopupTransition {
             .then(() => this.complete(version, "showing"));
     }
 
-    hide(completed: () => void): void {
-        if (this.view.destroyed || this.phaseValue === "hiding") return;
+    public hide(completed: () => void): void {
+        if (this.view.destroyed || this.phaseValue === "hiding") {
+            return;
+        }
         if (this.phaseValue === "showing") {
             this.killTween();
         } else {
@@ -69,7 +77,7 @@ export class UIPopupTransition {
             .then(() => this.complete(version, "hiding"));
     }
 
-    cancel(): void {
+    public cancel(): void {
         this.killTween();
         this.restoreTransform();
         this.baseline = undefined;
@@ -78,26 +86,35 @@ export class UIPopupTransition {
         this.restoreInput();
     }
 
-    /** New layout becomes the authored baseline; old callbacks can no longer close or restore it. */
-    relayout(apply: () => void): void {
+    /** 以新布局作为基准；旧回调不能再关闭或恢复界面。 */
+    public relayout(apply: () => void): void {
         const phase = this.phaseValue;
         const completed = this.completed;
         this.cancel();
         const version = this.version;
         apply();
-        if (this.view.destroyed || version !== this.version) return;
-        if (phase === "showing") this.show(completed);
-        else if (phase === "hiding") this.hide(completed!);
+        if (this.view.destroyed || version !== this.version) {
+            return;
+        }
+        if (phase === "showing") {
+            this.show(completed);
+        } else if (phase === "hiding") {
+            this.hide(completed!);
+        }
     }
 
     private get mid(): Laya.GWidget {
         const mid = this.pane.getChildByName("safeContent")?.getChildByName("mid");
-        if (!(mid instanceof Laya.GWidget)) throw new Error("Popup animation requires safeContent/mid.");
+        if (!(mid instanceof Laya.GWidget)) {
+            throw new Error("Popup animation requires safeContent/mid.");
+        }
         return mid;
     }
 
     private complete(version: number, phase: TransitionPhase): void {
-        if (version !== this.version || phase !== this.phaseValue) return;
+        if (version !== this.version || phase !== this.phaseValue) {
+            return;
+        }
         this.tween = undefined;
         this.restoreTransform();
         this.baseline = undefined;
@@ -105,7 +122,9 @@ export class UIPopupTransition {
         this.restoreInput();
         const completed = this.completed;
         this.completed = undefined;
-        if (!this.view.destroyed) completed?.();
+        if (!this.view.destroyed) {
+            completed?.();
+        }
     }
 
     private killTween(): void {
@@ -115,19 +134,29 @@ export class UIPopupTransition {
     }
 
     private restoreTransform(): void {
-        if (!this.baseline || this.pane.destroyed) return;
+        if (!this.baseline || this.pane.destroyed) {
+            return;
+        }
         const mid = this.mid;
-        if (!mid.destroyed) applyTransform(mid, this.baseline);
+        if (!mid.destroyed) {
+            applyTransform(mid, this.baseline);
+        }
     }
 
     private blockInput(): void {
-        if (this.inputBeforeTransition === undefined) this.inputBeforeTransition = this.view.mouseEnabled;
+        if (this.inputBeforeTransition === undefined) {
+            this.inputBeforeTransition = this.view.mouseEnabled;
+        }
         this.view.mouseEnabled = false;
     }
 
     private restoreInput(): void {
-        if (this.inputBeforeTransition === undefined) return;
-        if (!this.view.destroyed) this.view.mouseEnabled = this.inputBeforeTransition;
+        if (this.inputBeforeTransition === undefined) {
+            return;
+        }
+        if (!this.view.destroyed) {
+            this.view.mouseEnabled = this.inputBeforeTransition;
+        }
         this.inputBeforeTransition = undefined;
     }
 }

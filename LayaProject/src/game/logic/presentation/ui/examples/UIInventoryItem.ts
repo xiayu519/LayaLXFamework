@@ -5,10 +5,10 @@ const { regClass } = Laya;
 
 @regClass()
 export class UIInventoryItem extends UIInventoryItemBase {
-    itemId = "";
+    public itemId = "";
 
-    render(item: ExampleItem, index: number): void {
-        // A virtual row can represent a different item on every render.
+    public render(item: ExampleItem, index: number): void {
+        // 虚拟列表行每次渲染都可能对应不同物品。
         this.itemId = item.id;
         this.itemImage.src = inventoryIcon(index);
         this.title = item.name;
@@ -17,8 +17,10 @@ export class UIInventoryItem extends UIInventoryItemBase {
         this.grayed = item.quantity === 0;
     }
 
-    /** Called when this presentation ends; list destruction also releases pooled native children. */
-    clearBinding(): void { this.itemImage.src = ""; }
+    /** 本次展示结束时调用；列表销毁时也会释放池中的原生子节点。 */
+    public clearBinding(): void {
+        this.itemImage.src = "";
+    }
 }
 
 function inventoryIcon(index: number): string {

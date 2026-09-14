@@ -1,29 +1,48 @@
 # World 与场景
 
+按框架根 World → 业务小 World → Scene/UI 组织生命周期。WorldScope 自动登记专属 UI/Scene 的清理责任，管理器保存实际实例。公共事件、全局数据和红点由根初始化，首次同步完成（真实网络 TODO）后才进入 LobbyWorld。完整契约见 [World 生命周期设计](world-lifecycle-design.md)。
+
 `lx.worlds` 协调业务世界的初始化和卸载；`lx.scenes` 持有原生场景实例；每个 `BaseGameScene` 持有自己的 `scene.ui`。World 保存注册撤销和清理回调，不保存 UI 实例、不创建 UI 宿主，也没有 `world.ui`。
 
 ## 注册与进入 World
 
-应用组合根准备公共 UI 与 World 定义，框架 AppBootstrap 启动公共服务；注册仅准备描述数据，不等于加载。进入 World 时才初始化其专属 UI、Scene 和事件，退出只清理自身内容。账号数据与协议接收不依赖 World，登录数据可以在任何界面打开前落地。以下为专属内容的组合根片段：`context` 为 `RuntimeContext`，`battleScene` 与 `battleHud` 是游戏已声明的场景和 UI 路由，包含各自的资源地址及所需 bind；场景 Runtime 负责打开对应的 HUD。
+应用组合根准备公共 UI 与 World 定义，lx.init 统一初始化框架模块；注册仅准备描述数据，不等于加载。进入 World 时才初始化其专属 UI、Scene 和事件，退出只清理自身内容。账号数据与协议接收不依赖 World，登录数据可以在任何界面打开前落地。以下为 World 子类与工厂登记的简化片段：`battleScene` 与 `battleHud` 是游戏已声明的场景和 UI 路由，包含各自的资源地址及所需 bind；场景 Runtime 负责打开对应的 HUD。
 
 ```ts
-context.worlds.register({
-    id: "battle",
-    async initialize(world) {
-        const hud = context.ui.registerView(battleHud);
-        world.own(() => context.ui.unregisterView(hud));
+class BattleWorld extends BaseWorld<WorldScope> {
+    public readonly id = "battle";
+    private scene?: typeof battleScene;
 
-        const scene = context.scenes.register(battleScene);
-        world.own(() => context.scenes.unregister(scene));
+    protected override onRegister(world: WorldScope): void {
+        this.registerUI(world);
+        this.registerScenes(world);
+    }
 
-        // 先登记撤销，再开始异步工作；原始 Promise 必须返回/等待。
-        await context.scenes.open(scene, { levelId: 1 }, { signal: world.signal });
-    },
-});
-await context.worlds.enter("battle");
+    private registerUI(world: WorldScope): void {
+        world.registerView(battleHud);
+    }
+
+    private registerScenes(world: WorldScope): void {
+        this.scene = world.registerScene(battleScene);
+    }
+
+    protected override async onEnter(world: WorldScope): Promise<void> {
+        if (!this.scene) {
+            throw new Error("Scene has not been registered.");
+        }
+        await world.openScene(this.scene, { levelId: 1 });
+    }
+}
+
+lx.worlds.register({ id: "battle", create: () => new BattleWorld() });
+await lx.worlds.enter("battle");
 ```
 
-`WorldContext` 只有 `id`、`signal` 和 `own(cleanup)`。初始化自己的内容时使用原生 on/off、timer 或各模块注册 API，并立即登记撤销动作。回调逆序执行：先停止最后注册的副作用，再卸载场景，最后撤销专属 UI 定义。公共定义不交给 world.own；公共 UI 的实例仍由打开它的 Scene 或父窗口清理。两个 World 先退出再进入时，可以重新使用同一 Prefab；复用资源不等于共用实例。
+真实 [LobbyWorld](../src/game/logic/bootstrap/worlds/LobbyWorld.ts) 和 [BattleWorld](../src/game/logic/bootstrap/worlds/BattleWorld.ts) 还在 registerEvents 中登记各自的局部导航事件，onRegister 只保留三个方法调用。上面省略事件业务以突出 UI/Scene 路由；新增事件时同样在本类单独登记，复杂场景注册可在 registerScenes 中继续按功能分组。小 World 订阅 lx.events 或 lx.net 时也用 world.listen，由自身退出卸载。
+
+BaseWorld 位于 framework/application/world/BaseWorld，普通 TypeScript 类，不继承引擎组件。子类重写 onRegister/onEnter，可选重写 onExit，不重写 initialize。基类先登记 onExit 补偿，再执行注册和进入；取消后跳过尚未开始的 onEnter。onExit 在当时已登记的 own 逆序清理后执行，也会在部分初始化失败时执行。若退出时初始化仍未结束，晚到 own 继续由 WorldRegistry 排空；onExit 不代表所有异步工作已经结束，也不要在其中等待自身初始化完成。
+
+运行时 WorldScope 在纯 WorldContext 上增加原生 events、listen、ownCaller、registerView/registerScene/openScene、startServices、track 和 ownResource。退出时先按 signal 失效并清除已登记事件/timer/Tween，再逆依赖关闭内容；资源和模块先登记，依赖它们的 UI/Scene 后登记。公共定义不交给子 World；公共 UI 的实例仍由打开它的 Scene 或父窗口清理。每次激活克隆专属 route，后续调用使用返回的 route，防止旧 owner 撤销新定义。
 
 `enter(id)` 合并同一 World 的并发初始化；`get(id)` 只返回已完成初始化的活动 World 上下文。不同 World 可以共存，不隐含“当前 World”。`exit(id)` 取消初始化、运行已登记的清理，并等待原始初始化和晚到清理完成；晚到 own 会立即进入清理。初始化失败执行同样的补偿；清理失败保留诊断并阻止该条目重新进入。
 
@@ -34,7 +53,7 @@ await lx.worlds.exit("lobby");
 await lx.worlds.enter("battle");
 ```
 
-顺序由游戏导航业务决定；示例把并发点击合并在应用组合处。不要在将退出的 UI 内持有整段切换任务，也不要在初始化里调用并等待自身 exit。示例见 [registerExampleWorlds.ts](../src/game/logic/bootstrap/registerExampleWorlds.ts)。
+顺序由游戏导航业务决定；[LobbyWorld.ts](../src/game/logic/bootstrap/worlds/LobbyWorld.ts) 和 [BattleWorld.ts](../src/game/logic/bootstrap/worlds/BattleWorld.ts) 分别接收自身局部事件，再调用注入的导航函数，由 [GameApplication.ts](../src/game/logic/bootstrap/GameApplication.ts) 协调切换并合并并发请求。不要在将退出的 UI 内持有整段切换任务，也不要在初始化里调用并等待自身 exit。WorldDefinition 接口仍可用于边界适配，业务 World 统一继承 BaseWorld。
 
 ## 多场景与显式归属
 
@@ -49,7 +68,7 @@ const scene = await lx.scenes.open(battle, { levelId: 1 });
 lx.scenes.get(battle);         // 已就绪的实例；加载、卸载期间可能为 undefined。
 lx.scenes.get("battle.scene");
 await lx.scenes.close(battle); // 卸载实例和待完成加载，保留定义。
-await lx.scenes.unregister(battle); // 撤销定义；通常由 World 的 own 调用。
+await lx.scenes.unregister(battle); // 撤销定义；world.registerScene 已自动登记此清理。
 ```
 
 保存 register 返回的 route，或使用原注册对象，才能保留参数类型与注册身份。旧注册对象不能卸载后来同 ID 的新注册。字符串入口没有相同的参数类型检查。

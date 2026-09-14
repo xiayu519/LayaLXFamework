@@ -20,7 +20,7 @@ export class DefaultSceneLoadingPresenter implements SceneLoadingPresenter {
     private window: UISceneLoadingWindow | undefined;
     private generation = 0;
 
-    constructor(private readonly ui: UIRouter, prefabUrl: string) {
+    public constructor(private readonly ui: UIRouter, prefabUrl: string) {
         this.route = ui.register({
             id: DEFAULT_SCENE_LOADING_ROUTE_ID,
             url: prefabUrl,
@@ -30,47 +30,58 @@ export class DefaultSceneLoadingPresenter implements SceneLoadingPresenter {
             multiplicity: "singleton",
             retention: "hide",
             create: (pane) => {
-                if (!(pane instanceof UISceneLoading)) throw new Error("UISceneLoading.lh requires UISceneLoading Runtime.");
+                if (!(pane instanceof UISceneLoading)) {
+                    throw new Error("UISceneLoading.lh requires UISceneLoading Runtime.");
+                }
                 return new UISceneLoadingWindow(pane);
             },
         });
     }
 
-    async show(progress: SceneTransitionProgress): Promise<void> {
+    public async show(progress: SceneTransitionProgress): Promise<void> {
         const generation = ++this.generation;
         const window = await this.ui.show(this.route, progress) as UISceneLoadingWindow;
-        if (generation !== this.generation) return;
+        if (generation !== this.generation) {
+            return;
+        }
         this.window = window;
         window.setProgress(progress);
     }
 
-    update(progress: SceneTransitionProgress): void {
-        if (this.window && !this.window.destroyed) this.window.setProgress(progress);
+    public update(progress: SceneTransitionProgress): void {
+        if (this.window && !this.window.destroyed) {
+            this.window.setProgress(progress);
+        }
     }
 
-    fail(progress: SceneTransitionProgress, error: unknown): void {
-        if (this.window && !this.window.destroyed) this.window.setFailure(progress, error);
+    public fail(progress: SceneTransitionProgress, error: unknown): void {
+        if (this.window && !this.window.destroyed) {
+            this.window.setFailure(progress, error);
+        }
     }
 
-    hide(): void {
+    public hide(): void {
         this.generation += 1;
         const window = this.window;
         this.window = undefined;
-        if (window && !window.destroyed) this.ui.close(this.route.id, window);
-        else this.ui.close(this.route.id);
+        if (window && !window.destroyed) {
+            this.ui.close(this.route.id, window);
+        } else {
+            this.ui.close(this.route.id);
+        }
     }
 }
 
 class UISceneLoadingWindow extends BaseGameWindow<SceneTransitionProgress> {
     private readonly progressWidth: number;
 
-    constructor(private readonly view: UISceneLoading) {
+    public constructor(private readonly view: UISceneLoading) {
         super(view);
         this.modal = true;
         this.progressWidth = view.progressFill.width;
     }
 
-    setProgress(progress: SceneTransitionProgress): void {
+    public setProgress(progress: SceneTransitionProgress): void {
         const overallPercent = toPercent(progress.overall);
         this.view.phaseText.text = PHASE_LABELS[progress.phase];
         this.view.phaseText.color = "#f8fafc";
@@ -81,7 +92,7 @@ class UISceneLoadingWindow extends BaseGameWindow<SceneTransitionProgress> {
         this.view.progressFill.width = Math.round(this.progressWidth * progress.overall);
     }
 
-    setFailure(progress: SceneTransitionProgress, error: unknown): void {
+    public setFailure(progress: SceneTransitionProgress, error: unknown): void {
         this.setProgress(progress);
         const cancelled = error instanceof Error && error.name === "SceneTransitionCancelledError";
         this.view.phaseText.text = cancelled ? "加载已取消" : "加载失败，请重试";

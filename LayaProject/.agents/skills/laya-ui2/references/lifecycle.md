@@ -2,10 +2,10 @@
 
 - owner、host、layout 分开：`lx.ui` 的应用窗口由原生 GRoot/GWindow 承载；`BaseGameScene.ui` 的 UIViewRoute 全部使用原生 GWidget Runtime，包括 center-popup，挂 `.ls` 声明的 uiRoot。不为场景创建 GRoot，不改引擎默认 Root。
 - Runtime + IDE `.generated.ts` 或静态 Script 的 @property 完成节点引用，不维护第二套绑定器。Prefab.create 完成后才消费引用；同步属性赋值无需 token，跨 await 回写要检查失效。
-- 场景窗口根静态 UIViewLifecycle 配置 layout/layer/navigation/modal/closeOnMaskClick/multiplicity/retention；registerView 只保留 id/url 与可选 bind/onClosed。无 bind 时调用静态 Runtime.onBind，不要求导入具体 Runtime 构造类。IDE 可调参数放静态 Script；Runtime 是运行时替代类型，不把其新增属性当作 IDE 可保存字段。
+- 场景窗口根静态 UIViewLifecycle 配置 layout/layer/openMode/modal/closeOnMaskClick/multiplicity/retention；registerView 只保留 id/url 与可选 bind/onClosed。无 bind 时调用静态 Runtime.onBind，不要求导入具体 Runtime 构造类。IDE 可调参数放静态 Script；Runtime 是运行时替代类型，不把其新增属性当作 IDE 可保存字段。
 - UIViewRoute.bind / 默认 Runtime.onBind 的 session 提供 ui/token/lifetime/close、show、bindData、bindRedDot。session.show 打开的子窗口归本次展示，父关闭连同隐藏缓存和待加载一起清理；session.ui.show 归场景，父窗口关闭不影响它。旧 session.close 不得关闭新展示。singleton 按 owner 隔离，hide 不延长 owner 寿命；multiple 只允许 destroy。
-- navigation:page 参与页面覆盖，overlay 保留下面页面；这与 fullscreen/center-popup、modal 分开。页面暂停使用原生 active=false 并停止数据绑定，恢复原实例时同步重读快照。应用 Loading 不属于场景页面栈。
-- World 只登记路由及撤销回调，不持有 UI。unregisterView 立即撤销该定义的新请求，并清理所有场景中该定义的可见、隐藏与待加载实例；过期定义不得注销同 ID 新注册。
+- openMode 只影响全屏：replace 在新页绑定成功后关闭同宿主较早且层级不高于它的全屏，stack 保留旧展示运行。弹窗强制 stack；独立弹窗不被替换，旧页面拥有的子 UI 随旧展示关闭。失败保留旧页，晚到旧请求不可复活；成功后解除来源 signal 再关闭旧页。无自动返回栈，replace 使用 session.ui.show，父展示拥有的全屏子 UI 使用 stack。应用 Loading 不参与此流程。
+- WorldScope.registerView 自动登记专属路由的生命周期；实例由 SceneUI 保存，Scene 与其 UI 归该 World。使用返回的本次路由对象；unregisterView 撤销新请求并清理可见、隐藏与待加载实例，过期定义不能注销同 ID 新注册。公共路由留在根，公共 UI 实例仍归打开它的 Scene/父展示。
 - 场景离场取消打开请求并销毁所属可见实例、隐藏缓存和嵌套子窗口；等待原生加载稳定后再 GC。不能只销毁显示树来代替 owner 清理。
 - `GWindow.show()` 交给 `GRoot.showWindow()`；Hide 从显示树移除并触发 presentation 清理。
 - `GWindow.destroy()` 会先隐藏仍在 `GRoot` 的窗口。observer 在进入原生 destroy 前必须暂时解除，避免 Hide → router Destroy 重入。
