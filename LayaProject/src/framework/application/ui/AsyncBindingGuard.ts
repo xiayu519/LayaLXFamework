@@ -1,3 +1,4 @@
+import { createAbortController } from "../lifecycle/createAbortController";
 export interface BindingToken {
     readonly version: number;
     readonly signal: AbortSignal;
@@ -16,7 +17,7 @@ export class AsyncBindingGuard {
         }
         this.invalidate();
         const version = ++this.revision;
-        const controller = new AbortController();
+        const controller = createAbortController();
         this.controller = controller;
         if (parentSignal) {
             const abort = (): void => controller.abort();

@@ -23,6 +23,9 @@
     { "id": "independent_work_continues", "request": "公共存档格式变更尚待批准；当前游戏一个已授权且独立的分数显示修复不依赖它。对这个局部修复下一步？", "expected": "implement" }
   ],
   "cases": [
+    {"id":"world_domain_boundary","request":"新增远征玩法，每次开始建立一局队伍和局内状态，途中切换多个地图，返回大厅结束整局；按现有框架确定 World 划分与模块归属，不改共享 API。","expected":["lx-architecture"]},
+    {"id":"shared_ui_local_instance","request":"物品详情已经供大厅和战斗共用；修复大厅关闭后详情实例及其数据订阅仍然保留的问题，保留公共定义，不改变 World 划分。","expected":["laya-ui2"]},
+    {"id":"world_global_subscription","request":"战斗退出后仍收到账号模块的全局通知，只修复 BattleWorld 对该事件源的订阅清理，保持现有接口和归属不变。","expected":["laya-runtime-lifecycle"]},
     {"id":"ui_reference_home","request":"按给定主界面示意图，用已有散图拼好资源栏、主内容和底部导航，选择项目已有窗口与功能模板并验证适配。","expected":["laya-ui2"]},
     {"id":"ui_reference_popup_grid","request":"制作奖励弹窗，中间显示100个奖励的三列网格，下方领取和取消，沿用框架开合动画并验证滚动。","expected":["laya-ui2"]},
     {"id":"ui_reference_ambiguous_bag","request":"按背包示意图制作界面，图中只有物品格和详情，没说明全屏还是弹窗，请按现有流程处理。","expected":["laya-ui2"]},

@@ -1,3 +1,4 @@
+import { createAbortController } from "../application/lifecycle/createAbortController";
 export interface PendingServiceOperation {
     readonly serviceName: string;
     readonly phase: "start" | "stop";
@@ -58,7 +59,7 @@ export class ServiceOperations {
         const id = ++this.sequence;
         const record = { serviceName, phase, startedAt: Date.now(), abandoned: false };
         this.pending.set(id, record);
-        const controller = new AbortController();
+        const controller = createAbortController();
         return new Promise<void>((resolve, reject) => {
             let settled = false;
             const cleanup = (): void => {

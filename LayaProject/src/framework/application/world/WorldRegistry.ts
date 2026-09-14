@@ -1,3 +1,4 @@
+import { createAbortController } from "../lifecycle/createAbortController";
 import type {
     WorldCleanup, WorldContext, WorldRegistration, WorldRegistrySnapshot, WorldSnapshot,
 } from "./WorldDefinition";
@@ -196,7 +197,7 @@ export class WorldRegistry<TContext extends WorldContext = WorldContext> {
     }
 
     private createRecord(id: string): WorldRecord<TContext> {
-        const controller = new AbortController();
+        const controller = createAbortController();
         let resolveEnter!: (context: TContext) => void;
         let rejectEnter!: (error: unknown) => void;
         const enterTask = new Promise<TContext>((resolve, reject) => {

@@ -1,3 +1,4 @@
+import { createAbortController } from "../../application/lifecycle/createAbortController";
 import {
     LifetimeCleanupError,
     LifetimeScope,
@@ -34,7 +35,7 @@ export abstract class BaseGameScene<TArgs = void> extends Laya.Scene {
     /** 使用原生 Runtime 导出变量 uiRoot，或在首次访问 ui 前赋值为已导出的节点。 */
     public uiRoot: Laya.GWidget | null = null;
     private readonly sceneLifetime = new LifetimeScope();
-    private readonly sceneController = new AbortController();
+    private readonly sceneController = createAbortController();
     private transitionLoadingCompletion: (() => void) | undefined;
     private transitionPaused = false;
     private transitionLeaving = false;

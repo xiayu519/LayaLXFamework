@@ -1,5 +1,7 @@
 # 框架 World 与业务 World 的通用生命周期设计
 
+新增功能先按 [归属判定](ownership-decisions.md) 决定是否建立 World、公共 UI 定义与实例寿命、事件源与订阅；本文说明确定归属后的具体生命周期。
+
 日期：2026-09-14。状态：第一版已实施；真实服务器连接、完整同步协议和 IAP 权益接入仍为 TODO。
 
 补充的逐帧更新、BattleWorld 局部倍速和 WebSocket 集成见 [World 时间与网络](world-time-and-network.md)。lx.http 负责 HTTP，lx.net 为根持有的原生 Socket，默认不连接。

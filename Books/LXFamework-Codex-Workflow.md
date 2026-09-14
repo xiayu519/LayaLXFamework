@@ -31,6 +31,8 @@ Codex 对两类文件采用不同的官方发现顺序：`AGENTS.md` 从 Git 根
 
 实施请求授权范围内的可逆工作与必要验证。只有无法查明、会实质改变结果的产品选择需要追问；普通命名纠正、实现细节和文件数量变化直接处理。用户询问进度或中途补充时保留原任务目标。只读分析请求仍只读。
 
+新功能按 [World、UI 与事件归属判定](../LayaProject/docs/ownership-decisions.md) 从业务进退行为确定归属，开发者无需逐项标注技术分类。已有 owner 的局部修复沿用原设计。游戏内公用不自动上移框架；共享 UI 定义不意味着实例常驻；全局事件源不改变 UI/World 自己的订阅寿命。只读判断、代码实现与工作流修改分别按各自实际影响选择验收。
+
 输出先说明结果、相关文件和验证证据；不要用长计划、固定格式或重复检查占据简单任务。无法完成时报告具体失败、尝试和未验证项，不自行切模型或扩大范围。
 
 ## 模型与成本
@@ -78,6 +80,8 @@ Windows 与 macOS 共用同一套 AGENTS、Skills 和 npm 命令。GitHub Action
 本次迁移的分类、真实 Laya 执行证据和成本计量限制统一记录在 [GPT-6 工作流迁移验收](../LayaProject/docs/gpt6-workflow-validation.md)，不在使用手册中重复维护成绩。
 
 后续按影响选择检查、探针分组和模型案例筛选的证据见 [验证粒度优化验收](../LayaProject/docs/verification-scope-validation.md)。
+
+World、UI、事件归属判据与近期代码同步的验证见 [归属工作流验收](../LayaProject/docs/workflow-ownership-validation.md)，包含模型子集、独立执行和成本计量边界。
 
 真实商店、小游戏容器或 Native 签名等无法由 Headless 证明的行为应列为未验证项，不自动切换到 GUI。
 

@@ -10,8 +10,8 @@ interface WeChatRect {
 }
 
 interface WeChatWindowInfo {
-    readonly windowWidth: number;
-    readonly windowHeight: number;
+    readonly windowWidth?: number;
+    readonly windowHeight?: number;
     readonly screenWidth?: number;
     readonly screenHeight?: number;
     readonly screenTop?: number;
@@ -29,9 +29,7 @@ export class WeChatMiniGamePlatformService implements PlatformService {
     public readonly kind = "mini-game" as const;
 
     public static isSupported(): boolean {
-        const api = resolveWeChatApi();
-        return Boolean(api && (typeof api.getWindowInfo === "function"
-            || typeof api.getSystemInfoSync === "function"));
+        return Boolean(resolveWeChatApi());
     }
 
     public get viewport(): PlatformViewport {
@@ -40,8 +38,8 @@ export class WeChatMiniGamePlatformService implements PlatformService {
         if (!info) {
             return Object.freeze({ width: 0, height: 0 });
         }
-        const width = finiteSize(info.windowWidth || info.screenWidth || 0);
-        const height = finiteSize(info.windowHeight || info.screenHeight || 0);
+        const width = finiteSize(info.windowWidth ?? info.screenWidth ?? 0);
+        const height = finiteSize(info.windowHeight ?? info.screenHeight ?? 0);
         const screenTop = finiteCoordinate(info.screenTop);
         return Object.freeze({
             width,
@@ -82,7 +80,9 @@ export class WeChatMiniGamePlatformService implements PlatformService {
 
 function resolveWeChatApi(): WeChatApi | undefined {
     const value = (globalThis as typeof globalThis & { wx?: unknown }).wx;
-    return value && typeof value === "object" ? value as WeChatApi : undefined;
+    const api = value && typeof value === "object" ? value as WeChatApi : undefined;
+    return api && (typeof api.getWindowInfo === "function" || typeof api.getSystemInfoSync === "function")
+        ? api : undefined;
 }
 
 function normalizeRect(
@@ -118,7 +118,7 @@ function clamp(value: number, minimum: number, maximum: number): number {
 }
 
 function tryCall<TResult>(method: (() => TResult) | undefined, owner: WeChatApi): TResult | undefined {
-    if (!method) {
+    if (typeof method !== "function") {
         return undefined;
     }
     try {

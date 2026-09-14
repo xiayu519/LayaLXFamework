@@ -63,7 +63,11 @@ src/framework/ 是公共能力层，不依赖 game；src/game/logic/ 是保留�
 
 `lx.res` 返回原生 Laya.loader；普通原生场景直接使用 Laya.Scene。托管场景使用 `lx.scenes`，业务初始化协调使用 `lx.worlds`，独立账号数据通过 `lx.data.get(key)` 读取，应用停机使用 `await lx.stop()`。lx 直接持有模块，不增加原生 Scene 转发入口。
 
+框架创建取消对象统一使用内部 createAbortController：优先原生能力，缺失时复用固定版本的标准兼容库，仅补当前实例缺少的 reason/throwIfAborted，不修改全局或建立新生命周期。平台默认选择 Web/微信；识别出的 Native 或其他未支持小游戏要求通过 ApplicationConfig.platform 注入适配。安全区未能可信测量时返回 undefined，有效零边距与未知值分开，修复依据及目标设备验证边界见 [平台兼容性](platform-compatibility-review.md)。
+
 ## World、Scene 与账号数据
+
+新增业务的 World 划分、公共 UI 定义与实例、事件源与订阅按 [归属判定](ownership-decisions.md) 决策；游戏内全局能力仍留在当前 game，不能据此直接上移框架。
 
 公共 UI 和 World 工厂在 GameApplication 组合根准备，公共服务由 AppBootstrap 启停；注册不加载实例。业务类继承 BaseWorld<WorldScope>，按需覆写准备、事件、UI、场景和进出钩子；共同顺序由父类维护。WorldScope 自动登记专属 UI/Scene 清理，listen 记录原生订阅，startServices 复用服务启停，track/ownResource 接入异步资源归属。WorldRegistry 保持唯一的子 World 状态机：退出先失效；WorldScope 立即启动全部所属 Scene 的注销，使场景和 UI 的取消不被后登记的慢清理阻塞，随后逆序等待清理、原始任务及晚到补偿，失败保留诊断。Scene/UI 实例由既有管理器保存并归属于该 World；账号数据和全局红点独立于子 World。一个 World 可管理多个 Scene，不同 World 可以共存。
 

@@ -1,3 +1,4 @@
+import { createAbortController } from "../../application/lifecycle/createAbortController";
 export interface UIRequestInfo {
     readonly id: number;
     readonly routeId: string;
@@ -21,7 +22,7 @@ export class UIRequestTracker {
     private sequence = 0;
 
     public begin(routeId: string, signal?: AbortSignal): UIRequest {
-        const controller = new AbortController();
+        const controller = createAbortController();
         const abort = (): void => controller.abort();
         if (signal?.aborted) {
             abort();

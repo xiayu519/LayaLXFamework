@@ -1,3 +1,4 @@
+import { createAbortController } from "../application/lifecycle/createAbortController";
 import type { AppService, BootstrapProgress } from "../application/lifecycle/AppService";
 import { ServiceOperations } from "./ServiceOperations";
 
@@ -40,7 +41,7 @@ export class AppBootstrap {
     private startTask: Promise<void> | undefined;
     private stopTask: Promise<void> | undefined;
     private readonly operations = new ServiceOperations();
-    private readonly startController = new AbortController();
+    private readonly startController = createAbortController();
     private readonly failedStops = new Set<string>();
     private readonly latestStopAttempts = new Map<string, number>();
     private stopSequence = 0;

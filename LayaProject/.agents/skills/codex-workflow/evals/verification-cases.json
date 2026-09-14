@@ -1,6 +1,6 @@
 [
   { "id": "verify_docs_only", "request": "仅修正 README 和工程介绍中的导航链接与错别字，没有改变 AGENTS、Skill 或配置语义；本次专项验证选什么？", "expected": ["diff_links"] },
-  { "id": "verify_comment_only", "request": "只把 ScoreLabel.ts 的普通注释翻译成英文，没有改指令注释、类型、可执行代码或配置；本次专项验证选什么？", "expected": ["diff_links"] },
+  { "id": "verify_comment_only", "request": "只把 ScoreLabel.ts 的普通注释翻译成中文，没有改指令注释、类型、可执行代码或配置；本次专项验证选什么？", "expected": ["diff_links"] },
   { "id": "verify_local_ts", "request": "已修复命名游戏 formatScore 的千位分隔，接口和依赖不变；有相关单测，不涉及 Laya 引擎行为。本次专项验证选什么？", "expected": ["typecheck", "related_tests"] },
   { "id": "verify_skill_semantics", "request": "只调整一个 Skill 的授权判断语义，未改工具、记忆、游戏模板或 TS；有对应路由正负例。本次专项验证选什么？", "expected": ["skills", "model_subset"] },
   { "id": "verify_memory_only", "request": "只新增一条已验证的项目记忆并更新索引，没有改变检索器、Skill 或代码。本次专项验证选什么？", "expected": ["memory"] },

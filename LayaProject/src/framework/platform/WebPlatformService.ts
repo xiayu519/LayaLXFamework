@@ -17,8 +17,10 @@ export class WebPlatformService implements PlatformService {
     }
 
     public start(): void {
-        const document = Laya.Browser?.window?.document ?? globalThis.document;
-        if (!document?.body || this.safeAreaProbe) {
+        const hostWindow = Laya.Browser?.window ?? globalThis.window;
+        const document = hostWindow?.document ?? globalThis.document;
+        if (this.safeAreaProbe || !document?.body || typeof hostWindow?.getComputedStyle !== "function"
+            || !hostWindow.CSS?.supports?.("padding-top", "env(safe-area-inset-top)")) {
             return;
         }
         enableViewportFitCover(document);
@@ -59,16 +61,19 @@ export class WebPlatformService implements PlatformService {
         hostWindow.open(parsed.href, "_blank", "noopener,noreferrer");
     }
 
-    private readSafeArea(width: number, height: number): PlatformRect {
+    private readSafeArea(width: number, height: number): PlatformRect | undefined {
         const probe = this.safeAreaProbe;
-        if (!probe) {
-            return freezeRect(0, 0, width, height);
+        if (!probe || width <= 0 || height <= 0) {
+            return undefined;
         }
         const style = (Laya.Browser?.window ?? globalThis.window).getComputedStyle(probe);
         const top = cssPixel(style.paddingTop, height);
         const right = cssPixel(style.paddingRight, width);
         const bottom = cssPixel(style.paddingBottom, height);
         const left = cssPixel(style.paddingLeft, width);
+        if (top === undefined || right === undefined || bottom === undefined || left === undefined) {
+            return undefined;
+        }
         return freezeRect(left, top, Math.max(0, width - left - right), Math.max(0, height - top - bottom));
     }
 }
@@ -77,9 +82,9 @@ function finiteSize(value: number): number {
     return Number.isFinite(value) && value > 0 ? value : 0;
 }
 
-function cssPixel(value: string, limit: number): number {
+function cssPixel(value: string, limit: number): number | undefined {
     const parsed = Number.parseFloat(value);
-    return Number.isFinite(parsed) ? Math.max(0, Math.min(limit, parsed)) : 0;
+    return Number.isFinite(parsed) ? Math.max(0, Math.min(limit, parsed)) : undefined;
 }
 
 function freezeRect(x: number, y: number, width: number, height: number): PlatformRect {

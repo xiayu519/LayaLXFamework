@@ -1,3 +1,4 @@
+import { createAbortController } from "../../application/lifecycle/createAbortController";
 import {
     BaseGameScene,
     SceneLifecycleCleanupError,
@@ -108,7 +109,7 @@ export class SceneFlow {
 
         const requestId = ++this.requestVersion;
         this.activeController?.abort();
-        const controller = new AbortController();
+        const controller = createAbortController();
         this.activeController = controller;
         const onAbort = () => controller.abort();
         options.signal?.addEventListener("abort", onAbort, { once: true });

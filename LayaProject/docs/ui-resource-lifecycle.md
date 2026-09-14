@@ -46,7 +46,7 @@ npm run check:engine-source
 npm run test:headless -- --suite targeted --probe tests/game/logic/ui-resources.browser.mjs
 ```
 
-同轮构建输入未变时用 `node tools/test-browser.mjs --suite targeted --probe tests/game/logic/ui-resources.browser.mjs` 复用构建。结果是 Windows Headless Chromium / SwiftShader 下的引用与生命周期证明；长时间 heap 曲线、macOS、小游戏和 Native 真机仍需对应环境实测。宿主还须具备现有公共取消契约使用的 AbortController；本机引擎库未提供该补丁，不能由 Web 结果推断所有小游戏/Native JS 环境支持。IAP 是另一个接入边界，目前默认实现为 unsupported。
+同轮构建输入未变时用 `node tools/test-browser.mjs --suite targeted --probe tests/game/logic/ui-resources.browser.mjs` 复用构建。结果是 Windows Headless Chromium / SwiftShader 下的引用与生命周期证明；长时间 heap 曲线、macOS、小游戏和 Native 真机仍需对应环境实测。框架现已统一补齐缺失的宿主取消能力，并在移除 AbortController/AbortSignal/DOMException 后复测全部 13 类资源路径，见 [平台兼容性修复](platform-compatibility-review.md)；这仍不能替代目标设备验收。IAP 是另一个接入边界，目前默认实现为 unsupported。
 
 ## World 退出与后登记内容
 

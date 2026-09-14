@@ -35,6 +35,9 @@
       "engines": {
         "node": "^24.0.0"
       },
+      "dependencies": {
+        "abort-controller": "3.0.0"
+      },
       "scripts": {
         "doctor": "node tools/doctor.mjs",
         "check:project": "node tools/doctor.mjs --project-only",
