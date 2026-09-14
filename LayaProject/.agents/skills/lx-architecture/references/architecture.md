@@ -35,7 +35,7 @@ framework 不依赖 game。game 的 domain/application 保持纯净；`src/game/
 - `JsonConfigService` / `TablesRegistry`：普通 JSON 与 Luban Tables 的独立入口。
 - `AudioService`：基于 `SoundManager` 的 handle/owner 业务语义。
 - `SaveStore`：schema、版本、校验和迁移。
-- `PlatformService` / `PurchasePlatform` / `HttpTransport`：外部边界。
+- `PlatformService` / `HttpTransport`：外部边界；`lx.purchase` 是根持有的 PurchaseModule，通过 PurchaseChannel/PurchaseBackend 接入，首次数据同步后补查、World 退出继续、根停止先于游戏数据销毁，见 [支付设计](../../../../docs/payment-design.md)。
 - 框架内部 createAbortController 优先原生，缺失时复用标准兼容库并补实例缺少的 reason/throwIfAborted，不写全局。默认平台只有 Web/微信，已识别的 Native 或其他未支持小游戏需注入 ApplicationConfig.platform；安全区未知时省略字段，见 [平台兼容性](../../../../docs/platform-compatibility-review.md)。
 - `lx.http` / `lx.net`：HTTP 与 WebSocket 分开；lx.net 直接返回原生 Socket，调用 connectByUrl/on/send/close；私有 NetworkService 只承担根初始化与停止清理，默认不连接。真实服务器同步协议仍 TODO。按需逐帧的 World 登记原生 frameLoop，局部倍速作用于模拟 delta，不创建 Timer 或全局 Update 管理器，见 [时间与网络](../../../../docs/world-time-and-network.md)。
 - `StateMachine` / `RenderPerformance`：已验证的通用规则和诊断。

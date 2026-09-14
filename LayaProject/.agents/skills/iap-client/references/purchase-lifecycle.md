@@ -1,14 +1,14 @@
 # Purchase lifecycle
 
-建议持久化状态机：
+当前入口为 `lx.purchase`，初始化、恢复存档、事件与接入契约见 [支付模块设计](../../../../docs/payment-design.md)。订单状态来自可信订单服务，本地只持久化请求恢复线索：
 
 ```text
-created -> store-pending -> purchased -> server-validating
-        -> cancelled     -> validation-rejected
-        -> failed        -> entitlement-granted -> store-finished
+awaiting-payment -> awaiting-delivery -> delivered -> revoked
+                 -> cancelled/failed
+delivered + confirmation=required -> channel.finish -> confirmation=complete
 ```
 
-- 具体状态名可按商店 API 调整，但 purchase token / transaction id 必须稳定且唯一。
+- 渠道状态映射到现有契约，不直接替换模块状态名；purchase token / transaction id 必须稳定且唯一。
 - 商品展示信息来自商店查询；服务端商品配置决定可授予权益，客户端价格和 receipt 都不是最终可信依据。
 - consumable 发货、non-consumable 解锁与 subscription 有效期分别建模，不用一个布尔值覆盖。
 - 服务器以交易 ID 幂等校验和发货；客户端可重试查询结果，不重复授予权益。

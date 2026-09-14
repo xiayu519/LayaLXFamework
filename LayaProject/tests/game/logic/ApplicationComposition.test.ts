@@ -3,7 +3,8 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { HttpTransport } from "../../../src/framework/infrastructure/network/HttpTransport";
 import type { PlatformService } from "../../../src/framework/platform/PlatformService";
-import type { PurchasePlatform } from "../../../src/framework/platform/purchase/PurchasePlatform";
+import { purchaseFixture } from "../../framework/fixtures/purchase-fixtures";
+import { PurchaseEvent } from "../../../src/framework/domain/purchase/PurchaseTypes";
 import { FrameworkEvent } from "../../../src/framework/bootstrap/FrameworkEvent";
 
 class FakeEventDispatcher {
@@ -142,6 +143,7 @@ const clearRes = vi.fn();
 const tableBytes = readFileSync(resolve("assets/bootstrap/tables/tbtableappconfig.bin"));
 const runtimeConfig = JSON.parse(readFileSync(resolve("assets/bootstrap/config/runtime.json"), "utf8"));
 vi.stubGlobal("Laya", {
+    stage: root,
     regClass: () => () => {},
     property: () => () => {},
     Script: class { enabled = true; },
@@ -245,6 +247,79 @@ afterAll(() => vi.unstubAllGlobals());
 const baseConfig = { tipPrefabUrl: "test-tip.lh" };
 
 describe("single lx root", () => {
+    it("支付监听在首次订单同步前就绪，pending 不阻塞进入 World，订阅随 World 退出", async () => {
+        const { config: purchase, channel, backend } = purchaseFixture();
+        const localChanged = vi.fn(), rootChanged = vi.fn(), disposed = vi.fn();
+        let release!: () => void;
+        const gate = new Promise<void>(resolve => { release = resolve; });
+        backend.reconcile.mockImplementationOnce(async () => { await gate; return []; });
+        const starting = lx.init({ ...baseConfig, purchase, initialWorld: "shop",
+            initialize() { lx.events.on(PurchaseEvent.CHANGED, rootChanged, rootChanged); },
+            register() {
+                lx.worlds.register({ id: "shop", initialize(world) {
+                    world.listen(lx.events, PurchaseEvent.CHANGED, localChanged, localChanged);
+                } });
+            },
+            synchronization: { source: "test-orders", async synchronize() {
+                expect(channel.start).toHaveBeenCalledOnce();
+                lx.purchase.setAccount("A");
+            } },
+            dispose() { expect(channel.stop).toHaveBeenCalledOnce(); disposed(); },
+        });
+        await vi.waitFor(() => expect(backend.reconcile).toHaveBeenCalledOnce());
+        expect(lx.ready).toBe(false);
+        release();
+        await starting;
+        const order = await lx.purchase.buy("gems");
+        expect(order.status).toBe("awaiting-delivery");
+        expect(localChanged).toHaveBeenCalled();
+        await lx.worlds.exit("shop");
+        expect(channel.stop).not.toHaveBeenCalled();
+        localChanged.mockClear();
+        rootChanged.mockClear();
+        backend.deliver(order.orderId);
+        await lx.purchase.reconcile();
+        expect(localChanged).not.toHaveBeenCalled();
+        expect(rootChanged).toHaveBeenCalledOnce();
+        expect(backend.balances.get("A")).toBe(10);
+        const previousListener = channel.listener!;
+        const socket = lx.net;
+        await lx.stop();
+        expect(disposed).toHaveBeenCalledOnce();
+        backend.reconcile.mockClear();
+        root.event(Laya.Event.FOCUS, undefined);
+        socket.event(Laya.Event.OPEN);
+        previousListener({ accountId: "A", channel: "test", transactionId: "late", productId: "gems" });
+        await Promise.resolve();
+        expect(backend.reconcile).not.toHaveBeenCalled();
+    });
+
+    it("支付初始化部分失败仍停止渠道，且不进入首次同步和 World", async () => {
+        const { config: purchase, channel } = purchaseFixture();
+        const synchronize = vi.fn(), dispose = vi.fn();
+        channel.start.mockImplementationOnce(() => { throw new Error("channel startup failed"); });
+        await expect(lx.init({ ...baseConfig, purchase, dispose,
+            synchronization: { source: "test-orders", synchronize } })).rejects.toThrow("channel startup failed");
+        expect(channel.stop).toHaveBeenCalledOnce();
+        expect(dispose).toHaveBeenCalledOnce();
+        expect(synchronize).not.toHaveBeenCalled();
+        expect(lx.ready).toBe(false);
+    });
+
+    it("原生前台和连接恢复触发合并补查，停止后解除精确订阅", async () => {
+        const { config: purchase, backend } = purchaseFixture();
+        await lx.init({ ...baseConfig, purchase, initialize() { lx.purchase.setAccount("A"); } });
+        backend.reconcile.mockClear();
+        root.event(Laya.Event.FOCUS, undefined);
+        lx.net.event(Laya.Event.OPEN);
+        await vi.waitFor(() => expect(backend.reconcile).toHaveBeenCalledOnce());
+        await lx.stop();
+        backend.reconcile.mockClear();
+        root.event(Laya.Event.FOCUS, undefined);
+        await Promise.resolve();
+        expect(backend.reconcile).not.toHaveBeenCalled();
+    });
+
     it("exists before initialization without allocating native modules", async () => {
         const { logger } = await import("../../../src/framework/application/diagnostics/Logger");
         expect(lx.logger).toBe(logger);
@@ -573,16 +648,18 @@ describe("single lx root", () => {
         const platform: PlatformService = { name: "platform:test", kind: "native", viewport: { width: 720, height: 1280 },
             start: vi.fn(), stop: vi.fn(), nowMs: () => 123, openExternalUrl() {} };
         const http: HttpTransport = { request: vi.fn() };
-        const purchase = { supported: false } as unknown as PurchasePlatform;
+        const { config: purchase, channel } = purchaseFixture();
         await lx.init({ ...baseConfig, platform, http, purchase });
         expect(lx.platform).toBe(platform);
         expect(lx.http).toBe(http);
-        expect(lx.purchase).toBe(purchase);
+        expect(lx.purchase.supported).toBe(true);
+        expect(channel.start).toHaveBeenCalledOnce();
         lx.storage.save({ language: "en-US", muted: true, musicVolume: 0.25, soundVolume: 0.5 });
         await lx.stop();
         await lx.init(baseConfig);
         expect(lx.audio.settings).toEqual({ muted: true, musicVolume: 0.25, soundVolume: 0.5 });
         expect(platform.stop).toHaveBeenCalledOnce();
+        expect(channel.stop).toHaveBeenCalledOnce();
     });
 
     it("cleans modules when platform startup fails", async () => {

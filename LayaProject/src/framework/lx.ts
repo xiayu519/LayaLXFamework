@@ -2,6 +2,7 @@ import { TablesRegistry } from "./application/config/TablesRegistry";
 import { logger } from "./application/diagnostics/Logger";
 import { DataRegistry } from "./application/data/DataRegistry";
 import { WorldRegistry } from "./application/world/WorldRegistry";
+import { LifetimeScope } from "./application/lifecycle/LifetimeScope";
 import { SceneRegistry } from "./presentation/scene/SceneRegistry";
 import { AudioService } from "./infrastructure/audio/AudioService";
 import { ContentCatalog } from "./infrastructure/content/ContentCatalog";
@@ -14,8 +15,8 @@ import { PrefabPoolService } from "./infrastructure/pool/PrefabPoolService";
 import { LayaLocalStorageDriver, SaveStore } from "./infrastructure/storage/SaveStore";
 import type { PlatformService } from "./platform/PlatformService";
 import { createDefaultPlatformService } from "./platform/createDefaultPlatformService";
-import type { PurchasePlatform } from "./platform/purchase/PurchasePlatform";
-import { UnsupportedPurchasePlatform } from "./platform/purchase/UnsupportedPurchasePlatform";
+import { PurchaseModule } from "./application/purchase/PurchaseModule";
+import { PurchaseRecoveryStore } from "./infrastructure/storage/PurchaseRecoveryStore";
 import { UIRouter } from "./presentation/ui/UIRouter";
 import { RedDotStore } from "./presentation/ui/RedDotStore";
 import { RedDotBinding } from "./presentation/ui/RedDotBinding";
@@ -46,13 +47,14 @@ class Lx {
     public performance!: RenderPerformance;
     public storage!: SaveStore<ClientSettings>;
     public platform!: PlatformService;
-    public purchase!: PurchasePlatform;
+    public purchase!: PurchaseModule;
     public http!: HttpTransport;
     public redDots!: RedDotStore;
     public ui!: UIRouter;
     public scenes!: SceneRegistry;
 
     private network?: NetworkService;
+    private purchaseLifetime?: LifetimeScope;
     private bootstrap?: AppBootstrap;
     private cleanup?: ResourceCleanup;
     private initTask?: Promise<void>;
@@ -108,6 +110,7 @@ class Lx {
 
             this.cleanup = new ResourceCleanup([
                 { name: "worlds", stop: () => this.worlds?.dispose(), drain: async () => { await this.worlds?.waitForPendingLoads(); } },
+                { name: "purchase", stop: () => this.stopPurchase() },
                 { name: "scenes", stop: () => this.scenes?.dispose(), drain: async () => { await this.scenes?.waitForPendingLoads(); } },
                 { name: "ui", stop: () => this.ui?.dispose(), drain: async () => { await this.ui?.waitForPendingLoads(); }, retry: () => this.ui?.dispose() },
                 { name: "pool", stop: () => this.pool?.dispose(), drain: async () => { await this.pool?.waitForPendingLoads(); }, retry: () => this.pool?.dispose() },
@@ -134,7 +137,9 @@ class Lx {
             this.pool = new PrefabPoolService();
             this.performance = new RenderPerformance();
             this.storage = new SaveStore(new LayaLocalStorageDriver(), SETTINGS_SCHEMA);
-            this.purchase = application.purchase ?? new UnsupportedPurchasePlatform();
+            this.purchase = new PurchaseModule(application.purchase,
+                new PurchaseRecoveryStore(new LayaLocalStorageDriver(), application.purchase?.storageKey),
+                (event, value) => this.events.event(event, value));
             this.http = application.http ?? new LayaHttpTransport();
             this.network = new NetworkService();
             this.redDots = new RedDotStore();
@@ -156,6 +161,16 @@ class Lx {
                     application.register?.();
                     await application.initialize?.(context!.signal);
                 }, stop: () => application.dispose?.() },
+                { name: "purchase", start: async context => {
+                    await this.purchase.start(context);
+                    context!.signal.throwIfAborted();
+                    const stage = Laya.stage, socket = this.net, purchase = this.purchase;
+                    const lifetime = this.purchaseLifetime = new LifetimeScope();
+                    stage.on(Laya.Event.FOCUS, purchase, purchase.onResume);
+                    lifetime.defer(() => stage.off(Laya.Event.FOCUS, purchase, purchase.onResume));
+                    socket.on(Laya.Event.OPEN, purchase, purchase.onResume);
+                    lifetime.defer(() => socket.off(Laya.Event.OPEN, purchase, purchase.onResume));
+                }, stop: () => this.stopPurchase() },
                 { name: "initial-synchronization", start: context => this.synchronize(application.synchronization, context!.signal), stop() {} },
                 // 关闭时先退出子 World，再清理全局游戏模型与资源。
                 { name: "worlds", start() {}, stop: () => this.worlds.dispose() },
@@ -222,6 +237,7 @@ class Lx {
         }
         // 通知后立即使子 World 失效；具体事件、UI 和 Scene 仍按各 World 的登记清理。
         void this.worlds?.dispose().catch(() => {});
+        this.purchase?.suspend();
         return this.stopTask;
     }
 
@@ -241,16 +257,21 @@ class Lx {
             synchronization: { ...this.synchronization }, bootstrap: this.bootstrap.snapshot(),
             ui: this.ui.snapshot(), scenes: this.scenes.snapshot(), worlds: this.worlds.snapshot(),
             pools: this.pool.snapshot(), config: this.config.snapshot(),
+            purchase: this.purchase.snapshot(),
             pendingCleanup: this.cleanup.pendingCleanup, gc: this.cleanup.gc,
         };
     }
 
     private async synchronize(synchronization: ApplicationConfig["synchronization"], signal: AbortSignal): Promise<void> {
         if (!synchronization) {
+            await this.purchase.reconcile();
+            signal.throwIfAborted();
             return;
         }
         try {
             await synchronization.synchronize(signal);
+            signal.throwIfAborted();
+            await this.purchase.reconcile();
             signal.throwIfAborted();
             this.synchronization.state = "ready";
         } catch (error) {
@@ -271,7 +292,17 @@ class Lx {
             && !ui?.nativeLoads && !ui?.pendingRequests.length && !ui?.managed.length && !ui?.cleanupFailures
             && !ui?.tips.active && !ui?.tips.queued
             && !this.pool?.snapshot().some(pool => pool.active || pool.pending || pool.idle || pool.loading || pool.cleanupFailures)
-            && !this.config?.snapshot().length;
+            && !this.config?.snapshot().length && !this.purchase?.snapshot().pendingOperations;
+    }
+
+    private async stopPurchase(): Promise<void> {
+        if (this.purchase) {
+            try {
+                this.purchaseLifetime?.dispose();
+            } finally {
+                await this.purchase.stop();
+            }
+        }
     }
 
     private disposeRedDots(): void {

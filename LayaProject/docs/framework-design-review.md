@@ -83,8 +83,8 @@ onRegister → registerEvents → registerUI → registerScenes → onEnter
 | [lx.ts](../src/framework/lx.ts) | 唯一模块持有者和初始化顺序；停机异常仍完成清理，公共/局部事件归属明确 |
 | [createDefaultPlatformService.ts](../src/framework/platform/createDefaultPlatformService.ts) | 无状态平台选择；实际仅提供 Web/微信适配，Native 需另行实现 |
 | [PlatformService.ts](../src/framework/platform/PlatformService.ts) | 宿主视口、时间和外链的最小外部契约 |
-| [PurchasePlatform.ts](../src/framework/platform/purchase/PurchasePlatform.ts) | 支付边界契约；未包含收据校验、幂等发货等真实 IAP 流程 |
-| [UnsupportedPurchasePlatform.ts](../src/framework/platform/purchase/UnsupportedPurchasePlatform.ts) | 明确拒绝未实现支付，不返回模拟购买成功 |
+| 当时的 `PurchasePlatform.ts`（已替换） | 此次审查时仅为支付边界契约；后续由根 PurchaseModule 和两个接入契约替代，当前实现见 [支付设计](payment-design.md) |
+| 当时的 `UnsupportedPurchasePlatform.ts`（已删除） | 此次审查时明确拒绝未实现支付；当前由未配置的 PurchaseModule 保留拒绝行为，未加入生产模拟渠道 |
 | [WebPlatformService.ts](../src/framework/platform/WebPlatformService.ts) | 安全区 DOM 探针有启停归属；外链仅允许 HTTP/HTTPS |
 | [WeChatMiniGamePlatformService.ts](../src/framework/platform/WeChatMiniGamePlatformService.ts) | 能力检测、视口裁剪及 API 失败回退；设备实测仍独立 |
 | [BaseGameScene.ts](../src/framework/presentation/scene/BaseGameScene.ts) | Scene 持有 UI、失效信号和同步清理；原生 destroy 前先停副作用 |

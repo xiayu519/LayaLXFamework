@@ -5,7 +5,7 @@ description: 设计、接入或修复 IAP 商品查询、购买、恢复购买�
 
 # IAP Client
 
-1. 先读 [purchase-lifecycle.md](references/purchase-lifecycle.md)，再检查 `PurchasePlatform` 及目标商店当前官方文档。
+1. 先读 [purchase-lifecycle.md](references/purchase-lifecycle.md)，再检查 `PurchaseModule`、`PurchaseContracts` 及目标商店当前官方文档。
 2. 商店 SDK 与 Native 桥接只在 `src/framework/platform/` 实现；业务使用统一结果模型，Web unsupported 不得伪造成功。
 3. 购买、校验、发货与交易确认是可恢复状态机。以稳定 transaction id / purchase token 幂等，重复回调不得重复发货。
 4. 客户端不自行判定最终权益；收据或 purchase token 交给可信服务校验。确认交易仅在权益安全落账后执行。

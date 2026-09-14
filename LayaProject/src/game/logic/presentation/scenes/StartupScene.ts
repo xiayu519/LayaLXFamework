@@ -11,7 +11,7 @@ const SERVICE_LABELS: Readonly<Record<string, string>> = {
     "resource-cleanup": "准备资源回收", preferences: "读取本地设置",
     "game-initialize": "加载配置表与全局数据",
     "initial-synchronization": "同步初始数据与红点", worlds: "框架初始化完成",
-    network: "准备网络模块",
+    network: "准备网络模块", purchase: "初始化支付模块",
 };
 
 /** 只负责展示；由 AppEntry 打开此场景并执行应用初始化。 */

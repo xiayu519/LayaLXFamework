@@ -4,7 +4,7 @@
 
 lx 本身就是长期存在的框架根，直接持有公共事件、全局数据、红点和公共模块。AppEntry 先打开固定 Startup Loading，再调用 lx.init；模块创建与初始化顺序集中在 src/framework/lx.ts。业务小 World 只持有自己的 UI 注册、事件订阅、Scene、模块及资源，关闭时统一回收。
 
-IAP 游戏的根启动顺序为：初始化全局系统和数据接收入口 → 连接服务器与首次同步（TODO）→ 数据及红点状态就绪 → 根 World Ready → 进入 LobbyWorld。网络连接成功不能代替数据同步完成；协议接入尚未实施，现有本地模拟不能冒充真实同步。
+IAP 游戏的根启动顺序为：初始化全局系统和数据接收入口 → 启动根支付模块 → 连接服务器与首次同步（真实接入 TODO）→ 绑定支付账号并完成本次订单补查 → 数据及红点状态就绪 → 根 World Ready → 进入 LobbyWorld。网络连接成功不能代替数据同步完成；协议接入尚未实施，现有本地模拟不能冒充真实同步。
 
 原生 EventDispatcher 提供 lx.events 和 WorldScope.events，WorldScope 补订阅与内容的 owner 登记；Laya.timer、Scene、Loader 和 ui2 继续使用原生能力。World 不需挂载节点，也不新增全局 Timer/Update。接口、原生依据和网络 TODO 见 [World 生命周期设计](world-lifecycle-design.md)。
 
@@ -26,6 +26,7 @@ IAP 游戏的根启动顺序为：初始化全局系统和数据接收入口 →
 | 显示红点 | 业务更新计数，`session.bindRedDot(...)` | 计数归业务，绑定归展示 |
 | HTTP 请求 | `lx.http.request(...)` | 每个请求自己的取消与超时 |
 | WebSocket | `lx.net` 的原生事件/connectByUrl/send | 根持有连接，子 World 只管理自身订阅 |
+| 支付与恢复 | `lx.purchase.buy(productId)` / `reconcile()` | 根持有流程和账号恢复线索，UI/World 持有自身展示订阅 |
 
 场景 UI 与应用 UI 使用各自注册的 route；不为统一调用外观改变宿主和清理范围。现有背包 UI 默认通过 Context 接收依赖；`lx.data.get(key)` 是同一账号数据的可选查询入口，详见 [数据绑定](ui-data-binding.md)。基础例子无需先理解全部内部类型。
 
@@ -141,6 +142,8 @@ Laya.loader.load(.lh, HIERARCHY)
 
 保留原生 `Laya.HttpRequest` 发送/事件通道，仅通过 protected `_onLoad` 修正 3.4.1 未接受完整 2xx 的行为。JSON 在框架边界解码，HEAD/204/205 返回 null；parse/schema 错误不重试。响应提供平台/CORS 可见的小写 headers，`validate` 可收紧结构。发送前规范大小写 header、拒绝重复字段，并冻结本次重试共用的编码结果；ArrayBufferView 按 byteOffset/byteLength 精确发送。
 
+支付由根唯一创建的 PurchaseModule 处理，ApplicationConfig.purchase 注入渠道和订单服务两个契约；未配置时明确不支持。SDK 只提供支付信号，服务端订单决定到账与确认，游戏接收器先更新全局数据/红点，UI 只消费快照。恢复线索复用 SaveStore，按账号隔离，不保存收据或客户端权益；模块不依赖 World，不增加事件系统、网络转发层或轮询 Update。完整 API、失败边界与真实接入 TODO 见 [支付设计](payment-design.md)。
+
 ## 内容资产门禁
 
 `AssetImportPolicy.json` 固定 2D 纹理、图集、音频和 Spine 3.8 导入规格。`validate:content-assets` 校验真实 `.meta` 与文件头；它不替代目标设备的压缩纹理、音频解码、Spine 动画和性能验收。详细规则见 [asset-import.md](asset-import.md)。
@@ -151,11 +154,11 @@ CompilerSettings.mainScript 通过 AppEntry.ts.meta UUID 指向 main，引擎已
 
 Startup 原生引用 `UISceneLoading.lh`，保留完整 UI 骨架并复用 UILayoutService；不经过尚未初始化的 lx.ui。模板 HTML 闪屏保持关闭。BootstrapOptions.onProgress 报告已完成服务数；进度额外为初始 World 预留一个工作项，根 Ready 后仍显示场景加载，完成前不提前显示 100%。该百分比表示工作项，不代表下载字节或预计耗时。观察者抛错触发回滚，启动结束后解除回调引用。
 
-lx.init 等待 ApplicationConfig.initialize 和 synchronization.synchronize；全局模型及红点就绪后 ready 为 true，再进入 initialWorld。init/main 会继续等待首次 World 完成，随后销毁 Startup 并输出 [LX] READY。当前演示同步来源明确标记为 development-simulator，真实服务器和 IAP 权益接入仍为 TODO。
+lx.init 等待 ApplicationConfig.initialize、支付监听启动、synchronization.synchronize 和支付首次 reconcile；全局模型及红点就绪后 ready 为 true，再进入 initialWorld。init/main 会继续等待首次 World 完成，随后销毁 Startup 并输出 [LX] READY。当前演示同步来源明确标记为 development-simulator，通用支付流程已集成，真实服务器、支付 SDK 和权益映射仍为 TODO。
 
 内部 AppBootstrap 顺序启动、逆序停止，失败步骤也参与补偿。AbortSignal 提供协作式取消，停止方法应幂等并能处理部分初始化。默认每步初始化 30s、停止 10s，可经 ApplicationConfig.lifecycle 配置。超时后仍追踪原始任务并处理晚到补偿；停机前后均通过 lx.snapshot() 查询状态，不再保存或解绑另一份 Runtime。
 
-lx.stop 先保存共享停止任务并派发 FrameworkEvent.STOPPING，随后立即失效子 World，等待其关闭后停止全局业务与框架模块；通知中的重入 stop 复用同一任务；监听器抛错也继续失效和清理，结束后由停止任务报告错误。ResourceCleanup 等待原生组件延迟销毁和原始加载，稳定后才执行 Scene.gc。未完成或失败的清理会阻止再次初始化；不再使用 Runtime 绑定、隔离集合或后台重检。旧异步任务仍需失效与补偿。
+lx.stop 先保存共享停止任务并派发 FrameworkEvent.STOPPING，随后立即失效子 World 与支付回写，等待 World 关闭、支付停止收尾后再销毁全局游戏数据和其余模块；通知中的重入 stop 复用同一任务；监听器抛错也继续失效和清理，结束后由停止任务报告错误。ResourceCleanup 等待原生组件延迟销毁和原始加载，稳定后才执行 Scene.gc。未完成或失败的清理会阻止再次初始化；不再使用 Runtime 绑定、隔离集合或后台重检。旧异步任务仍需失效与补偿。
 
 ## 验证证据
 

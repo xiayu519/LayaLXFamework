@@ -2,7 +2,7 @@ import type { BootstrapOptions } from "./AppBootstrap";
 import type { ContentEntry } from "../infrastructure/content/ContentCatalog";
 import type { DataEntry } from "../application/data/DataRegistry";
 import type { PlatformService } from "../platform/PlatformService";
-import type { PurchasePlatform } from "../platform/purchase/PurchasePlatform";
+import type { PurchaseConfig } from "../domain/purchase/PurchaseContracts";
 import type { HttpTransport } from "../infrastructure/network/HttpTransport";
 import type { UIRouter } from "../presentation/ui/UIRouter";
 import type { SceneLoadingPresenter } from "../presentation/scene/SceneFlow";
@@ -15,7 +15,7 @@ export interface ApplicationConfig {
     readonly initialWorld?: string;
     readonly lifecycle?: BootstrapOptions & { readonly pendingLoadTimeoutMs?: number };
     readonly platform?: PlatformService;
-    readonly purchase?: PurchasePlatform;
+    readonly purchase?: PurchaseConfig;
     readonly http?: HttpTransport;
     createSceneLoadingPresenter?(ui: UIRouter): SceneLoadingPresenter;
     /** 注册公共 UI、全局模型与规则以及 World 工厂；此处不加载 World。 */

@@ -2,7 +2,7 @@
 
 新增功能先按 [归属判定](ownership-decisions.md) 决定是否建立 World、公共 UI 定义与实例寿命、事件源与订阅；本文说明确定归属后的具体生命周期。
 
-日期：2026-09-14。状态：第一版已实施；真实服务器连接、完整同步协议和 IAP 权益接入仍为 TODO。
+日期：2026-09-14。状态：第一版及根支付模块已实施；真实服务器连接、完整同步协议、支付 SDK 和权益映射仍为 TODO。支付的当前实现及验证见 [支付设计](payment-design.md)。
 
 补充的逐帧更新、BattleWorld 局部倍速和 WebSocket 集成见 [World 时间与网络](world-time-and-network.md)。lx.http 负责 HTTP，lx.net 为根持有的原生 Socket，默认不连接。
 
@@ -26,6 +26,7 @@ lx（唯一框架根，与框架生命周期一致）
 ├─ 平台、配表、全局功能和共享资源
 ├─ 全局数据系统、协议接收与账号状态（按登录状态重置）
 ├─ 全局红点系统、红点状态与计算规则
+├─ 支付模块、按账号恢复线索与渠道通知（真实 SDK/订单服务 TODO）
 ├─ 网络连接与首次数据同步协调（真实接入 TODO）
 ├─ LobbyWorld（每次进入建立独立运行期）
 │  ├─ 局部 EventDispatcher、对公共事件源的订阅
@@ -51,9 +52,11 @@ lx 本身就是根 World：模块访问与模块所有权在同一对象。业�
 Laya 引擎初始化完成 → AppEntry 显示 Startup
   → 大 World 初始化原生适配、公共事件、公共 UI 与全局服务
   → 初始化全局数据模型、红点存储及规则，先安装数据接收入口
+  → 启动根支付模块的渠道通知
   → TODO：连接服务器、建立账号会话、请求首次同步
   → 接收并校验同步数据，写入全局模型与服务端红点状态
   → 完成本次数据对应的本地红点计算，确认首次同步完整
+  → 已配置支付时绑定账号，完成本次订单恢复查询与可执行的确认
   → 大 World Ready（所有必需全局服务与数据已就绪）
   → 初始化 LobbyWorld → 打开 LobbyScene/UI
   → 大厅首次展示读取已有数据/红点 → 销毁 Startup
@@ -63,7 +66,7 @@ Ready 是根生命周期协调者等待初始化任务得到的状态，不能�
 
 全局初始化任务由应用组合登记所需模块与可等待的首次同步步骤；框架等待这些任务，不硬编码背包、商城、任务等数据表名或 Lobby 的具体类。根 Ready 后再由现有游戏入口选择并进入初始 World，World 管理器负责阻止依赖根数据的小 World 提前进入。
 
-lx.init 等待配置的 initialize 与 synchronization.synchronize 完成后，将根置为 ready，再进入 initialWorld。WorldRegistry 拒绝提前进入；init/main 继续等待首次 World 完成。AppEntry 的并发调用优先等待当前启动任务，Loading 在 Lobby UI 就绪后关闭。
+lx.init 等待配置的 initialize、支付模块启动、synchronization.synchronize 与支付 reconcile 完成后，将根置为 ready，再进入 initialWorld。支付账号在游戏首次同步期间绑定；未接入或未绑定账号时不发起补查。WorldRegistry 拒绝提前进入；init/main 继续等待首次 World 完成。AppEntry 的并发调用优先等待当前启动任务，Loading 在 Lobby UI 就绪后关闭。
 
 数据系统和红点系统的对象在根初始化时建立一次；小 World 退出不清空它们，也不停止规则更新。红点规则属于全局功能模块，由游戏应用在根组合处登记；规则的业务代码仍在 game，框架不依赖具体游戏。UI 仅绑定和显示，根数据还未完成同步时不先打开空大厅再补一次初始化。
 
@@ -76,7 +79,7 @@ lx.init 等待配置的 initialize 与 synchronization.synchronize 完成后，�
 - 已集成根持有的 Laya.Socket；TODO：配置实际服务器、认证与消息契约，不预先实现未知协议的心跳/重连/消息路由。
 - TODO：定义服务器首次同步完整的确认条件、必需数据集合、版本和重连补同步规则；以同步完成任务作为根 Ready 的一个必要条件。
 - TODO：接入全局数据模型和红点状态应用，覆盖半包、乱序、旧账号、断线与重试失败。
-- TODO：接入 IAP 结果影响的账号数据/权益同步；购买、确认和补发流程另按支付任务实现，本轮不伪造服务端发货结果。
+- 已实现根支付流程、账号隔离、恢复查询和确认重试；TODO：通过 PurchaseChannel/PurchaseBackend 接入真实 SDK、订单服务与账号权益同步，不伪造服务端发货结果。
 
 当前 ExampleDeliveryService 的本地模拟可继续提供明确标记的开发数据来源；它只能证明示例初始化顺序，不能标记为真实服务器已连接或真实同步完成。正式连接尚未接入时不得用直接返回成功的空 TODO 绕过 Ready 条件。
 
