@@ -1,5 +1,5 @@
 import { lx } from "./framework/lx";
-import { xlog } from "./framework/xlog";
+import { logger } from "./framework/application/diagnostics/Logger";
 import { GameApplication, StartupScene } from "./game/bootstrap/GameStartup";
 
 /** 统筹启动和失败回滚；启动场景只负责展示进度。 */
@@ -40,7 +40,7 @@ export class AppEntry {
             }));
             scene.destroy();
             if (lx.ready) {
-                xlog.log("[LX] READY");
+                logger.log("[LX] READY");
             }
         } catch (error) {
             scene.fail(error);

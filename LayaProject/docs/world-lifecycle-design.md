@@ -102,13 +102,13 @@ lx.init 等待配置的 initialize 与 synchronization.synchronize 完成后，�
 | `FrameworkEvent.READY` | 全局模块、首次数据与红点同步完成，自动进入初始 World 之前；每轮初始化一次 | 无 |
 | `FrameworkEvent.STOPPING` | 根开始关闭，在子 World 失效和模块清理之前；每轮关闭一次 | 无 |
 
-公共事件只表达根框架的生命周期；子 World 的进入和退出通过 `onRegister/onEnter/onExit` 管理，局部业务事件使用各自的 `world.events`。当前不把每次子 World 进出广播到公共事件源。事件只作通知，不等待异步监听器；等待关闭完成使用 `await lx.stop()`，等待子 World 进入或退出使用 `await lx.worlds.enter/exit`。`STOPPING` 不代表已清理完成，不能替代生命周期清理。
+公共事件只表达根框架的生命周期；子 World 的注册阶段由父类统一调用 `onRegister/registerEvents/registerUI/registerScenes`，进入和退出通过 `onEnter/onExit` 管理，局部业务事件使用各自的 `world.events`。当前不把每次子 World 进出广播到公共事件源。事件只作通知，不等待异步监听器；等待关闭完成使用 `await lx.stop()`，等待子 World 进入或退出使用 `await lx.worlds.enter/exit`。`STOPPING` 不代表已清理完成，不能替代生命周期清理。
 
 [lx.ts](../src/framework/lx.ts) 创建公共事件源、登记框架自身的 `READY/STOPPING` 日志监听，在根关闭时统一清理。[GameApplication.register](../src/game/logic/bootstrap/GameApplication.ts) 只登记全局内容和 World 工厂，不集中注册子 World 事件。初始 World 注册时 `READY` 已派发；查询当前就绪状态使用 `lx.ready`。
 
-[LobbyWorld](../src/game/logic/bootstrap/worlds/LobbyWorld.ts) 在自己的 `onRegister` 订阅 `LobbyWorld.ENTER_BATTLE`，[BattleWorld](../src/game/logic/bootstrap/worlds/BattleWorld.ts) 同样订阅 `BattleWorld.RETURN_LOBBY`。它们都使用本次激活的 `world.events`，UI 点击只发请求，由所属 World 的具名方法处理，再调用应用提供的切换函数。事件监听、UI 路由与 Scene 注册都随该 World 退出清理；再次进入重新创建，不在公共事件源留存。
+[LobbyWorld](../src/game/logic/bootstrap/worlds/LobbyWorld.ts) 在自己的 `registerEvents` 订阅 `LobbyWorld.ENTER_BATTLE`，[BattleWorld](../src/game/logic/bootstrap/worlds/BattleWorld.ts) 同样订阅 `BattleWorld.RETURN_LOBBY`。它们都使用本次激活的 `world.events`，UI 点击只发请求，由所属 World 的具名方法处理，再调用应用提供的切换函数。事件监听、UI 路由与 Scene 注册都随该 World 退出清理；再次进入重新创建，不在公共事件源留存。
 
-事件源归属与订阅寿命分别判断：如果子 World 需要监听公共事件，仍在自己的 `onRegister` 中用 `world.listen(lx.events, ...)` 登记，退出时只卸载自己的订阅。不能因为事件源是公共的，就把所有消费者的注册也搬到框架或 GameApplication。
+事件源归属与订阅寿命分别判断：如果子 World 需要监听公共事件，仍在自己的 `registerEvents` 中用 `world.listen(lx.events, ...)` 登记，退出时只卸载自己的订阅。不能因为事件源是公共的，就把所有消费者的注册也搬到框架或 GameApplication。
 
 caller 使用真实的 World、模块或 UI 实例，method 使用稳定的具名方法；不在解绑时重新 bind。每个 `(source, type, caller, method)` 由一个运行期负责，避免同一原生订阅被两个 scope 重复认领。caller 完全归某 scope 时可按记录的各个 source 调用 offAllCaller；否则精确 off。
 
@@ -162,7 +162,7 @@ World 持有专属 UI 注册与 Scene 生命周期，不意味着它必须是可
 | UI 的 `session.bindData/bindRedDot`、`session.lifetime.defer` | 展示结束时清理数据和红点订阅、按钮事件；具体对称 `on/off` 见 [UIBattle](../src/game/logic/presentation/ui/examples/UIBattle.ts) |
 | `world.own(cleanup)` | 执行自行登记的业务或资源清理 |
 
-正常退出时先停事件与定时副作用，再逆序卸载 Scene/UI 和业务内容，随后调用子类 `onExit`；已登记的内容不需在子类重复销毁。`onExit` 用于释放本类引用或其他业务收尾，不得依赖 UI 仍然存活。初始化中途取消时也会调用该钩子，之后才结束的异步工作仍必须检查 `signal` 并登记晚到清理；`lx.worlds.exit(id)` 会等这些清理全部结束。
+正常退出时先停事件与定时副作用，并立即启动所有所属 Scene 的注销；再按登记顺序等待同一关闭任务及 UI/业务清理，随后调用子类 `onExit`；已登记的内容不需在子类重复销毁。`onExit` 用于释放本类引用或其他业务收尾，不得依赖 UI 仍然存活。初始化中途取消时也会调用该钩子，之后才结束的异步工作仍必须检查 `signal` 并登记晚到清理；`lx.worlds.exit(id)` 会等这些清理全部结束。
 
 `registered → initializing → active → exiting → disposed`，失败记录单独保留。关闭后可以保留轻量 World 定义/工厂，但必须释放本次激活的对象图；再次进入创建新的 activation、局部事件源、模块和副作用。优先登记创建 World 实例的工厂，避免重用含旧字段的已销毁实例。
 
@@ -176,20 +176,14 @@ World 持有专属 UI 注册与 Scene 生命周期，不意味着它必须是可
 
 ## 业务类的实际写法
 
-WorldScope 位于 framework/bootstrap，引擎无关的 WorldContext/BaseWorld/WorldRegistry 保持在 application。以下摘录实际 [BattleWorld](../src/game/logic/bootstrap/worlds/BattleWorld.ts) 的注册、事件处理与退出方法；onRegister 只编排三个具名注册方法，复杂列表留在对应方法中；字段、构造依赖和场景打开见原文件。registerScene 返回本次激活的路由对象，后续打开要使用该返回值。
+WorldScope 位于 framework/bootstrap，引擎无关的 WorldContext/BaseWorld/WorldRegistry 保持在 application。以下摘录实际 [BattleWorld](../src/game/logic/bootstrap/worlds/BattleWorld.ts) 的注册、事件处理与退出方法；三个注册钩子只提供本类内容，固定顺序在 BaseWorld.initialize 中执行；字段、构造依赖和场景打开见原文件。registerScene 返回本次激活的路由对象，后续打开要使用该返回值。
 
 ```ts
-protected override onRegister(world: WorldScope): void {
-    this.registerEvents(world);
-    this.registerUI(world);
-    this.registerScenes(world);
-}
-
-private registerEvents(world: WorldScope): void {
+protected override registerEvents(world: WorldScope): void {
     world.listen(world.events, BattleWorld.RETURN_LOBBY, this, this.onReturnLobby);
 }
 
-private registerUI(world: WorldScope): void {
+protected override registerUI(world: WorldScope): void {
     world.registerView<UILobbyArgs, UIBattle>({
         id: "lx.examples.battle",
         url: "bootstrap/ui/examples/UIBattle.lh",
@@ -198,7 +192,7 @@ private registerUI(world: WorldScope): void {
     });
 }
 
-private registerScenes(world: WorldScope): void {
+protected override registerScenes(world: WorldScope): void {
     this.scene = world.registerScene(BATTLE_SCENE);
 }
 
@@ -208,7 +202,7 @@ protected override onExit(): void {
 }
 
 private onReturnLobby(): void {
-    void this.enterLobby().catch(error => xlog.error("[World examples] return lobby failed", error));
+    void this.enterLobby().catch(error => logger.error("[World examples] return lobby failed", error));
 }
 ```
 
@@ -230,6 +224,8 @@ private onReturnLobby(): void {
 相关回归在 [组合测试](../tests/game/logic/ApplicationComposition.test.ts)、[WorldRegistry 测试](../tests/framework/WorldRegistry.test.ts)、[启动与 World 原生探针](../tests/game/logic/startup-worlds.browser.mjs) 和 [原生事件探针](../tests/framework/world-events.browser.mjs)。安装包源码基线与实际命令结果单独报告；开发模拟不作为真实网络或支付验收。
 
 ## 2026-09-14 验证记录
+
+以下保留单一入口提交 `31573bd` 的阶段记录；父类调度、World 退出竞态修复和下游规则的最新结果见 [框架设计复查](framework-design-review.md)。
 
 - `npm run verify`：全项目快速回归通过，包含源码与测试类型检查、35 个文件的 406 项单元测试、架构与同步完整性检查、源资产/内容资产/资源布局/性能预算校验。保留既有 SceneFlow/SceneUI/UIRouter 文件长度审查提示。
 - 工作流测试 ArchitectureAnalysis、CodexWorkflow、BrowserProbePlan、GameCreation、GameProject：5 个文件、55 项测试通过，覆盖架构分析、项目配置、游戏创建和探针选择。

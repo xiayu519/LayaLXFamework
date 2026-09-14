@@ -47,7 +47,7 @@ Codex 对两类文件采用不同的官方发现顺序：`AGENTS.md` 从 Git 根
 
 框架定位为单人开发、单人维护。Codex 默认单代理；用户要求或独立风险边界确有收益时才委派，并隔离写入区域，子代理继承当前模型/强度。修改前复读目标文件并保留已有改动。Git 写操作按用户授权执行。
 
-下游仓库存在 `.framework-lock.json` 时，manifest 管理内容为只读；框架缺口反馈上游，稳定消费等待验证后的 Tag，开发联调可按需同步已提交的 channel snapshot。目录所有权、启动扩展点和同步命令只在 [框架发行与下游同步](../LayaProject/docs/framework-distribution.md) 维护。
+下游仓库存在 `.framework-lock.json` 时，框架类型或公共功能改动先让开发者选择上游分支或当前项目，已明确的同范围选择不重复确认。当前项目允许修改原受管文件，本地差异只提示；lock 保留来源基线，仍可同步已确认 Tag 或已提交的 channel snapshot。同步覆盖已有修改前另行确认，防止丢失内容。目录归属、启动扩展点和同步命令只在 [框架发行与下游同步](../LayaProject/docs/framework-distribution.md) 维护。
 
 ## 验证
 
@@ -87,7 +87,7 @@ Windows 与 macOS 共用同一套 AGENTS、Skills 和 npm 命令。GitHub Action
 
 工作集只保留有效且有独立价值的经验，过时、冲突或已被规则完整吸收的条目直接删除并清理链接；历史查 Git。`check:memory` 检查 active 状态、索引与正文的本地链接。具体记录条件见 [memory-policy.md](../LayaProject/.agents/skills/project-memory/references/memory-policy.md)。
 
-Codex 官方 [Memories](https://learn.chatgpt.com/docs/customization/memories) 位于用户目录 `~/.codex/memories/`，由客户端在启用后后台生成；与仓库记忆可互补。项目不自动启停官方记忆、不手改其生成状态或同步两套目录。团队必守规则继续放在 AGENTS/Skill/版本化文档，不能依赖个人记忆传给其他成员。
+Codex 官方 [Memories](https://learn.chatgpt.com/docs/customization/memories) 位于用户目录 `~/.codex/memories/`，由客户端在启用后后台生成；与仓库记忆可互补。项目不自动启停官方记忆、不手改其生成状态或同步两套目录。项目必守规则继续放在 AGENTS/Skill/版本化文档，不依赖个人记忆维持约束。
 
 本次冲突清理、检索回归与独立执行证据见 [项目记忆验收](../LayaProject/docs/project-memory-validation.md)。
 

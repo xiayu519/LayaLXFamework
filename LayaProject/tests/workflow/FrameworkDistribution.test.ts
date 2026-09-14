@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, rmdirSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -44,8 +44,10 @@ describe("framework distribution", () => {
         write(join(destination, resource), "game custom skin\n");
         const legacy = "LayaProject/assets/bootstrap/framework/ui/Tip.lh";
         write(join(destination, legacy), "legacy game skin\n");
+        const owners = ".github/CODEOWNERS";
+        write(join(destination, owners), "* @game-maintainer\n");
         // 模拟旧发布版本的持有记录；下次同步应移交归属，不删除资源。
-        writeJson(join(destination, ".framework-lock.json"), { files: [{ path: legacy }] });
+        writeJson(join(destination, ".framework-lock.json"), { files: [{ path: legacy }, { path: owners }] });
         git(source, "init");
         git(source, "config", "user.name", "Framework Test");
         git(source, "config", "user.email", "framework-test@example.invalid");
@@ -55,13 +57,14 @@ describe("framework distribution", () => {
         run("sync", "--source", source, "--destination", destination, "--ref", "v1.0.0");
         expect(readFileSync(join(destination, resource), "utf8")).toBe("game custom skin\n");
         expect(readFileSync(join(destination, legacy), "utf8")).toBe("legacy game skin\n");
+        expect(readFileSync(join(destination, owners), "utf8")).toBe("* @game-maintainer\n");
         const lock = JSON.parse(readFileSync(join(destination, ".framework-lock.json"), "utf8"));
         expect(lock.files.some((entry: { path: string }) => entry.path.includes("/assets/"))).toBe(false);
         write(join(destination, resource), "game revised skin\n");
         expect(run("check", "--destination", destination)).toContain("Framework integrity OK");
     }, distributionTestTimeoutMs);
 
-    it("locks managed files, rejects downstream patches and restores through sync", () => {
+    it("reports downstream changes without rejecting them, preserves provenance and confirms replacement", () => {
         const source = fixture("lx-framework-source-");
         const destination = fixture("lx-framework-consumer-");
         writeJson(join(source, "framework.manifest.json"), {
@@ -106,7 +109,22 @@ describe("framework distribution", () => {
 
         const managedFile = join(destination, "LayaProject", "src", "framework", "Example.ts");
         write(managedFile, "export const value = 2;\n");
-        expect(() => run("check", "--destination", destination)).toThrow(/Framework integrity check failed/);
+        const baselineLock = readFileSync(lockPath, "utf8");
+        expect(run("check", "--destination", destination)).toContain("Framework local changes:");
+        expect(run("upstream", "--source", source, "--destination", destination)).toContain("Framework upstream OK");
+        expect(readFileSync(lockPath, "utf8")).toBe(baselineLock);
+        expect(() => run("sync", "--source", source, "--destination", destination, "--ref", "v1.0.0"))
+            .toThrow(/would overwrite local changes/);
+        expect(readFileSync(managedFile, "utf8")).toBe("export const value = 2;\n");
+        expect(readFileSync(lockPath, "utf8")).toBe(baselineLock);
+
+        rmSync(managedFile);
+        expect(run("check", "--destination", destination)).toContain("missing LayaProject/src/framework/Example.ts");
+        rmdirSync(join(destination, "LayaProject/src/framework"));
+        expect(run("check", "--destination", destination)).toContain("Framework local changes:");
+        expect(() => run("sync", "--source", source, "--destination", destination, "--ref", "v1.0.0"))
+            .toThrow(/locally deleted/);
+        write(managedFile, "export const value = 2;\n");
 
         const lock = JSON.parse(readFileSync(lockPath, "utf8"));
         const entry = lock.files.find((item: { path: string }) => item.path.endsWith("Example.ts"));
@@ -121,10 +139,14 @@ describe("framework distribution", () => {
             .toThrow(/Framework upstream verification failed/);
 
         write(join(destination, "LayaProject", "src", "framework", "DownstreamPatch.ts"), "export {};\n");
-        expect(() => run("check", "--destination", destination)).toThrow(/unlocked/);
+        expect(run("check", "--destination", destination)).toContain("unlocked");
 
-        run("sync", "--source", source, "--destination", destination, "--ref", "v1.0.0");
+        expect(() => run("sync", "--source", source, "--destination", destination, "--ref", "v1.0.0"))
+            .toThrow(/local-only/);
+        run("sync", "--source", source, "--destination", destination, "--ref", "v1.0.0", "--overwrite-local");
         expect(run("check", "--destination", destination)).toContain("Framework integrity OK");
+        expect(readFileSync(managedFile, "utf8")).toBe("export const value = 1;\n");
+        expect(existsSync(join(destination, "LayaProject/src/framework/DownstreamPatch.ts"))).toBe(false);
     }, distributionTestTimeoutMs);
 
     it("updates a channel snapshot explicitly while keeping the previous commit reproducible", () => {

@@ -9,14 +9,31 @@ export abstract class BaseWorld<TContext extends WorldContext = WorldContext> im
         // 先移除本 World 持有的注册项，再执行最终业务清理。
         // 注册或进入过程部分失败时，也会通过此钩子清理。
         context.own(() => this.onExit(context));
-        await this.onRegister(context);
-        if (!context.signal.aborted) {
-            await this.onEnter(context);
+        // 公共顺序只在父类维护；子类只提供各阶段内容，取消后不再执行后续阶段。
+        const steps = [this.onRegister, this.registerEvents, this.registerUI, this.registerScenes, this.onEnter];
+        for (const step of steps) {
+            if (context.signal.aborted) {
+                return;
+            }
+            await step.call(this, context);
         }
     }
 
-    /** 编排子类的 registerEvents、registerUI、registerScenes；通过 WorldScope 登记退出清理。 */
-    protected abstract onRegister(context: TContext): void | Promise<void>;
+    /** 可选准备阶段：先登记局部模块、资源和 caller，再注册依赖它们的事件、UI 与场景。 */
+    protected onRegister(_context: TContext): void | Promise<void> {
+    }
+
+    /** 只登记本 World 的事件订阅；公共源上的订阅也由本 World 管理寿命。 */
+    protected registerEvents(_context: TContext): void | Promise<void> {
+    }
+
+    /** 登记本 World 专属 UI 定义；使用 WorldScope 自动绑定退出清理。 */
+    protected registerUI(_context: TContext): void | Promise<void> {
+    }
+
+    /** 在 UI 定义之后登记场景，保证退出时先销毁场景及其 UI 实例。 */
+    protected registerScenes(_context: TContext): void | Promise<void> {
+    }
 
     /** 打开场景并启动业务；依赖场景的逐帧任务应在场景准备完成后启动。 */
     protected abstract onEnter(context: TContext): void | Promise<void>;

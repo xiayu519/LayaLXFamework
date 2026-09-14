@@ -22,6 +22,9 @@ const semverTagPattern = /^v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
 const command = process.argv[2] ?? "check";
 const options = parseOptions(process.argv.slice(3));
 const destinationRoot = resolve(options.get("destination") ?? defaultRepositoryRoot);
+if (options.has("overwrite-local") && command !== "sync") {
+    throw new Error("--overwrite-local is only valid for framework sync.");
+}
 
 if (command === "manifest") {
     const manifest = readManifest(destinationRoot);
@@ -113,14 +116,18 @@ async function verifyUpstream(root, parsed) {
 
 function parseOptions(args) {
     const parsed = new Map();
-    for (let index = 0; index < args.length; index += 2) {
+    for (let index = 0; index < args.length; index++) {
         const key = args[index];
-        const value = args[index + 1];
-        if (!["--source", "--repository", "--ref", "--channel", "--destination"].includes(key) || !value) {
-            throw new Error(`Invalid framework distribution option '${key ?? ""}'.`);
-        }
-        if (parsed.has(key.slice(2))) {
+        if (parsed.has(key?.slice(2))) {
             throw new Error(`Duplicate framework distribution option '${key}'.`);
+        }
+        if (key === "--overwrite-local") {
+            parsed.set("overwrite-local", true);
+            continue;
+        }
+        const value = args[++index];
+        if (!["--source", "--repository", "--ref", "--channel", "--destination"].includes(key) || !value || value.startsWith("--")) {
+            throw new Error(`Invalid framework distribution option '${key ?? ""}'.`);
         }
         parsed.set(key.slice(2), value);
     }
@@ -163,12 +170,13 @@ function readManifest(root) {
     return manifest;
 }
 
-function expandManagedFiles(root, manifest) {
+function expandManagedFiles(root, manifest, allowMissing = false) {
     const files = new Set();
     for (const entry of manifest.managedPaths) {
         if (entry.endsWith("/**")) {
             const directory = safeResolve(root, entry.slice(0, -3));
             if (!existsSync(directory) || !statSync(directory).isDirectory()) {
+                if (allowMissing && !existsSync(directory)) continue;
                 throw new Error(`Managed directory is missing: ${entry.slice(0, -3)}`);
             }
             for (const path of walkFiles(directory)) {
@@ -177,6 +185,7 @@ function expandManagedFiles(root, manifest) {
         } else {
             const path = safeResolve(root, entry);
             if (!existsSync(path) || !statSync(path).isFile()) {
+                if (allowMissing && !existsSync(path)) continue;
                 throw new Error(`Managed file is missing: ${entry}`);
             }
             files.add(portable(relative(root, path)));
@@ -196,27 +205,30 @@ function checkIntegrity(root) {
     }
 
     const lock = readConsumerLock(lockPath);
-    const failures = [];
+    const differences = [];
     const manifestHash = hashFile(join(root, "framework.manifest.json"));
     if (manifestHash !== lock.manifestHash) {
-        failures.push("framework.manifest.json differs from the locked upstream manifest");
+        differences.push("framework.manifest.json differs from the locked upstream manifest");
     }
     const locked = new Map(lock.files.map((entry) => [entry.path, entry]));
-    const current = new Set(expandManagedFiles(root, manifest));
+    const current = new Set(expandManagedFiles(root, manifest, true));
     for (const [path, expected] of locked) {
         const target = safeResolve(root, path);
         if (!existsSync(target)) {
-            failures.push(`missing ${path}`);
+            differences.push(`missing ${path}`);
         } else if (hashFile(target) !== expected.sha256 || statSync(target).size !== expected.size) {
-            failures.push(`changed ${path}`);
+            differences.push(`changed ${path}`);
         }
         current.delete(path);
     }
     for (const path of current) {
-        failures.push(`unlocked ${path}`);
+        differences.push(`unlocked ${path}`);
     }
-    if (failures.length > 0) {
-        throw new Error(`Framework integrity check failed:\n- ${failures.join("\n- ")}\nRun the approved framework sync command; do not patch managed files downstream.`);
+    if (differences.length > 0) {
+        // lock 记录上次同步来源；本地改动如实报告，不再作为下游禁止修改的门禁。
+        console.log(`Framework local changes: ${differences.length} difference(s) from ${formatLockSource(lock)} (${lock.commit}).\n- ${differences.join("\n- ")}`);
+        console.log("Framework/shared changes require a developer choice: an upstream branch or this project. Reuse an existing choice for the same scope; keep the lock as the source baseline.");
+        return;
     }
     console.log(`Framework integrity OK: ${formatLockSource(lock)} (${lock.commit}), ${lock.files.length} managed file(s).`);
 }
@@ -271,9 +283,13 @@ async function syncFramework(root, parsed) {
         const oldLockPath = join(root, ".framework-lock.json");
         const oldLock = existsSync(oldLockPath) ? readJson(oldLockPath) : undefined;
         const nextFiles = new Set(sourceFiles);
+        const conflicts = findSyncConflicts(root, sourceRoot, manifest, nextFiles, oldLock);
+        if (conflicts.length && !parsed.has("overwrite-local")) {
+            throw new Error(`Framework sync would overwrite local changes:\n- ${conflicts.join("\n- ")}\nReview these paths and preserve or merge them. Use --overwrite-local only after the developer chooses to replace them.`);
+        }
         for (const entry of oldLock?.files ?? []) {
-            // 已发布的可视资源归游戏持有，即使旧 lock 曾管理这些资源。
-            if (!nextFiles.has(entry.path) && !isGameResource(entry.path)) {
+            // 移交给游戏的资源和审查配置保留，不按过期上游文件删除。
+            if (!nextFiles.has(entry.path) && !isProjectOwnedFile(entry.path)) {
                 const stale = safeResolve(root, entry.path);
                 if (existsSync(stale) && statSync(stale).isFile()) {
                     rmSync(stale);
@@ -314,6 +330,26 @@ async function syncFramework(root, parsed) {
     }
 }
 
+/** 同步会覆盖或删除本地内容；先完整列出冲突，不能把允许本地修改变成静默丢失修改。 */
+function findSyncConflicts(root, sourceRoot, manifest, nextFiles, oldLock) {
+    const previous = new Map((oldLock?.files ?? []).filter(entry => !isProjectOwnedFile(entry.path)).map(entry => [entry.path, entry]));
+    const candidates = new Set([...previous.keys(), ...expandManagedFiles(root, manifest, true), ...nextFiles]);
+    const conflicts = [];
+    for (const local of candidates) {
+        const target = safeResolve(root, local);
+        const expected = previous.get(local);
+        if (!existsSync(target)) {
+            if (expected && nextFiles.has(local)) conflicts.push(`locally deleted ${local}`);
+            continue;
+        }
+        const hash = hashFile(target);
+        if (expected && hash === expected.sha256 && statSync(target).size === expected.size) continue;
+        if (nextFiles.has(local) && hash === hashFile(safeResolve(sourceRoot, local))) continue;
+        conflicts.push(`${expected ? "changed" : "local-only"} ${local}`);
+    }
+    return conflicts;
+}
+
 function removeDestinationExtras(root, manifest, expectedFiles) {
     for (const entry of manifest.managedPaths) {
         if (!entry.endsWith("/**")) {
@@ -332,8 +368,9 @@ function removeDestinationExtras(root, manifest, expectedFiles) {
     }
 }
 
-function isGameResource(path) {
-    return ["bootstrap", "packages", "shared"].some(root => path.startsWith(`LayaProject/assets/${root}/`));
+function isProjectOwnedFile(path) {
+    return path === ".github/CODEOWNERS"
+        || ["bootstrap", "packages", "shared"].some(root => path.startsWith(`LayaProject/assets/${root}/`));
 }
 
 function validateJsonContracts(root, manifest) {

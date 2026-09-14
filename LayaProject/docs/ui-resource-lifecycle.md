@@ -47,3 +47,7 @@ npm run test:headless -- --suite targeted --probe tests/game/logic/ui-resources.
 ```
 
 同轮构建输入未变时用 `node tools/test-browser.mjs --suite targeted --probe tests/game/logic/ui-resources.browser.mjs` 复用构建。结果是 Windows Headless Chromium / SwiftShader 下的引用与生命周期证明；长时间 heap 曲线、macOS、小游戏和 Native 真机仍需对应环境实测。宿主还须具备现有公共取消契约使用的 AbortController；本机引擎库未提供该补丁，不能由 Web 结果推断所有小游戏/Native JS 环境支持。IAP 是另一个接入边界，目前默认实现为 unsupported。
+
+## World 退出与后登记内容
+
+World 运行中可以追加专属 UI 注册，清理时不能因后登记 UI 的慢加载而推迟所属 Scene 的失效。WorldScope 在退出开始时就启动全部所属 Scene 的注销，立即取消场景/展示的工作；清理队列随后等待同一关闭任务，不重复释放原生实例或引用。新增的真实 World 探针覆盖列表图集共享持有与待完成 UI/池加载，发现和修复记录见 [框架设计复查](framework-design-review.md)。

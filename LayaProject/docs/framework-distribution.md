@@ -2,15 +2,15 @@
 
 ## 所有权
 
-仓库根没有 `.framework-lock.json` 时是上游开发模式；存在 lock 时是下游消费模式。下游不得直接修改 `framework.manifest.json` 管理的文件。
+仓库根没有 `.framework-lock.json` 时是上游开发模式；存在 lock 时是下游消费模式。`framework.manifest.json` 定义同步范围，lock 记录上次同步的来源基线。它们不再将下游框架文件设为只读。涉及框架类型或公共功能时，开发工作流先提示开发者选择在上游分支修改，还是直接在当前项目修改；同一已选范围不重复确认。纯游戏局部实现不触发这个选择。
 
-| 上游管理 | 下游管理 |
+| 框架同步范围 | 游戏维护范围 |
 | --- | --- |
 | `src/framework/**`、`src/AppEntry.ts` 及其 `.meta` | `src/game/**`（含 IDE 生成的 Runtime 字段） |
 | 通用资源加载与 UI 生命周期代码 | `assets/bootstrap/**`、`assets/packages/**`、`assets/shared/**`，包括 Startup、Tip、Loading |
 | 根 `.agents/**`、`.codex/**`、`AGENTS.md` | `src/game/<game-id>/AGENTS.md`、`.agents/**`、`.codex/memory/**` |
 | `tools/**`、`tests/framework/**`、`tests/workflow/**` | `tests/game/**`、游戏专属工具 |
-| `Design/tools/**`、`Design/genBin.*` | `Design/Tables/**` |
+| `Design/tools/**`、`Design/genBin.*` | `Design/Tables/**`、`.github/CODEOWNERS` |
 
 `package.json`、`LayaProject.laya`、`PlayerSettings.json`、`CompilerSettings.json`、`ResourceLayout.json` 和 `tsconfig.json` 归下游维护，但 manifest 会校验框架依赖的最小 JSON 字段；下游可添加游戏字段，不能删除或改写公共契约。`CompilerSettings.mainScript` 必须引用 `AppEntry.ts.meta` 的 UUID，其余编译选项保留。`PlayerSettings.json` 的公共契约只约束框架所需模块、ui2 插件和 Spine 版本，不包含 `resolution`；同步会保留每个项目自己选择的 `designWidth`、`designHeight`、`scaleMode` 和 `screenMode`。
 
@@ -32,11 +32,11 @@ GameStartup.ts 选择游戏配置与 StartupScene；框架模块全部在 lx.ts 
 
 `AppEntry.ts` 使用 Laya 原生启动脚本入口，负责去重启动和失败回滚，不重复初始化引擎；停机调用 `await lx.stop()`。应用生命周期不依赖 `Startup.ls`，销毁业务场景或启动展示场景不会停止应用。IDE 的“启动场景预览”执行配置的 `main()`；“当前场景预览”只打开当前资产，需要应用服务时应切回启动预览。`logic` 不是游戏目录；固定桥接与命名游戏组合都归下游，framework 不依赖 game。
 
-游戏桥接改为 src/game/bootstrap/GameStartup.ts，导出 GameApplication 配置类和 StartupScene。AppEntry 直接调用 lx.init，不再调用运行时工厂。升级到本版的下游需迁移这个游戏所有的桥接文件，并按 ApplicationConfig 实现 register/initialize/synchronization/dispose；框架同步限制与 lock 规则保持原样。当前模板配置保留在 logic/bootstrap/GameApplication.ts，明确使用开发模拟器，真实游戏需接入自己的协议。
+游戏桥接改为 src/game/bootstrap/GameStartup.ts，导出 GameApplication 配置类和 StartupScene。AppEntry 直接调用 lx.init，不再调用运行时工厂。升级到本版的下游需迁移这个游戏所有的桥接文件，并按 ApplicationConfig 实现 register/initialize/synchronization/dispose。当前模板配置保留在 logic/bootstrap/GameApplication.ts，明确使用开发模拟器，真实游戏需接入自己的协议。
 
 ## 发布与同步
 
-正式发布时，上游完成 `npm run verify:release`、提交并创建不可变 SemVer Tag。下游只在独立同步分支执行：
+正式发布时，上游完成 `npm run verify:release`、提交并创建不可变 SemVer Tag。下游可以在独立同步分支执行，便于审阅和回退：
 
 ```shell
 git switch -c sync/framework-0.2.0
@@ -60,4 +60,12 @@ npm run check:framework-integrity
 
 第一次建立下游仓库时仍建议从一个已发布 Tag 创建完整项目并设置自己的 `origin`，再对同一 Tag 执行一次 `framework:sync` 生成初始 lock。之后可以同步更高的已发布版本，也可以按需显式更新 `main` snapshot；下游不会在上游 push 时自动漂移。
 
-本地文件仍可被编辑，但受管文件与 lock 不一致会被离线完整性检查拒绝；唯一的 GitHub Workflow 只运行同步契约检查，通过 `npm run check:framework-upstream` 对照 lock 指向的真实 Tag 或 channel 历史中的固定 commit，因此同时伪造文件与 lock 也会失败。它不安装或检测 LayaAir、.NET、Python、浏览器与 Codex CLI；这些环境及游戏回归由使用者在本地按需验证。用于 snapshot 的 channel 必须禁止 force-push，仓库必须启用分支保护并要求 `CODEOWNERS` 审查；框架缺口回到上游修复，不能修改哈希绕过。
+`check:framework-integrity` 对下游受管文件的修改、新增、删除和 manifest 差异输出 `Framework local changes:`，正常退出，不修改 lock。必要的 Laya/TypeScript JSON 契约和 lock 格式仍需有效。`check:framework-upstream` 只核对 lock 声称的真实来源，因此当前项目的代码修改可以通过，伪造来源仍会失败。唯一的 GitHub Workflow 只执行这些同步契约检查，不安装或检测 LayaAir、.NET、Python、浏览器与 Codex CLI；游戏验证由开发者在本地按需完成。
+
+## 本地修改与覆盖确认
+
+开发提示发生在工作流中，不是游戏运行时弹窗：涉及框架类型或公共功能时，询问“在框架上游分支改更合适，还是直接在当前项目改？”选择当前项目后可以修改原受管文件并运行相关验证；选择上游后进入对应上游分支实现。已明确的选择在同一范围内持续有效。lock 保留上次同步来源，不把本地修改伪装成上游发布内容。
+
+下一次同步会先列出将被覆盖、删除或恢复的本地差异，包括已提交修改、本地新增和本地删除；存在冲突时在写入前停止。开发者可先保留并合并差异，或明确选择替换后为原同步命令添加 `--overwrite-local`。这个确认只保护实际文件内容，允许下游修改本身不需要绕过检查。
+
+`.github/CODEOWNERS` 不再随框架同步；旧 lock 曾管理的该文件会保留并移交游戏维护。上游仓库自己的审查配置仍归上游维护，下游是否使用 CODEOWNERS、分支保护由开发者决定。为保证 snapshot 可重现，上游 channel 应保留已发布 commit 的可达性，避免改写历史。

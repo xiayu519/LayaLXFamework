@@ -145,7 +145,9 @@ export class UIBindings {
             return;
         }
         binding.active = true;
-        for (const event of binding.events) binding.source.on(event, binding, binding.notify);
+        for (const event of binding.events) {
+            binding.source.on(event, binding, binding.notify);
+        }
         binding.refresh();
     }
 

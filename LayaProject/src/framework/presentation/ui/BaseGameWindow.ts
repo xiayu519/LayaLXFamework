@@ -1,4 +1,4 @@
-import { logger as xlog } from "../../application/diagnostics/Logger";
+import { logger } from "../../application/diagnostics/Logger";
 import {
     LifetimeCleanupError,
     LifetimeScope,
@@ -292,7 +292,7 @@ export abstract class BaseGameWindow<TArgs> extends Laya.GWindow {
                     this.onClosed();
                 }
                 catch (error) {
-                    xlog.error("[UI] onClosed failed after window cleanup", error);
+                    logger.error("[UI] onClosed failed after window cleanup", error);
                 }
             });
         }

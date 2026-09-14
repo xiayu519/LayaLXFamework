@@ -66,6 +66,39 @@ beforeEach(() => { factories.clear(); load.mockClear(); gc.mockReset(); });
 afterAll(() => vi.unstubAllGlobals());
 
 describe("SceneRegistry", () => {
+    it("preserves scene argument types through registration and public entry points", async () => {
+        const registry = new SceneRegistry({ waitForFrame: async () => {} });
+        const route = registry.register<{ level: number }>({ id: "typed", url: "typed.ls" });
+        const prepare = vi.fn();
+        class ArgumentScene extends BaseGameScene<{ level: number }> {
+            protected override onPrepare(context: { readonly args: { level: number } }): void {
+                prepare(context.args);
+            }
+        }
+        factories.set(route.url, new FakePrefab(() => new ArgumentScene()));
+        if (false) {
+            // @ts-expect-error 不同参数的路由不能通过类型赋值相互冒充。
+            const incompatible: SceneRoute<{ level: string }> = route;
+            void incompatible;
+            // @ts-expect-error 数字关卡参数不能被字符串替代。
+            void registry.open(route, { level: "invalid" });
+            // @ts-expect-error 场景参数不能缺少必需的关卡字段。
+            void registry.open(route, {});
+            const flow = undefined as unknown as import("../../src/framework/presentation/scene/SceneFlow").SceneFlow;
+            const world = undefined as unknown as import("../../src/framework/bootstrap/WorldScope").WorldScope;
+            // @ts-expect-error 内部切换入口也保留路由参数约束。
+            void flow.open(route, { level: "invalid" });
+            const owned = world.registerScene(route);
+            // @ts-expect-error World 登记与打开之间不能丢失路由参数类型。
+            void world.openScene(owned, { level: "invalid" });
+        }
+        const scene = await registry.open(route, { level: 7 });
+        expect(prepare).toHaveBeenCalledWith({ level: 7 });
+        expect(registry.get(route)).toBe(scene);
+        await registry.dispose();
+        expect(scene.destroyed).toBe(true);
+    });
+
     it("keeps simultaneous native scenes independent and only replaces the requested route", async () => {
         const registry = setup();
         const [firstLobby, firstBattle] = await Promise.all([registry.open(lobby, undefined), registry.open(battle, undefined)]);

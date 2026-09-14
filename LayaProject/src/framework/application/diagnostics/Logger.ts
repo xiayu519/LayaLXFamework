@@ -36,5 +36,5 @@ export class Logger {
     }
 }
 
-/** xlog 与兼容入口 lx.logger 共用此实例。 */
+/** 显式导入与 lx.logger 共用此实例，启动前即可使用。 */
 export const logger = new Logger();

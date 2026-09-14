@@ -1,5 +1,5 @@
-import { logger as xlog } from "../../application/diagnostics/Logger";
-import { UILayer } from "./UILayer";
+import { logger } from "../../application/diagnostics/Logger";
+import { UILayer, UI_LAYER_CAPACITY } from "./UILayer";
 import type { UILayoutService } from "./UILayoutService";
 
 export interface TipQueueOptions {
@@ -125,7 +125,7 @@ export class TipQueue {
         const operation = this.present(message);
         this.pending.add(operation);
         operation.catch((error: unknown) => {
-            xlog.error("[LX] tip presentation failed", error);
+            logger.error("[LX] tip presentation failed", error);
         }).finally(() => {
             this.pending.delete(operation);
             if (!this.disposed) {
@@ -153,7 +153,7 @@ export class TipQueue {
 
         messageText.text = message;
         root.addChild(view);
-        view.zOrder = UILayer.Toast * 1000;
+        view.zOrder = UILayer.Toast * UI_LAYER_CAPACITY;
         const safeArea = this.layout?.snapshot().topSafeArea;
         const area = safeArea && safeArea.width > 0 && safeArea.height > 0
             ? safeArea

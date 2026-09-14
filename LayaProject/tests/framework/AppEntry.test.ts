@@ -125,9 +125,9 @@ describe("AppEntry uses one lx initialization", () => {
     });
 
     it("honors disabled startup diagnostics", async () => {
-        const { xlog } = await import("../../src/framework/xlog");
-        xlog.enabled = false;
+        const { logger } = await import("../../src/framework/application/diagnostics/Logger");
+        logger.enabled = false;
         try { await main(); expect(console.log).not.toHaveBeenCalled(); }
-        finally { xlog.enabled = true; }
+        finally { logger.enabled = true; }
     });
 });

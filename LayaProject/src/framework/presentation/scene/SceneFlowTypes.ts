@@ -19,6 +19,8 @@ export interface SceneTransitionProgress {
 export interface SceneRoute<TArgs> {
     readonly id: string;
     readonly url: string;
+    /** 只关联参数类型，注册时无需赋值；避免不同参数的路由被结构类型误判为兼容。 */
+    readonly argsType?: TArgs;
 }
 
 export interface SceneOpenOptions {

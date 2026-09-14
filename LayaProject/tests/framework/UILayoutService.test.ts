@@ -52,6 +52,48 @@ const stage = new FakeStage();
 afterEach(() => vi.unstubAllGlobals());
 
 describe("UILayoutService", () => {
+    it("rolls back a subscription when its initial callback fails", async () => {
+        root.width = stage.width = 720;
+        root.height = stage.height = 1280;
+        vi.stubGlobal("Laya", { GWidget: FakeWidget, GRoot: { inst: root }, stage });
+        const { UILayoutService } = await import("../../src/framework/presentation/ui/UILayoutService");
+        const layout = new UILayoutService(createPlatform({ width: 720, height: 1280 }));
+        layout.refresh();
+        const failure = new Error("Initial layout failed.");
+        const failed = vi.fn(() => { throw failure; });
+        expect(() => layout.subscribe(failed)).toThrow(failure);
+        const active = vi.fn();
+        const unsubscribe = layout.subscribe(active);
+        root.width = stage.width = 640;
+        expect(() => layout.refresh()).not.toThrow();
+        expect(failed).toHaveBeenCalledTimes(1);
+        expect(active).toHaveBeenCalledTimes(2);
+        unsubscribe();
+        root.width = stage.width = 600;
+        layout.refresh();
+        expect(active).toHaveBeenCalledTimes(2);
+    });
+
+    it("preserves an earlier subscription if subscribing the same callback again fails", async () => {
+        root.width = stage.width = 720;
+        root.height = stage.height = 1280;
+        vi.stubGlobal("Laya", { GWidget: FakeWidget, GRoot: { inst: root }, stage });
+        const { UILayoutService } = await import("../../src/framework/presentation/ui/UILayoutService");
+        const layout = new UILayoutService(createPlatform({ width: 720, height: 1280 }));
+        layout.refresh();
+        const listener = vi.fn();
+        const unsubscribe = layout.subscribe(listener);
+        listener.mockImplementationOnce(() => { throw new Error("Repeated subscription failed."); });
+        expect(() => layout.subscribe(listener)).toThrow("Repeated subscription failed.");
+        root.width = stage.width = 640;
+        layout.refresh();
+        expect(listener).toHaveBeenCalledTimes(3);
+        unsubscribe();
+        root.width = stage.width = 600;
+        layout.refresh();
+        expect(listener).toHaveBeenCalledTimes(3);
+    });
+
     it("clips safe areas and capsule avoidance into a local host rectangle", async () => {
         root.width = stage.width = 720; root.height = stage.height = 1280;
         vi.stubGlobal("Laya", { GWidget: FakeWidget, GRoot: { inst: root }, stage });

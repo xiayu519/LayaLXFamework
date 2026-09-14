@@ -36,7 +36,9 @@ export class ServiceOperations {
     private complete(id: number): void {
         this.pending.delete(id);
         if (!this.pending.size) {
-            for (const resolve of this.idleWaiters) resolve();
+            for (const resolve of this.idleWaiters) {
+                resolve();
+            }
             this.idleWaiters.clear();
         }
     }

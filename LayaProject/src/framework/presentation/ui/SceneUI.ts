@@ -1,4 +1,4 @@
-import { logger as xlog } from "../../application/diagnostics/Logger";
+import { logger } from "../../application/diagnostics/Logger";
 import { LifetimeCleanupError, LifetimeScope } from "../../application/lifecycle/LifetimeScope";
 import { AsyncBindingGuard, awaitBinding, BindingCancelledError } from "../../application/ui/AsyncBindingGuard";
 import type { UIHostRect, UILayoutService, UILayoutSnapshot } from "./UILayoutService";
@@ -153,12 +153,16 @@ export class SceneUI {
         if (!this.disposed) {
             this.disposed = true;
             this.sceneOwner.open = false;
-            for (const owner of this.owners) owner.requests.cancel();
+            for (const owner of this.owners) {
+                owner.requests.cancel();
+            }
             this.unsubscribeLayout();
             this.mask?.off(Laya.Event.CLICK, this, this.onMaskClick);
         }
         const errors: unknown[] = [];
-        for (const record of [...this.records.values()]) attempt(errors, () => this.destroyView(record));
+        for (const record of [...this.records.values()]) {
+            attempt(errors, () => this.destroyView(record));
+        }
         attempt(errors, () => {
             this.mask?.destroy();
             this.mask = undefined;
@@ -171,13 +175,17 @@ export class SceneUI {
     }
 
     public async waitForPendingLoads(): Promise<void> {
-        while (this.pending.size) await Promise.allSettled([...this.pending.keys()]);
+        while (this.pending.size) {
+            await Promise.allSettled([...this.pending.keys()]);
+        }
     }
 
     /** @internal 路由器先封锁注册项，再执行该路由的清理。 */
     public async unregisterView(route: ViewRoute): Promise<void> {
         const errors: unknown[] = [];
-        for (const owner of this.owners) owner.requests.cancel(route.id);
+        for (const owner of this.owners) {
+            owner.requests.cancel(route.id);
+        }
         for (const record of [...this.records.values()]) {
             if (record.route === route) {
                 attempt(errors, () => this.destroyView(record));
@@ -435,7 +443,9 @@ export class SceneUI {
         presentation.requests.cancel();
         const errors: unknown[] = [];
         attempt(errors, () => presentation.bindings.dispose());
-        for (const child of [...presentation.records]) attempt(errors, () => this.destroyView(child));
+        for (const child of [...presentation.records]) {
+            attempt(errors, () => this.destroyView(child));
+        }
         attempt(errors, () => presentation.lifetime.dispose());
         this.owners.delete(presentation);
         if (errors.length) {
@@ -486,7 +496,7 @@ export class SceneUI {
                 record.route.onClosed?.(record.view, args);
             }
             catch (error) {
-                xlog.error("[UI] onClosed failed after view cleanup", error);
+                logger.error("[UI] onClosed failed after view cleanup", error);
             }
         });
     }
@@ -573,7 +583,7 @@ export class SceneUI {
         }
         // 新页面已生效；旧持有者清理失败时仍保留新页面，错误可通过诊断查询。
         if (errors.length) {
-            xlog.error("[UI] replaced pages failed to clean up", new LifetimeCleanupError(errors));
+            logger.error("[UI] replaced pages failed to clean up", new LifetimeCleanupError(errors));
         }
     }
 

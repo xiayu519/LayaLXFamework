@@ -28,7 +28,7 @@
 2. [lx.ts](../src/framework/lx.ts)：模块成员、全部框架模块创建、启动顺序、停止入口。
 3. [GameStartup.ts](../src/game/bootstrap/GameStartup.ts)：当前项目选择哪份游戏配置和启动画面。
 4. [GameApplication.ts](../src/game/logic/bootstrap/GameApplication.ts)：可调用演示配置，register 集中登记公共 UI 与 World 工厂，initialize 处理全局演示数据与红点，dispose 清理；局部事件留在对应 World。
-5. [LobbyWorld.ts](../src/game/logic/bootstrap/worlds/LobbyWorld.ts)、[BattleWorld.ts](../src/game/logic/bootstrap/worlds/BattleWorld.ts)：onRegister 分别调用 registerEvents、registerUI、registerScenes，事件处理方法留在本类；退出时自动撤销订阅与注册，onExit 清理本类引用。
+5. [LobbyWorld.ts](../src/game/logic/bootstrap/worlds/LobbyWorld.ts)、[BattleWorld.ts](../src/game/logic/bootstrap/worlds/BattleWorld.ts)：分别覆写父类的 registerEvents、registerUI、registerScenes，公共顺序由 BaseWorld.initialize 唯一调度，事件处理方法留在本类；退出时自动撤销订阅与注册，onExit 清理本类引用。
 
 ```text
 main → AppEntry.start
@@ -57,7 +57,7 @@ src/game/logic 是保留的可调用脚本库。当前 GameStartup 选择其中�
 - World 工厂注册不创建实例；每次进入才创建新的 World 和局部事件源。
 - Scene/UI 的 owner 和宿主保持原生约定，关闭时解除自己的监听和 timer/Tween。
 - 旧异步任务在退出后失效，原始加载和晚到补偿仍被等待；稳定后才能执行 Scene.gc。
-- 上游/下游同步限制保持原样；本轮没有改 lock、manifest 或同步强制限制。
+- 下游框架改动由开发者选择上游分支或当前项目；本地差异不再阻塞完整性检查。lock 记录真实来源，后续同步覆盖本地修改前确认；CODEOWNERS 不再随框架强制分发。
 
 ## 验证
 
@@ -66,3 +66,5 @@ src/game/logic 是保留的可调用脚本库。当前 GameStartup 选择其中�
 真实引擎探针覆盖 Loading 先显示、数据同步前不进 Lobby、失败重试、World 并存与关闭、公共/局部事件隔离、局部倍速，以及原生 WebSocket 文本/二进制回声和根停止。实际命令与本机结果见 [验证记录](world-lifecycle-design.md#2026-09-14-验证记录)，不将 Windows Chromium 的通过外推到其他平台。
 
 代码规范见 [code-style.md](code-style.md)，World 契约见 [world-lifecycle-design.md](world-lifecycle-design.md)。
+
+后续复查纠正了子类重复编排，并在真实资源探针中修复了 World 退出取消延后的问题，见 [设计复查与复测记录](framework-design-review.md)。

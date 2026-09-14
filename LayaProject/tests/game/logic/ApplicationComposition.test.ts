@@ -246,8 +246,8 @@ const baseConfig = { tipPrefabUrl: "test-tip.lh" };
 
 describe("single lx root", () => {
     it("exists before initialization without allocating native modules", async () => {
-        const { xlog } = await import("../../../src/framework/xlog");
-        expect(lx.logger).toBe(xlog);
+        const { logger } = await import("../../../src/framework/application/diagnostics/Logger");
+        expect(lx.logger).toBe(logger);
         expect(globalThis.lx).toBe(lx);
         expect(lx.ready).toBe(false);
         expect(() => lx.net).toThrow("not initialized");
@@ -458,6 +458,35 @@ describe("single lx root", () => {
         dispatcher.event(FrameworkEvent.STOPPING);
         expect(liveChild).toHaveBeenCalledOnce();
         expect(order).toHaveLength(4);
+    });
+
+    it("关闭通知抛错仍立即失效子 World，清理结束后通过共享任务报告错误", async () => {
+        await lx.init(baseConfig);
+        const cleaned = vi.fn(), listener = vi.fn();
+        const failure = new Error("stop observer failed");
+        let nested: Promise<void> | undefined;
+        lx.events.on(FrameworkEvent.STOPPING, {}, () => {
+            nested = lx.stop();
+            throw failure;
+        });
+        lx.worlds.register({ id: "child", initialize(world) {
+            world.listen(world.events, "local", listener, listener);
+            world.own(cleaned);
+        } });
+        const world = await lx.worlds.enter("child");
+        const stopping = lx.stop();
+        expect(nested).toBe(stopping);
+        expect(lx.stop()).toBe(stopping);
+        expect(world.signal.aborted).toBe(true);
+        world.events.event("local");
+        expect(listener).not.toHaveBeenCalled();
+        await expect(stopping).rejects.toBe(failure);
+        expect(cleaned).toHaveBeenCalledOnce();
+        expect(lx.snapshot().worlds.worlds).toEqual([]);
+        expect(lx.snapshot().bootstrap.state).toBe("stopped");
+        expect(() => lx.net).toThrow("stopped");
+        await lx.init(baseConfig);
+        expect(lx.ready).toBe(true);
     });
 
     it("取消进入立即卸载局部事件，并等待晚到清理；清理失败保留诊断", async () => {

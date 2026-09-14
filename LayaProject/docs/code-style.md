@@ -6,7 +6,7 @@
 
 有状态、有生命周期或需要业务继承的模块使用具名类。成员保存自身状态，具名方法表达主要流程，业务细节留在所属类；初始化入口集中创建模块并按依赖顺序启动。禁止在大型工厂函数中用闭包承载运行时状态，或以内联对象实现完整 World 和模块。配置、路由描述、单步生命周期回调和快照可使用对象字面量；纯计算、校验和无状态工厂可以使用函数。
 
-World 子类的 onRegister 只编排 registerEvents、registerUI、registerScenes 等具名方法，分别承载事件、UI 和场景注册；复杂列表继续在对应方法内按功能拆分。通过 WorldScope 登记时自动绑定退出清理，onExit 只做本类状态与额外业务收尾，不重复卸载已托管的内容。
+有固定步骤的公共流程由父类负责，子类只实现差异点。BaseWorld.initialize 统一执行准备、事件、UI、场景、进入，并逐步检查取消；子类覆写 registerEvents、registerUI、registerScenes 等内容钩子，不复制三步编排，也不靠调用 super 才能完成清理。可选 onRegister 用于提前准备资源、局部模块与 caller；onExit 只做本类业务收尾。
 
 存在真实共同生命周期时提供基类与子类，例如 BaseWorld → LobbyWorld / BattleWorld。根/子 World 共用内容归属和回收机制，基类给出稳定的 protected 扩展点，管理器保留唯一的状态机；不依赖子类手动调用 super 才能释放。模块之间通过明确依赖组合，不创建万能基类、全局服务查找器或无节点需求的引擎组件。
 
@@ -29,13 +29,15 @@ World 子类的 onRegister 只编排 registerEvents、registerUI、registerScene
 
 保留 TypeScript 严格类型、readonly、接口/联合类型、Promise 和模块导入；事件处理使用稳定的具名方法，Laya caller 指向其真实对象。业务新增 API 不以 any[]/Function 擦除 payload 类型，不在每次 getter 中创建日志函数。Cocos 专用构建限制不直接移植；引擎兼容规则以本项目固定版本源码与实际证据为准。
 
+公共泛型必须实际关联类型结构，不能只声明一个未参与成员类型的参数并假定不同实例互不兼容。SceneRoute 的 argsType 是可选类型关联，不需要业务填写；类型验证同时覆盖直接调用和不同参数路由之间的错误赋值。
+
 ## 生命周期归属与原生能力
 
 全局事件源、数据系统、红点状态/规则归框架根 World 初始化与持有，等待首次数据同步（包括红点）就绪后再进入 LobbyWorld。小 World 持有局部事件、对全局事件的订阅、自己的 UI 注册、Scene 和资源；小 World 中的 UI 只管理显示状态及展示期绑定，不初始化全局数据或红点规则。
 
 事件派发使用原生 EventDispatcher；通用层只登记订阅归属和清理责任。公共源与局部源独立，子级关闭精确卸载自身监听；不能清空公共事件源。所有常见注册成功时绑定 owner，清理器遍历登记的内容，不根据 Lobby/Battle 等业务名称逐项写死。这些归属接口已经实现。
 
-框架自己的公共事件和监听在框架层登记；子 World 特有的事件、订阅、UI 和 Scene 在对应子类的 onRegister 登记，并随自身退出卸载。GameApplication 只组合全局内容和 World 工厂，不汇总各 World 的局部事件。子 World 监听公共事件时，该订阅仍由子 World 管理寿命，不能因事件源公共而把订阅挪到根层。实际示例使用 lx.events 的 READY/STOPPING，以及大厅、战斗各自 world.events 上的导航请求。
+框架自己的公共事件和监听在框架层登记；子 World 特有的事件、订阅、UI 和 Scene 在对应子类的 registerEvents/registerUI/registerScenes 钩子登记，并随自身退出卸载。GameApplication 只组合全局内容和 World 工厂，不汇总各 World 的局部事件。子 World 监听公共事件时，该订阅仍由子 World 管理寿命，不能因事件源公共而把订阅挪到根层。实际示例使用 lx.events 的 READY/STOPPING，以及大厅、战斗各自 world.events 上的导航请求。
 
 Timer、Tween、Scene、Loader、Pool、ui2 继续使用原生 API；按需添加的归属适配必须明确原生能力缺少的生命周期责任，不再实现派发、计时、加载缓存或渲染系统。
 
@@ -45,7 +47,7 @@ Timer、Tween、Scene、Loader、Pool、ui2 继续使用原生 API；按需添�
 
 运行时单例统一使用 `lx`，属性和方法使用 lowerCamelCase：`lx.ui.show()`、`lx.scenes.open()`、`lx.pool.acquire()`。类、接口、类型使用 PascalCase：`SceneUI`、`BaseGameScene`、`UIViewRoute`。不是所有 TypeScript 标识或文件都小写。
 
-类和 Runtime 脚本文件与类同名，例如 AppEntry.ts、UIDynamicImage.ts；单例模块使用 lx.ts、xlog.ts。常量、原生事件枚举与日志保留语义，不改写 Laya 原生命名。
+类和 Runtime 脚本文件与类同名，例如 AppEntry.ts、UIDynamicImage.ts；运行时单例模块使用 lx.ts，日志类及其实例统一定义在 Logger.ts。常量、原生事件枚举与日志保留语义，不改写 Laya 原生命名。
 
 UI Prefab 文件名、根节点名和对应 Runtime 类名统一加 `UI` 前缀，例如 `UITip.lh`、`UIInventory.lh` / `UIInventory.ts`。这是本项目的界面命名约定；`TipQueue` 等服务继续按职责命名。启动 UI 统一放 `assets/bootstrap/ui/`，包括游戏可编辑的 `UISceneLoading` 和 `UITip`；示例页面、组件与模板放其 `examples/`，详见 [UI 模板索引](ui-templates.md)。
 
@@ -60,6 +62,6 @@ lx.ui.tip("保存完成");
 
 `lx` 是公共运行时实例，业务不用 `LX` 大写别名。类型继承、route 类型和组合根仍可显式导入框架类；业务不创建第二个框架根。导入路径大小写必须与磁盘一致，脚本改名同时保留原 `.meta` UUID；不改 IDE 生成字段和原生序列化名称。
 
-运行时主动日志显式导入 `framework/xlog`，使用 `xlog.log()` / `xlog.error()`，通过 `xlog.enabled` 统一关闭。它是独立于 runtime 的公共诊断入口，不注册全局变量；lx.logger 保留为同一对象的兼容入口。框架内部把同一个 logger 导入为 xlog，不反向依赖 lx；只有 logger 实现直接调用 console。IDE 内预览、浏览器和微信开发者工具自动使用黄色文本日志，手机小游戏和 Native 保留普通输出；error 保持错误级别。Node 构建和验证工具仍使用各自的控制台输出。详见 [统一日志](logging.md)。
+运行时主动日志显式导入 `framework/application/diagnostics/Logger` 中的 `logger`，使用 `logger.log()` / `logger.error()`，通过 `logger.enabled` 统一关闭。Logger 不依赖框架初始化、不注册全局变量；`lx.logger` 指向同一实例。框架内部也直接导入 logger，不取别名、不反向依赖 lx；只有 Logger 实现直接调用 console。IDE 内预览、浏览器和微信开发者工具自动使用黄色文本日志，手机小游戏和 Native 保留普通输出；error 保持错误级别。Node 构建和验证工具仍使用各自的控制台输出。详见 [统一日志](logging.md)。
 
 Laya 官方源码使用 `GLoader` 类配合 `src`、`loadContent()`，以及 `Loader` 类配合 `load()`，可作为这套项目约定的依据；这不是 TypeScript 编译器强制的大小写规范。[官方 GLoader](https://github.com/layabox/LayaAir/blob/v3.4.1/src/layaAir/laya/ui2/GLoader.ts)、[官方 Loader](https://github.com/layabox/LayaAir/blob/v3.4.1/src/layaAir/laya/net/Loader.ts)。本项目按固定 3.4.1 基线验证，不直接套用旧商业项目的全局命名或资源接口。

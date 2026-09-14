@@ -90,8 +90,8 @@ function parseArguments(args) {
 function renderAgents(gameId, gameName) {
     return `# ${gameName}\n\nGame ID: \`${gameId}\`.\n\n`
         + "本文件只补充当前游戏规则。从本目录启动 Codex 时，AGENTS 按项目根到当前目录合并，因此 LayaProject/AGENTS.md 先于本文件生效；Skills 从当前目录向仓库根扫描，因此公共与游戏 Skills 同时可用。\n\n"
-        + "游戏脚本以当前目录为边界；可调用 `src/game/logic/` 的公共业务逻辑，但不得把当前游戏代码写回 logic。只在这里记录团队确认且跨任务稳定的玩法、平台、设计分辨率、资产和验收约束；不要复制公共框架规则，也不要写死 Skill 路由。\n\n"
-        + "游戏专属 Skill 放在 `.agents/skills/`，使用独立名称和精确 description；游戏经验写入本目录 `.codex/memory/`。公共能力候选先留在本游戏，证明跨游戏复用后再反馈上游。\n";
+        + "游戏脚本以当前目录为边界；可调用 `src/game/logic/` 的公共业务逻辑，但不得把当前游戏代码写回 logic。只在这里记录开发者确认且跨任务稳定的玩法、平台、设计分辨率、资产和验收约束；不要复制公共框架规则，也不要写死 Skill 路由。\n\n"
+        + "游戏专属 Skill 放在 `.agents/skills/`，使用独立名称和精确 description；游戏经验写入本目录 `.codex/memory/`。公共能力候选先留在本游戏；确需修改框架时，按根 AGENTS 让开发者选择上游分支或当前项目，已批准范围不重复询问。\n";
 }
 
 function renderSkillsReadme(gameId) {

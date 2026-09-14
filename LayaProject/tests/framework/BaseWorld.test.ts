@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { BaseWorld } from "../../src/framework/application/world/BaseWorld";
 import type { WorldContext } from "../../src/framework/application/world/WorldDefinition";
 import { WorldRegistry } from "../../src/framework/application/world/WorldRegistry";
@@ -9,8 +9,19 @@ describe("class-based World lifecycle", () => {
         class LobbyWorld extends BaseWorld {
             public readonly id = "lobby";
             protected override onRegister(context: WorldContext): void {
-                events.push("register");
+                events.push("prepare");
+                context.own(() => { events.push("release-resource"); });
+            }
+            protected override registerEvents(context: WorldContext): void {
+                events.push("events");
+                context.own(() => { events.push("unregister-events"); });
+            }
+            protected override registerUI(context: WorldContext): void {
+                events.push("ui");
                 context.own(() => { events.push("unregister-ui"); });
+            }
+            protected override registerScenes(context: WorldContext): void {
+                events.push("scenes");
                 context.own(() => { events.push("unregister-scene"); });
             }
             protected override onEnter(): void { events.push("enter"); }
@@ -23,7 +34,8 @@ describe("class-based World lifecycle", () => {
         registry.register(new LobbyWorld());
         await registry.enter("lobby");
         await Promise.all([registry.exit("lobby"), registry.exit("lobby")]);
-        expect(events).toEqual(["register", "enter", "unregister-scene", "unregister-ui", "exit"]);
+        expect(events).toEqual(["prepare", "events", "ui", "scenes", "enter",
+            "unregister-scene", "unregister-ui", "unregister-events", "release-resource", "exit"]);
     });
 
     it("compensates partial registration and can enter the same definition again with a fresh scope", async () => {
@@ -58,18 +70,19 @@ describe("class-based World lifecycle", () => {
         const events: string[] = [];
         class LoadingWorld extends BaseWorld {
             public readonly id = "loading";
-            protected override async onRegister(context: WorldContext): Promise<void> {
+            protected override async registerUI(context: WorldContext): Promise<void> {
                 events.push("register");
                 await pending;
                 context.own(() => { events.push("late-cleanup"); });
             }
+            protected override registerScenes(): void { events.push("scenes"); }
             protected override onEnter(): void { events.push("enter"); }
             protected override onExit(): void { events.push("exit"); }
         }
         const registry = new WorldRegistry();
         registry.register(new LoadingWorld());
         const entered = registry.enter("loading");
-        await Promise.resolve();
+        await vi.waitFor(() => expect(events).toEqual(["register"]));
         const exited = registry.exit("loading");
         await expect(entered).rejects.toThrow("cancelled");
         resume();
@@ -94,5 +107,31 @@ describe("class-based World lifecycle", () => {
         await expect(registry.exit("failing")).rejects.toThrow("cleanup failed");
         expect(cleaned).toBe(true);
         expect(registry.snapshot().cleanupFailures).toBe(1);
+    });
+
+    it.each(["events", "ui", "scenes"])("compensates a failed %s hook without entering later stages", async failed => {
+        const completed: string[] = [], cleaned: string[] = [];
+        const entered = vi.fn();
+        class BrokenWorld extends BaseWorld {
+            public readonly id = "broken";
+            protected override registerEvents(context: WorldContext): void { this.register("events", context); }
+            protected override registerUI(context: WorldContext): void { this.register("ui", context); }
+            protected override registerScenes(context: WorldContext): void { this.register("scenes", context); }
+            protected override onEnter(): void { entered(); }
+            protected override onExit(): void { cleaned.push("exit"); }
+            private register(stage: string, context: WorldContext): void {
+                completed.push(stage);
+                context.own(() => { cleaned.push(stage); });
+                if (stage === failed) throw new Error(`${stage} failed`);
+            }
+        }
+        const registry = new WorldRegistry();
+        registry.register(new BrokenWorld());
+        await expect(registry.enter("broken")).rejects.toThrow(`${failed} failed`);
+        const expected = ["events", "ui", "scenes"].slice(0, ["events", "ui", "scenes"].indexOf(failed) + 1);
+        expect(completed).toEqual(expected);
+        expect(cleaned).toEqual([...expected].reverse().concat("exit"));
+        expect(entered).not.toHaveBeenCalled();
+        expect(registry.snapshot().pendingLoads).toBe(0);
     });
 });

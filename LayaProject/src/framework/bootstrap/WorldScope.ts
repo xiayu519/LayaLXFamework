@@ -21,7 +21,7 @@ export class WorldScope implements WorldContext {
     private readonly subscriptions = new Set<WorldSubscription>();
     private readonly callers = new Set<object>();
     private readonly pending = new Set<Promise<unknown>>();
-    private readonly sceneRoutes = new Set<SceneRoute<unknown>>();
+    private readonly sceneRoutes = new Map<SceneRoute<unknown>, () => Promise<void>>();
     private readonly invalidationErrors: unknown[] = [];
 
     public constructor(private readonly context: WorldContext,
@@ -94,11 +94,16 @@ export class WorldScope implements WorldContext {
     public registerScene<TArgs>(definition: SceneRoute<TArgs>): SceneRoute<TArgs> {
         this.signal.throwIfAborted();
         const route = this.managers.scenes.register({ ...definition });
-        this.sceneRoutes.add(route);
-        this.own(async () => {
-            await this.managers.scenes.unregister(route);
-            this.sceneRoutes.delete(route);
-        });
+        let closing: Promise<void> | undefined;
+        const unregister = (): Promise<void> => {
+            if (!closing) {
+                closing = this.managers.scenes.unregister(route);
+                void closing.then(() => this.sceneRoutes.delete(route), () => {});
+            }
+            return closing;
+        };
+        this.sceneRoutes.set(route, unregister);
+        this.own(unregister);
         return route;
     }
 
@@ -161,7 +166,12 @@ export class WorldScope implements WorldContext {
         this.signal.removeEventListener("abort", this.invalidate);
         const actions = [...this.subscriptions].map(subscription => subscription.off).concat([
             ...[...this.callers].flatMap(caller => [() => Laya.timer.clearAll(caller), () => Laya.Tween.killAll(caller)]),
-            () => this.events.offAll()]);
+            () => this.events.offAll(),
+            ...[...this.sceneRoutes.values()].map(unregister => () => {
+                // 运行中追加的 UI 清理可能等待慢加载；不能因此延后子场景的失效。
+                // 原生关闭立即开始，own 队列随后等待同一任务并报告清理失败。
+                void unregister().catch(() => {});
+            })]);
         this.subscriptions.clear();
         this.callers.clear();
         for (const action of actions) {

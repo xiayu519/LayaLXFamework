@@ -145,7 +145,9 @@ export class SceneRegistry {
 
     public async waitForPendingLoads(): Promise<void> {
         do {
-            while (this.pending.size) await Promise.allSettled([...this.pending]);
+            while (this.pending.size) {
+                await Promise.allSettled([...this.pending]);
+            }
             await Promise.all([...this.entries.values()].map(async entry => {
                 try {
                     await entry.flow?.waitForPendingLoads();
@@ -329,7 +331,9 @@ export class SceneRegistry {
 
     private loadingFront(): { entry: SceneRegistration; progress: SceneTransitionProgress } | undefined {
         let latest: { entry: SceneRegistration; progress: SceneTransitionProgress } | undefined;
-        for (const [entry, progress] of this.loading) latest = { entry, progress };
+        for (const [entry, progress] of this.loading) {
+            latest = { entry, progress };
+        }
         return latest;
     }
 

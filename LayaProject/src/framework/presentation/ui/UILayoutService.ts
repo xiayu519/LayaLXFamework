@@ -111,20 +111,31 @@ export class UILayoutService {
     }
 
     public subscribe(listener: (snapshot: UILayoutSnapshot) => void): () => void {
+        const alreadyRegistered = this.listeners.has(listener);
         this.listeners.add(listener);
-        if (this.currentValue.viewport.width > 0 && this.currentValue.viewport.height > 0) {
-            listener(this.currentValue);
+        try {
+            if (this.currentValue.viewport.width > 0 && this.currentValue.viewport.height > 0) {
+                listener(this.currentValue);
+            }
+        } catch (error) {
+            // 首次通知失败时，调用方拿不到解除函数；撤销本次新登记，保留此前的订阅。
+            if (!alreadyRegistered) {
+                this.listeners.delete(listener);
+            }
+            throw error;
         }
         return () => this.listeners.delete(listener);
     }
 
-    public refresh = (): void => {
+    public readonly refresh = (): void => {
         const next = createLayoutSnapshot(this.platform.viewport, this.topAvoidanceGap);
         if (sameLayout(this.currentValue, next)) {
             return;
         }
         this.currentValue = next;
-        for (const listener of this.listeners) listener(next);
+        for (const listener of this.listeners) {
+            listener(next);
+        }
     };
 
     public apply(window: Laya.GWindow, mode: UIWindowLayout): void {

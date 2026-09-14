@@ -35,7 +35,7 @@ IAP 游戏的根启动顺序为：初始化全局系统和数据接收入口 →
 
 结构与命名遵循 [代码约定](code-style.md)：状态和生命周期由具名类承载，真实共有流程提供基类扩展点；运行时 lx 与属性/方法使用 lowerCamelCase，类与 Runtime 脚本使用 PascalCase。
 
-统一诊断入口为显式导入的 `xlog.log/error`，`enabled` 同时控制两种输出，启动前也可用。framework/xlog 仅导出 application/diagnostics/Logger，不依赖框架初始化、不注册全局变量；lx.logger 保留兼容并指向同一对象。UI 模块直接依赖内部诊断模块，避免回引 lx。业务服务仍经 lx，日志是独立的公共短入口，不保存历史、不参与 World 生命周期，见 [统一日志](logging.md)。
+统一诊断使用 [Logger.ts](../src/framework/application/diagnostics/Logger.ts) 导出的唯一 `logger` 实例，通过 `logger.log/error` 输出，`enabled` 同时控制两种输出，启动前也可用。直接导入不依赖框架初始化、不注册全局变量；`lx.logger` 指向同一对象。UI 模块直接依赖该诊断模块，避免回引 lx。日志不保存历史、不参与 World 生命周期，见 [统一日志](logging.md)。
 
 ## 基线
 
@@ -65,9 +65,9 @@ src/framework/ 是公共能力层，不依赖 game；src/game/logic/ 是保留�
 
 ## World、Scene 与账号数据
 
-公共 UI 和 World 工厂在 GameApplication 组合根准备，公共服务由 AppBootstrap 启停；注册不加载实例。业务类继承 BaseWorld<WorldScope>，使用 onRegister/onEnter/onExit。WorldScope 自动登记专属 UI/Scene 清理，listen 记录原生订阅，startServices 复用服务启停，track/ownResource 接入异步资源归属。WorldRegistry 保持唯一的子 World 状态机：退出先失效，逆依赖清理，等待原始任务及晚到清理，失败保留诊断。Scene/UI 实例由既有管理器保存并归属于该 World；账号数据和全局红点独立于子 World。一个 World 可管理多个 Scene，不同 World 可以共存。
+公共 UI 和 World 工厂在 GameApplication 组合根准备，公共服务由 AppBootstrap 启停；注册不加载实例。业务类继承 BaseWorld<WorldScope>，按需覆写准备、事件、UI、场景和进出钩子；共同顺序由父类维护。WorldScope 自动登记专属 UI/Scene 清理，listen 记录原生订阅，startServices 复用服务启停，track/ownResource 接入异步资源归属。WorldRegistry 保持唯一的子 World 状态机：退出先失效；WorldScope 立即启动全部所属 Scene 的注销，使场景和 UI 的取消不被后登记的慢清理阻塞，随后逆序等待清理、原始任务及晚到补偿，失败保留诊断。Scene/UI 实例由既有管理器保存并归属于该 World；账号数据和全局红点独立于子 World。一个 World 可管理多个 Scene，不同 World 可以共存。
 
-LobbyWorld、BattleWorld 的工厂统一登记在 GameApplication.register()；各子类的 onRegister 只编排 registerEvents、registerUI、registerScenes。UI 点击先发所属 World 的局部导航请求，由该 World 的具名处理方法调用注入的切换函数；GameApplication.switchWorld 只协调跨 World 切换与并发合并。账号与红点规则由该配置的 initialize/dispose 启停。框架全部模块由 lx 创建，ResourceCleanup 只实现停止 owner、等待原生收尾和 GC，不持有另一份框架模块。
+LobbyWorld、BattleWorld 的工厂统一登记在 GameApplication.register()；BaseWorld.initialize 固定执行 onRegister 准备、registerEvents、registerUI、registerScenes 和 onEnter，各阶段之间检查取消；子类只覆写内容钩子。UI 点击先发所属 World 的局部导航请求，由该 World 的具名处理方法调用注入的切换函数；GameApplication.switchWorld 只协调跨 World 切换与并发合并。账号与红点规则由该配置的 initialize/dispose 启停。框架全部模块由 lx 创建，ResourceCleanup 只实现停止 owner、等待原生收尾和 GC，不持有另一份框架模块。
 
 `lx.scenes.register/open/get/close/unregister` 管理每个 route 的实例。不同 route 并存，重开同 route 只替换自身实例；不猜“当前场景”、不调用全局 closeAll。场景根 Runtime 继承 BaseGameScene，通过 .ls 原生引用的 uiRoot 持有 SceneUI。2D 摄像机放 Area2D，页面/HUD/弹窗放其同级 uiRoot；只有应用 Loading 等进入 GRoot。
 
@@ -78,6 +78,8 @@ LobbyWorld、BattleWorld 的工厂统一登记在 GameApplication.register()；�
 ## UI 生命周期
 
 owner 决定生命周期，host 决定实际父节点，layout 决定适配。应用 `lx.ui` 使用原生 GRoot/GWindow；场景 `.ls` 直接声明 `uiRoot: GWidget`，`BaseGameScene.ui` 按需创建 SceneUI。场景的所有布局（含 center-popup）用 `registerView({ id, url, bind? })` 注册原生 GWidget Runtime，经 `this.ui.show(route,args)` 挂 uiRoot。不为场景另建 GRoot，也不改原生默认实例。
+
+布局订阅归对应 UI 对象持有。UILayoutService.subscribe 首次同步通知抛错时撤销本次新增监听，避免构造失败且无法取得解除函数的对象被长期保留；已有相同回调的订阅不会被失败的重复登记移除。
 
 `session.show()` 打开的子 UI 归当前展示，父关闭自动销毁子窗口、隐藏缓存和待加载；`session.ui.show()` 打开的独立 UI 归场景，父页面关闭不影响它。singleton 按 owner 隔离，hide 只在 owner 存活期间复用。全屏通过 openMode:replace/stack 选择关闭下层或叠加；replace 在新窗口准备成功后结束旧展示，stack 保留下层运行。独立弹窗不参与替换，父关闭仍清理其子窗口。范围与返回流程见 [UI 层级与打开方式](ui-navigation.md)。
 
@@ -149,7 +151,7 @@ lx.init 等待 ApplicationConfig.initialize 和 synchronization.synchronize；�
 
 内部 AppBootstrap 顺序启动、逆序停止，失败步骤也参与补偿。AbortSignal 提供协作式取消，停止方法应幂等并能处理部分初始化。默认每步初始化 30s、停止 10s，可经 ApplicationConfig.lifecycle 配置。超时后仍追踪原始任务并处理晚到补偿；停机前后均通过 lx.snapshot() 查询状态，不再保存或解绑另一份 Runtime。
 
-lx.stop 先保存共享停止任务并派发 FrameworkEvent.STOPPING，随后立即失效子 World，等待其关闭后停止全局业务与框架模块；通知中的重入 stop 复用同一任务。ResourceCleanup 等待原生组件延迟销毁和原始加载，稳定后才执行 Scene.gc。未完成或失败的清理会阻止再次初始化；不再使用 Runtime 绑定、隔离集合或后台重检。旧异步任务仍需失效与补偿。
+lx.stop 先保存共享停止任务并派发 FrameworkEvent.STOPPING，随后立即失效子 World，等待其关闭后停止全局业务与框架模块；通知中的重入 stop 复用同一任务；监听器抛错也继续失效和清理，结束后由停止任务报告错误。ResourceCleanup 等待原生组件延迟销毁和原始加载，稳定后才执行 Scene.gc。未完成或失败的清理会阻止再次初始化；不再使用 Runtime 绑定、隔离集合或后台重检。旧异步任务仍需失效与补偿。
 
 ## 验证证据
 
@@ -160,3 +162,5 @@ Headless Chromium 真实探针覆盖：JSON 与 Tables、`Laya.timer.clearAll`�
 架构门禁使用 TypeScript AST 和 tsconfig 模块解析，覆盖静态、动态、side-effect、export、require 和 alias。类型依赖仍检查分层但不计入运行时环；不可静态定位的动态模块路径明确拒绝。它不是任意 eval/运行时元编程的安全沙箱。
 
 本轮单一入口、World 注册拆分与 lx.net 接入的实际结果见 [验证记录](world-lifecycle-design.md#2026-09-14-验证记录)，不把探针能力列表当作本轮全套通过证明。
+
+父类公共调度、资源释放竞态和下游实施位置的最新复查见 [框架设计复查](framework-design-review.md)。

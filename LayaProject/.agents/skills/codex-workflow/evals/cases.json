@@ -1,5 +1,9 @@
 {
   "decisions": [
+    { "id": "downstream_choose_location", "request": "当前游戏仓库有 .framework-lock.json，用户要求修改框架公共类型和功能，影响已明确，但尚未选择在上游分支还是当前项目实施。下一步？", "expected": "realign" },
+    { "id": "downstream_current_approved", "request": "下游有 .framework-lock.json；已列出公共接口修改与验收范围，开发者明确选择直接在当前项目修改。工具报告 managed files 与锁定来源不同。下一步？", "expected": "implement" },
+    { "id": "downstream_upstream_approved", "request": "下游的公共修改范围已批准，开发者明确选择在已有上游工作分支实施，该分支工作区干净且位置明确。下一步？", "expected": "implement" },
+    { "id": "downstream_game_local", "request": "下游有 .framework-lock.json，用户只要求修改当前游戏的按钮文案，不涉及框架类型、公共功能或共享契约。下一步？", "expected": "implement" },
     { "id": "read_only_review", "request": "用户只要求诊断框架缺陷；已定位可以直接修复的 bug。下一步？", "expected": "inspect_only" },
     { "id": "approved_scope", "request": "上一轮已列出修复和验收边界；用户说先优化并验证，方案和边界均未变化。下一步？", "expected": "implement" },
     { "id": "internal_fix", "request": "用户要求修复 framework 内部拼接错误，公共 API、生命周期、失败策略均不变，验收明确。下一步？", "expected": "implement" },

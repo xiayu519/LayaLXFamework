@@ -29,7 +29,7 @@ export class RedDotBinding extends Laya.Script {
     private bindings: UIBindings | undefined;
     private listening = false;
 
-    /** 用于场景局部红点状态或复用的 GList 行；未指定时使用应用级实例。 */
+    /** 显式指定已有数据源或为复用的 GList 行换 key；未指定时使用应用级实例。 */
     public bind(store: RedDotStore | undefined, key = this.key): void {
         // 先拒绝无效绑定，再解除此前仍有效的绑定。
         if (key) {

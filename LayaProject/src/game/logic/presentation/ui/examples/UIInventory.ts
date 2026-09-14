@@ -1,4 +1,4 @@
-import { xlog } from "../../../../../framework/xlog";
+import { logger } from "../../../../../framework/application/diagnostics/Logger";
 import type { UIViewRoute, UIViewSession } from "../../../../../framework/presentation/ui/UIViewRoute";
 import type { UIConfirmationArgs, UIConfirmation } from "./UIConfirmation";
 import type { UIFullscreenMidArgs, UIFullscreenMid } from "./UIFullscreenMid";
@@ -100,7 +100,7 @@ export class UIInventory extends UIInventoryBase {
             }
             catch (error) {
                 if (token.isCurrent()) {
-                    xlog.error("[UI examples] centered page failed", error);
+                    logger.error("[UI examples] centered page failed", error);
                     ui.tip("暂时无法打开，请重试");
                 }
             }
@@ -139,7 +139,7 @@ export class UIInventory extends UIInventoryBase {
                 }
             } catch (error) {
                 if (token.isCurrent()) {
-                    xlog.error("[UI examples] confirmation failed", error);
+                    logger.error("[UI examples] confirmation failed", error);
                     ui.tip("暂时无法打开，请重试");
                 }
             } finally {
@@ -164,7 +164,7 @@ export class UIInventory extends UIInventoryBase {
             returning = true;
             void Promise.resolve().then(() => token.isCurrent() ? args.onBack?.() : undefined).catch(error => {
                 if (token.isCurrent()) {
-                    xlog.error("[UI examples] return page failed", error);
+                    logger.error("[UI examples] return page failed", error);
                     ui.tip("暂时无法返回，请重试");
                 }
             }).finally(() => {

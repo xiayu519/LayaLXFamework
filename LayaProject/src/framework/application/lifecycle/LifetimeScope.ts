@@ -8,7 +8,7 @@ export class LifetimeCleanupError extends Error {
 }
 
 export class LifetimeScope {
-    private cleanups: Cleanup[] = [];
+    private readonly cleanups: Cleanup[] = [];
     private disposedValue = false;
 
     public get disposed(): boolean {

@@ -34,8 +34,6 @@ const frameworkAccessFromGame = {
 };
 const mainPath = join(sourceRoot, "AppEntry.ts");
 const lxPath = join(sourceRoot, "framework", "lx.ts");
-const xlogPath = join(sourceRoot, "framework", "xlog.ts");
-const loggerPath = join(sourceRoot, "framework", "application", "diagnostics", "Logger.ts");
 const gameCompositionBridgePath = join(sourceRoot, "game", "bootstrap", "GameStartup.ts");
 
 function walk(directory) {
@@ -130,8 +128,8 @@ for (const file of sourceFiles) {
         if (sourceLocation.scope === "root") {
             const targetRelative = relative(sourceRoot, target).split(sep).join("/");
             if (file !== mainPath
-                || !["framework/lx", "framework/xlog", "game/bootstrap/GameStartup"].includes(targetRelative)) {
-                failures.push(`${localPath(file)}: root entry may only import game startup, lx and xlog.`);
+                || !["framework/lx", "framework/application/diagnostics/Logger", "game/bootstrap/GameStartup"].includes(targetRelative)) {
+                failures.push(`${localPath(file)}: root entry may only import game startup, lx and logger.`);
             }
             continue;
         }
@@ -158,10 +156,8 @@ for (const file of sourceFiles) {
                 }
             }
             const allowed = layerDependencies[sourceLocation.layer];
-            // 独立日志入口只公开不依赖引擎的诊断能力。
-            const isLoggingEntry = file === xlogPath && sourceTarget === loggerPath;
             const isFrameworkRoot = file === lxPath && targetLocation.scope === "framework";
-            if (allowed && !allowed.has(targetLocation.layer) && !isLoggingEntry && !isFrameworkRoot) {
+            if (allowed && !allowed.has(targetLocation.layer) && !isFrameworkRoot) {
                 failures.push(
                     `${localPath(file)}: ${sourceLocation.scope}/${sourceLocation.layer} cannot import `
                     + `${targetLocation.scope}/${targetLocation.layer} (${specifier}).`,

@@ -18,9 +18,9 @@ framework 不依赖 game。game 的 domain/application 保持纯净；`src/game/
 - 公共 UI 定义在应用组合根登记，不加载；lx.ts 创建公共事件源并登记框架自身 READY/STOPPING 监听，AppBootstrap 只执行模块启动与停止。World 只初始化和撤销专属内容，不能注销公共路由。全局数据与其通知不依赖 World；公共 UI 实例仍归 Scene 或父窗口。
 - `main()` / `AppEntry.start()`：在引擎初始化之后启动应用，`CompilerSettings.mainScript` 通过 UUID 引用；不挂载到 Scene，不重复 `Laya.init()`。
 - `ContentCatalog`：稳定 ID 到 URL，不管理 Loader 所有权。
-- `BaseWorld<WorldScope>`：业务类继承 onRegister/onEnter/onExit；onRegister 只编排本类的 registerEvents/registerUI/registerScenes，分别拥有订阅、UI 和 Scene 注册，实际实例由既有管理器保存。LobbyWorld/BattleWorld 通过工厂逐次创建，GameApplication.register 只登记工厂与全局内容；局部事件在子类接收后调用注入的导航函数。
+- `BaseWorld<WorldScope>`：父类 initialize 固定调度可选准备 onRegister、registerEvents、registerUI、registerScenes、onEnter，并逐步检查取消；子类只覆写内容钩子，onExit 做业务收尾，实际 UI/Scene 实例由既有管理器保存。LobbyWorld/BattleWorld 通过工厂逐次创建，GameApplication.register 只登记工厂与全局内容；局部事件在子类接收后调用注入的导航函数。
 - 全部框架模块在 lx.ts 创建和初始化。ResourceCleanup 仅执行 owner 失效、原始任务收尾和 GC；游戏配置提供 register/initialize/synchronization/dispose，不复制框架模块清单。
-- `WorldRegistry`：lx.worlds 协调子 World 的定义/工厂、激活和逆序清理。纯 WorldContext 保留 id/signal/own；bootstrap 注入 WorldScope，提供原生 events、listen 和自动登记的 UI/Scene/模块/资源归属。子 World 监听公共源仍由自身登记订阅，退出不清空公共源。退出先失效，再等待原始初始化和晚到清理。
+- `WorldRegistry`：lx.worlds 协调子 World 的定义/工厂、激活和逆序清理。纯 WorldContext 保留 id/signal/own；bootstrap 注入 WorldScope，提供原生 events、listen 和自动登记的 UI/Scene/模块/资源归属。子 World 监听公共源仍由自身登记订阅，退出不清空公共源。退出先失效并立即启动全部所属 Scene 的注销，再等待同一关闭任务、原始初始化和晚到清理，不能让后登记的慢清理延后子场景取消。
 - 根 World 为 lx；全局数据和红点就绪后才进入 initialWorld。当前模板使用明确标记的开发模拟器，真实网络 TODO。关闭时先结束业务 World，再释放全局内容。
 - `SceneRegistry` / `BaseGameScene`：lx.scenes 按 route 持有原生实例，不同 route 并存，内部 SceneFlow 复用切换事务。用 get(route/id) 取明确实例；Scene 持有自己的 UI。
 - `DataRegistry`：lx.data.get(typedKey) 获取组合根预先创建的功能数据；只存引用，不在服务/World/UI 中新建账号模型。协议接收早于 UI，World 退出保留账号数据，账号退出使旧 receiver 失效。

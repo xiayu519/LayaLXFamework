@@ -71,7 +71,7 @@ LayaLXFamework/
 | `lx.platform` | 平台类型、安全区、时间和外部链接 |
 | `lx.purchase` | 支付平台接口；默认实现不支持购买和恢复，尚非完整支付业务 |
 | `lx.performance` | DrawCall、三角形和资源内存快照 |
-| `xlog` | 显式导入，log/error 两种输出、enabled 总开关；IDE、浏览器与微信开发者工具支持黄色文本，启动前可用，兼容 lx.logger |
+| `logger` | 显式导入，log/error 两种输出、enabled 总开关；IDE、浏览器与微信开发者工具支持黄色文本，启动前可用，与 lx.logger 共用一个实例 |
 
 应用由 src/AppEntry.ts 的原生 main 启动，引擎已完成 Laya.init。AppEntry 先打开 Startup.ls，再调用 await lx.init(new GameApplication(progress))。lx 自己持有并统一初始化框架模块，等待全局数据和红点同步后进入 Lobby；首次 UI 就绪才关闭 Loading。失败显示错误并清理，干净停止后可通过同一个 lx 重新初始化。
 
@@ -81,7 +81,7 @@ LayaLXFamework/
 
 GameApplication 准备公共 UI 和 World 工厂，初始化全局账号数据、协议接收入口与红点规则；lx 统一创建并启动框架模块。首次数据同步完成后，根发布 FrameworkEvent.READY，再进入初始 World。当前接收链使用开发模拟器，真实服务器同步仍为 TODO。
 
-进入时才创建 World 实例；各子类的 onRegister 调用 registerEvents、registerUI、registerScenes，分别登记局部事件、UI 和场景。WorldScope 同时记录清理责任，退出时先解除监听与副作用，再销毁 Scene 及所属 UI、撤销专属定义；onExit 只做本类业务收尾。公共注册、账号数据和全局红点独立于子 World，公共 UI 的实例仍归打开它的 Scene。
+进入时才创建 World 实例；BaseWorld.initialize 统一调度准备、事件、UI、场景和进入阶段，子类只覆写对应钩子，不再复制编排代码。WorldScope 同时记录清理责任，退出时先解除监听与副作用，立即启动所有所属 Scene 的关闭，再等待其 UI/原始加载收尾并撤销专属定义；onExit 只做本类业务收尾。公共注册、账号数据和全局红点独立于子 World，公共 UI 的实例仍归打开它的 Scene。
 
 框架自身的 READY/STOPPING 监听在 lx.ts 登记；大厅、战斗的导航请求分别在自己的 world.events 上派发与处理。子 World 监听 lx.events 时也由自己用 world.listen 登记，退出只解除该订阅。根停止先发布 STOPPING，再关闭全部子 World 和全局模块；完成停止以 await lx.stop() 为准。
 
@@ -89,7 +89,7 @@ GameApplication 准备公共 UI 和 World 工厂，初始化全局账号数据�
 
 ### UI
 
-UI Prefab 和对应 Runtime 统一使用 `UI` 前缀。`assets/bootstrap/ui/` 放游戏可编辑的 `UISceneLoading` 和 `UITip`；示例页面、组件与模板集中在其 `examples/`。启动资源不纳入框架只读同步，应用提供 Tip 资源地址和 Loading 展示实现，目录与复用入口见 [UI 模板索引](LayaProject/docs/ui-templates.md)。
+UI Prefab 和对应 Runtime 统一使用 `UI` 前缀。`assets/bootstrap/ui/` 放游戏可编辑的 `UISceneLoading` 和 `UITip`；示例页面、组件与模板集中在其 `examples/`。启动资源不纳入框架文件同步，应用提供 Tip 资源地址和 Loading 展示实现，目录与复用入口见 [UI 模板索引](LayaProject/docs/ui-templates.md)。
 
 UI 的 owner、host 和 layout 分开决定：owner 管生命周期，host 是实际父节点，layout 管全屏或弹窗适配。场景可以同时拥有页面、HUD 和弹窗，也可以让一个页面拥有子弹窗。
 
@@ -137,7 +137,7 @@ const snapshot = lx.ui.snapshot(); // scenes 汇总场景 UI；managed/visible/t
 lx.ui.tip("金币不足");
 ```
 
-全屏界面的“打开方式”可选关闭下层（replace）或叠加下层（stack），弹窗始终叠加。replace 在新页面准备成功后才结束旧展示；背包返回大厅会显式重开大厅。层级选择包含数字范围，同层新窗口靠前，见 [UI 层级与打开方式](LayaProject/docs/ui-navigation.md)。运行时日志显式导入 [xlog](LayaProject/docs/logging.md)，设置 enabled=false 可关闭两种输出；不占用小游戏或 SDK 的全局名称。
+全屏界面的“打开方式”可选关闭下层（replace）或叠加下层（stack），弹窗始终叠加。replace 在新页面准备成功后才结束旧展示；背包返回大厅会显式重开大厅。层级选择包含数字范围，同层新窗口靠前，见 [UI 层级与打开方式](LayaProject/docs/ui-navigation.md)。运行时日志显式导入 [logger](LayaProject/docs/logging.md)，设置 enabled=false 可关闭两种输出；不占用小游戏或 SDK 的全局名称。
 
 详细说明见 [UI 布局与归属](LayaProject/docs/ui-layout.md)、[数据驱动 UI](LayaProject/docs/ui-data-binding.md)、[红点](LayaProject/docs/ui-red-dots.md)和[场景切换](LayaProject/docs/scene-flow.md)。
 
@@ -259,7 +259,7 @@ lx.audio.applySettings(lx.storage.load().value);
 ### 网络
 
 ```ts
-import { xlog } from "./framework/xlog"; // 路径按所在脚本位置调整。
+import { logger } from "./framework/application/diagnostics/Logger"; // 路径按所在脚本位置调整。
 
 const controller = new AbortController();
 
@@ -275,7 +275,7 @@ const response = await lx.http.request<PlayerProfile>("/api/profile", {
     },
 });
 
-xlog.log(response.status, response.data);
+logger.log(response.status, response.data);
 ```
 
 ### 原生资源、场景、平台与性能
@@ -350,6 +350,8 @@ npm run game:create -- --name "用户提供的名称" --id english-game-name
 
 该命令在 `src/game/english-game-name/` 创建具体游戏目录及独立 `AGENTS.md`、Skills 和 memory。之后从该目录启动 Codex；游戏可以调用 `src/game/logic/`，但 logic 不得反向依赖任何具体游戏。资源按功能放入 `assets/packages/<feature>/`；需要接入启动、配表或 Headless 验收时，再由游戏维护 `src/game/bootstrap/GameStartup.ts`、`settings/GameProject.json` 和 `settings/HeadlessValidation.json`。使用 Codex 时的入口和规则见 [Codex 工作流](Books/LXFamework-Codex-Workflow.md)。
 
-实际游戏作为下游仓库时，稳定版本按发布 Tag 同步，开发联调可显式同步 channel snapshot；目录归属和命令见 [框架发行与下游同步](LayaProject/docs/framework-distribution.md)。
+实际游戏作为下游仓库时，框架类型或公共功能改动先由开发者选择在上游分支还是当前项目实施；同一批准范围不重复询问。本地差异只提示，lock 保留同步来源，覆盖本地修改前另行确认。稳定版本按发布 Tag 同步，开发联调可同步 channel snapshot；目录归属和命令见 [框架发行与下游同步](LayaProject/docs/framework-distribution.md)。
 
 项目按单人开发、单人维护定位，手写代码与配置注释使用中文。AppEntry 显示 Loading，lx 是唯一模块持有者与初始化入口；GameApplication.register 集中登记 World 工厂，各 World 分别注册自身事件、UI 和 Scene。内部执行器负责取消、逆序清理与晚到补偿。见 [代码规范](LayaProject/docs/code-style.md)、[Tyou 对比](LayaProject/docs/architecture-simplification-notes.md)、[World 用法](LayaProject/docs/scene-flow.md) 与 [生命周期及验证记录](LayaProject/docs/world-lifecycle-design.md)。
+
+本轮父类注册调度、World 退出竞态与资源复测的发现和结果见 [框架设计复查](LayaProject/docs/framework-design-review.md)。

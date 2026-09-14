@@ -192,17 +192,34 @@ class Lx {
             return Promise.resolve();
         }
         this.stopping = true;
+        const errors: unknown[] = [];
         this.stopTask = Promise.resolve().then(async () => {
             try {
                 await this.bootstrap?.stop();
-            } finally {
+            } catch (error) {
+                errors.push(error);
+            }
+            try {
                 if (this.cleanup && !this.cleanup.started) {
                     await this.cleanup.stop();
                 }
+            } catch (error) {
+                errors.push(error);
+            }
+            if (errors.length === 1) {
+                throw errors[0];
+            }
+            if (errors.length > 1) {
+                throw Object.assign(new Error("Framework stopping failed."), { errors });
             }
         }).finally(() => { this.stopCompleted = true; });
         // 先保存共享任务，关闭通知中的重入调用复用同一任务。
-        this.events?.event(FrameworkEvent.STOPPING);
+        try {
+            this.events?.event(FrameworkEvent.STOPPING);
+        } catch (error) {
+            // 原生派发遇到异常会中断；生命周期清理必须继续，错误随停止任务报告。
+            errors.push(error);
+        }
         // 通知后立即使子 World 失效；具体事件、UI 和 Scene 仍按各 World 的登记清理。
         void this.worlds?.dispose().catch(() => {});
         return this.stopTask;

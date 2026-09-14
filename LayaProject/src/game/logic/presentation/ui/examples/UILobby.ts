@@ -1,4 +1,4 @@
-import { xlog } from "../../../../../framework/xlog";
+import { logger } from "../../../../../framework/application/diagnostics/Logger";
 import type { UIViewRoute, UIViewSession } from "../../../../../framework/presentation/ui/UIViewRoute";
 import type { UIInventoryArgs, UIInventory } from "./UIInventory";
 import type { ExampleInventoryContext, ExampleDeliveryContext } from "./ExampleInventoryContext";
@@ -43,7 +43,7 @@ export class UILobby extends UILobbyBase {
                     { signal: session.token.signal });
             } catch (error) {
                 if (session.token.isCurrent()) {
-                    xlog.error("[UI examples] inventory failed", error);
+                    logger.error("[UI examples] inventory failed", error);
                     session.ui.tip("暂时无法打开，请重试");
                 }
             } finally {

@@ -97,7 +97,9 @@ export class WorldRegistry<TContext extends WorldContext = WorldContext> {
             if (!record.controller.signal.aborted) {
                 record.context = this.createContext?.(record.context) ?? record.context;
                 const world = "create" in definition ? definition.create() : definition;
-                if (world.id !== id) throw new Error("World factory returned a different id: " + id);
+                if (world.id !== id) {
+                    throw new Error("World factory returned a different id: " + id);
+                }
                 return world.initialize(record.context);
             }
         }).then(() => {
@@ -171,7 +173,9 @@ export class WorldRegistry<TContext extends WorldContext = WorldContext> {
 
     /** 等待原始初始化工作，以及取消后才追加的清理操作。 */
     public async waitForPendingLoads(): Promise<void> {
-        while (this.pending.size > 0) await Promise.allSettled([...this.pending]);
+        while (this.pending.size > 0) {
+            await Promise.allSettled([...this.pending]);
+        }
         this.throwCleanupFailures();
     }
 
@@ -245,7 +249,9 @@ export class WorldRegistry<TContext extends WorldContext = WorldContext> {
         if (wasInitializing && cancelEnter) {
             record.rejectEnter(new WorldInitializationCancelledError(record.context.id));
         }
-        for (const cleanup of record.cleanups.splice(0).reverse()) this.queueCleanup(record, cleanup);
+        for (const cleanup of record.cleanups.splice(0).reverse()) {
+            this.queueCleanup(record, cleanup);
+        }
         return record.exitTask;
     }
 

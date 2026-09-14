@@ -1,24 +1,24 @@
 # 统一日志
 
-业务显式导入 `xlog` 输出日志，提供 log、error 两种输出和一个总开关。启动前、启动失败及停机后都可使用，不依赖已启动的 runtime。
+业务显式导入 `logger` 输出日志，提供 log、error 两种输出和一个总开关。启动前、启动失败及停机后都可使用，不依赖框架初始化。
 
 ```ts
-import { xlog } from "../../framework/xlog";
+import { logger } from "../../framework/application/diagnostics/Logger";
 
-xlog.log("[Inventory] snapshot received", version);
-xlog.error("[UI] failed to open inventory", error);
+logger.log("[Inventory] snapshot received", version);
+logger.error("[UI] failed to open inventory", error);
 
-xlog.enabled = false; // 同时关闭 log 和 error。
-xlog.enabled = true;  // 恢复后只输出新日志。
+logger.enabled = false; // 同时关闭 log 和 error。
+logger.enabled = true;  // 恢复后只输出新日志。
 ```
 
 默认开启。需要发布时关闭，可以在 AppEntry.main 执行前设置一次；该开关不随 Scene、World 切换或 runtime 重启重置。着色只处理 log 的文本格式，对象和 Error 实例保留，不做 JSON 序列化、日志缓存、磁盘写入或网络上传。关闭输出不会阻止调用方构造参数，耗时的诊断数据可先判断 enabled 再生成。
 
-src 中框架和业务的主动日志调用全部使用 xlog。框架内部把同一个无引擎依赖的 logger 导入为 xlog，避免内部模块反向依赖 lx；业务从 framework/xlog 导入。只有日志实现直接调用 console。保留 lx.logger 兼容入口，两者引用相同对象，共享 enabled，不会产生两份日志配置。引擎自身输出、浏览器未捕获异常和 Node 构建工具日志不受此开关控制，错误处理与异常传播也不会因为关闭日志而改变。
+src 中框架和业务的主动日志统一使用 logger。调用方直接从 `framework/application/diagnostics/Logger` 导入唯一实例，框架内部无需反向依赖 lx；只有 Logger 实现直接调用 console。`lx.logger` 指向同一对象，共享 enabled，不产生第二份日志配置。引擎自身输出、浏览器未捕获异常和 Node 构建工具日志不受此开关控制，错误处理与异常传播也不会因为关闭日志而改变。
 
 ## 各宿主的黄色日志
 
-lx.init 根据平台契约与公开的 Laya 环境标记选择一次样式，每条日志不再查询 SDK。自动选择不会重置 enabled。独立导入 xlog、尚未初始化框架 时默认 plain；初始化框架 后可设置 `xlog.style="plain"` 关闭着色。
+lx.init 根据平台契约与公开的 Laya 环境标记选择一次样式，每条日志不再查询 SDK。自动选择不会重置 enabled。独立导入 logger、尚未初始化框架时默认 plain；初始化框架后可设置 `logger.style="plain"` 关闭着色。
 
 | 宿主 | 自动样式 | 识别与行为 |
 | --- | --- | --- |
@@ -48,10 +48,8 @@ IDE 模式下，字符串部分显示黄色 `#ffd54f`；消息里原有的方括
 
 ## 平台与同名 SDK
 
-xlog 是模块导出，不使用 declare global，不赋值 window、globalThis 或 GameGlobal，不读取 wx、Native 桥接或支付 SDK。导入链只有 xlog.ts → Logger.ts，不触发框架启动，只使用宿主 console.log/error。交给 Laya 编译器打包，不要求小游戏宿主直接执行未编译的 TypeScript/ESM。参见 [Laya 脚本编译](https://layaair.com/3.4/doc/basics/IDE/projectSettings/scriptCompiler/readme.html) 与 [TypeScript 模块作用域](https://www.typescriptlang.org/docs/handbook/modules/theory.html)。
+logger 是 Logger.ts 的模块导出，不使用 declare global，不赋值 window、globalThis 或 GameGlobal，不读取 wx、Native 桥接或支付 SDK。直接导入不会触发框架启动，只使用宿主 console.log/error。交给 Laya 编译器打包，不要求小游戏宿主直接执行未编译的 TypeScript/ESM。参见 [Laya 脚本编译](https://layaair.com/3.4/doc/basics/IDE/projectSettings/scriptCompiler/readme.html) 与 [TypeScript 模块作用域](https://www.typescriptlang.org/docs/handbook/modules/theory.html)。
 
-名称并非全行业唯一，例如腾讯 [Mars Xlog](https://github.com/Tencent/mars/blob/master/README.md) 也使用它；这不要求改名，因为模块内导入不会覆盖 SDK 的全局变量或原生类。使用明确的相对路径，不注册名为 xlog 的裸模块或平台插件。若同一个文件还要导入 SDK 的同名成员，给 SDK 导入取别名，例如 `import { xlog as sdkXlog } from "your-sdk"`。
+当前调用方没有需要另取日志别名的命名冲突；回归覆盖“SDK 已有全局 logger/GameGlobal.logger，且没有 window/document/Laya”的环境，确认导入不会覆盖或调用 SDK 的同名对象。此验证证明模块隔离，不代表未接入的所有 SDK 或移动端真机均已验收。
 
-当前项目扫描未发现已有 xlog 符号；回归覆盖“SDK 已有全局 xlog/GameGlobal.xlog，且没有 window/document/Laya”的环境。此验证证明模块隔离，不代表未接入的所有 SDK 或移动端真机均已验收。
-
-入口：[xlog.ts](../src/framework/xlog.ts)。实现：[Logger.ts](../src/framework/application/diagnostics/Logger.ts)。验证：[Logger.test.ts](../tests/framework/Logger.test.ts)。
+实现：[Logger.ts](../src/framework/application/diagnostics/Logger.ts)。验证：[Logger.test.ts](../tests/framework/Logger.test.ts)。

@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { logger } from "../../src/framework/application/diagnostics/Logger";
-import { xlog } from "../../src/framework/xlog";
 
 afterEach(() => { logger.enabled = true; logger.style = "plain"; vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
@@ -9,8 +8,7 @@ describe("application logging", () => {
         const output = vi.spyOn(console, "log").mockImplementation(() => {});
         const errors = vi.spyOn(console, "error").mockImplementation(() => {});
         const failure = new Error("load failed");
-        expect(xlog).toBe(logger);
-        xlog.log("[Game] starting", { world: "lobby" });
+        logger.log("[Game] starting", { world: "lobby" });
         logger.error("[UI] failed", failure);
         expect(output).toHaveBeenCalledWith("[Game] starting", { world: "lobby" });
         expect(errors).toHaveBeenCalledWith("[UI] failed", failure);
@@ -19,12 +17,12 @@ describe("application logging", () => {
     it("disables both levels without buffering, and can enable them again", () => {
         const output = vi.spyOn(console, "log").mockImplementation(() => {});
         const errors = vi.spyOn(console, "error").mockImplementation(() => {});
-        xlog.enabled = false;
+        logger.enabled = false;
         logger.log("hidden"); logger.error(new Error("hidden"));
         expect(output).not.toHaveBeenCalled();
         expect(errors).not.toHaveBeenCalled();
-        xlog.enabled = true;
-        const { log, error } = xlog;
+        logger.enabled = true;
+        const { log, error } = logger;
         log("visible"); error("visible error");
         expect(output).toHaveBeenCalledExactlyOnceWith("visible");
         expect(errors).toHaveBeenCalledExactlyOnceWith("visible error");
@@ -35,21 +33,21 @@ describe("application logging", () => {
         const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
         const errors = vi.spyOn(console, "error").mockImplementation(() => {});
         const object = { item: 7 }, failure = new Error("load failed");
-        xlog.style = "laya-editor";
-        xlog.log("[Game] %d", 7, object, failure, "[color=red]literal[/color]");
+        logger.style = "laya-editor";
+        logger.log("[Game] %d", 7, object, failure, "[color=red]literal[/color]");
         expect(output).toHaveBeenCalledExactlyOnceWith(
             "[color=#ffd54f]\\[Game] %d[/color]", 7, object, failure,
             "[color=#ffd54f]\\[color=red]literal\\[/color][/color]");
         expect(warning).not.toHaveBeenCalled();
-        xlog.error("[Game] error", failure);
+        logger.error("[Game] error", failure);
         expect(errors).toHaveBeenCalledExactlyOnceWith("[Game] error", failure);
-        xlog.enabled = false;
-        xlog.log("disabled"); xlog.error("disabled");
+        logger.enabled = false;
+        logger.log("disabled"); logger.error("disabled");
         expect(output).toHaveBeenCalledTimes(1);
         expect(errors).toHaveBeenCalledTimes(1);
-        xlog.enabled = true;
-        xlog.style = "plain";
-        xlog.log("[Game] no markup", object);
+        logger.enabled = true;
+        logger.style = "plain";
+        logger.log("[Game] no markup", object);
         expect(output).toHaveBeenLastCalledWith("[Game] no markup", object);
     });
 
@@ -57,37 +55,37 @@ describe("application logging", () => {
         const output = vi.spyOn(console, "log").mockImplementation(() => {});
         const errors = vi.spyOn(console, "error").mockImplementation(() => {});
         const object = { count: 7 }, failure = new Error("load failed");
-        xlog.style = "css";
-        xlog.log("[Game] %s %d %o", "items", 7, object, failure);
+        logger.style = "css";
+        logger.log("[Game] %s %d %o", "items", 7, object, failure);
         expect(output).toHaveBeenLastCalledWith("%c[Game] %s %d %o", "color:#ffd54f", "items", 7, object, failure);
-        xlog.log("literal %c", "color:red");
+        logger.log("literal %c", "color:red");
         expect(output).toHaveBeenLastCalledWith("%cliteral %c", "color:#ffd54f", "color:red");
-        xlog.log(object, failure);
+        logger.log(object, failure);
         expect(output).toHaveBeenLastCalledWith(object, failure);
-        xlog.log();
+        logger.log();
         expect(output).toHaveBeenLastCalledWith();
-        xlog.error("[Game] error", failure);
+        logger.error("[Game] error", failure);
         expect(errors).toHaveBeenCalledExactlyOnceWith("[Game] error", failure);
     });
 
     it("does not access formatting configuration or arguments when output is disabled", () => {
         const output = vi.spyOn(console, "log").mockImplementation(() => {});
-        const descriptor = Object.getOwnPropertyDescriptor(xlog, "style")!;
+        const descriptor = Object.getOwnPropertyDescriptor(logger, "style")!;
         const readStyle = vi.fn(() => { throw new Error("style accessed"); });
         const object = { toString() { throw new Error("argument converted"); } };
-        Object.defineProperty(xlog, "style", { configurable: true, get: readStyle });
+        Object.defineProperty(logger, "style", { configurable: true, get: readStyle });
         try {
-            xlog.enabled = false;
-            xlog.log("[Game]", object);
+            logger.enabled = false;
+            logger.log("[Game]", object);
             expect(readStyle).not.toHaveBeenCalled();
             expect(output).not.toHaveBeenCalled();
-        } finally { Object.defineProperty(xlog, "style", descriptor); }
+        } finally { Object.defineProperty(logger, "style", descriptor); }
     });
 
-    it("imports without engine or browser globals and leaves an SDK's global xlog untouched", async () => {
+    it("imports without engine or browser globals and leaves an SDK's global logger untouched", async () => {
         const sdkLogger = { log: vi.fn(), error: vi.fn(), enabled: true };
-        vi.stubGlobal("xlog", sdkLogger);
-        vi.stubGlobal("GameGlobal", { xlog: sdkLogger });
+        vi.stubGlobal("logger", sdkLogger);
+        vi.stubGlobal("GameGlobal", { logger: sdkLogger });
         vi.stubGlobal("window", undefined);
         vi.stubGlobal("document", undefined);
         vi.stubGlobal("Laya", undefined);
@@ -95,14 +93,14 @@ describe("application logging", () => {
         const output = vi.spyOn(console, "log").mockImplementation(() => {});
         const errors = vi.spyOn(console, "error").mockImplementation(() => {});
         vi.resetModules();
-        const { xlog: standalone } = await import("../../src/framework/xlog");
+        const { logger: standalone } = await import("../../src/framework/application/diagnostics/Logger");
         standalone.log("before engine initialization");
         standalone.error("host error output");
         standalone.enabled = false;
         expect(output).toHaveBeenCalledExactlyOnceWith("before engine initialization");
         expect(errors).toHaveBeenCalledExactlyOnceWith("host error output");
-        expect(Reflect.get(globalThis, "xlog")).toBe(sdkLogger);
-        expect(Reflect.get(globalThis, "GameGlobal")).toEqual({ xlog: sdkLogger });
+        expect(Reflect.get(globalThis, "logger")).toBe(sdkLogger);
+        expect(Reflect.get(globalThis, "GameGlobal")).toEqual({ logger: sdkLogger });
         expect(Reflect.get(globalThis, "lx")).toBeUndefined();
         expect(sdkLogger.enabled).toBe(true);
         expect(sdkLogger.log).not.toHaveBeenCalled();

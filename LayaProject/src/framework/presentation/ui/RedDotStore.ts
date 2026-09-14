@@ -53,7 +53,9 @@ export class RedDotStore extends Laya.EventDispatcher {
                 throw new Error("Red dot aggregate exceeds the safe integer range.");
             }
         }
-        for (const [key, value] of writes) writeValue(this.values, key, value);
+        for (const [key, value] of writes) {
+            writeValue(this.values, key, value);
+        }
         for (const [key, delta] of deltas) {
             if (delta === 0) {
                 continue;

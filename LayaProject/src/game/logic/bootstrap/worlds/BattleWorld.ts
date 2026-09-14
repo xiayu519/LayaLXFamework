@@ -1,5 +1,5 @@
 import { BaseWorld } from "../../../../framework/application/world/BaseWorld";
-import { xlog } from "../../../../framework/xlog";
+import { logger } from "../../../../framework/application/diagnostics/Logger";
 import type { WorldScope } from "../../../../framework/bootstrap/WorldScope";
 import type { ExampleInventoryContext } from "../../presentation/ui/examples/ExampleInventoryContext";
 import type { UIBattle } from "../../presentation/ui/examples/UIBattle";
@@ -20,18 +20,12 @@ export class BattleWorld extends BaseWorld<WorldScope> {
         super();
     }
 
-    protected override onRegister(world: WorldScope): void {
-        this.registerEvents(world);
-        this.registerUI(world);
-        this.registerScenes(world);
-    }
-
-    private registerEvents(world: WorldScope): void {
+    protected override registerEvents(world: WorldScope): void {
         // 局部事件由战斗自己注册和处理，WorldScope 在退出开始时自动 off。
         world.listen(world.events, BattleWorld.RETURN_LOBBY, this, this.onReturnLobby);
     }
 
-    private registerUI(world: WorldScope): void {
+    protected override registerUI(world: WorldScope): void {
         // 这些注册同时登记退出清理，不需要在 onExit 重复调用 UI/Scene 的销毁接口。
         world.registerView<UILobbyArgs, UIBattle>({
             id: "lx.examples.battle",
@@ -41,7 +35,7 @@ export class BattleWorld extends BaseWorld<WorldScope> {
         });
     }
 
-    private registerScenes(world: WorldScope): void {
+    protected override registerScenes(world: WorldScope): void {
         this.scene = world.registerScene(BATTLE_SCENE);
     }
 
@@ -61,6 +55,6 @@ export class BattleWorld extends BaseWorld<WorldScope> {
     }
 
     private onReturnLobby(): void {
-        void this.enterLobby().catch(error => xlog.error("[World examples] return lobby failed", error));
+        void this.enterLobby().catch(error => logger.error("[World examples] return lobby failed", error));
     }
 }

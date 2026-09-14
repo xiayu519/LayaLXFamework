@@ -82,6 +82,31 @@ async function verifyUIResources() {
             results.push(loop ? "loop-list" : "virtual-list");
         }
 
+        // 从真实业务 World 离场：列表及其图片跟随场景销毁，另一个 owner 的图集继续保留。
+        for (let cycle = 0; cycle < 3; cycle++) {
+            const asset = await atlases(`world-list-${cycle}`);
+            const keeper = own(new Laya.Sprite());
+            keeper.graphics.drawTexture(asset.ta, 0, 0, 1, 1);
+            Laya.stage.addChild(keeper);
+            const scene = lx.scenes.get("examples.lobby");
+            const view = await scene.ui.show("lx.examples.inventory", { title: "世界退出资源回归" });
+            view.itemList.itemRenderer = (index, row) => { row.itemImage.src = index % 2 ? asset.urlA : asset.urlB; };
+            view.itemList.numItems = 100;
+            view.itemList.refreshVirtualList();
+            await frame();
+            await lx.worlds.exit("examples.lobby");
+            assert(scene.destroyed && view.destroyed && !lx.worlds.get("examples.lobby"), "World exit retained its scene or list");
+            assert(asset.a.referenceCount === 1 && asset.b.referenceCount === 0, "World exit unbalanced shared atlas references");
+            await collect();
+            assert(!asset.a.destroyed && !asset.bitmapA.destroyed && asset.b.destroyed && asset.bitmapB.destroyed,
+                "World cleanup destroyed a surviving owner's atlas or retained the released atlas");
+            dispose(keeper);
+            await collect();
+            assert(asset.a.destroyed && asset.bitmapA.destroyed, "last owner release after World exit leaked the atlas");
+            await lx.worlds.enter("examples.lobby");
+        }
+        results.push("world-exit-shared-atlas-list");
+
         // 池获取请求取消后，不能实例化之后才加载好的预制体，也不能取消其他消费者的加载。
         const poolId = "__ui_resource_pool", url = "__lx_resource_prefab.lh?case=pool&slow=1";
         let created = 0;
@@ -155,24 +180,26 @@ async function verifyUIResources() {
             "closing during async binding leaked resources or ran a late write");
         results.push("close-during-async-binding");
 
-        // 场景仍有未完成的预制体 UI 加载和池获取时将其销毁，同时保持应用运行。
+        // World 仍有未完成的预制体 UI 加载和池获取时退出，同时保持应用运行。
         const old = lx.scenes.get('examples.lobby'), scope = old.ui;
         const scenePoolId = "__ui_resource_scene_pool";
         let lateCreates = 0;
         lx.pool.register({ id: scenePoolId, url: "__lx_resource_prefab.lh?case=scene-pool&slow=1", maxIdle: 0,
             create(prefab) { lateCreates++; return prefab.create(); } });
         const acquisition = lx.pool.acquire(scenePoolId, { signal: old.signal }).then(() => false, () => true);
-        const lateRoute = lx.ui.registerView({ id: "__ui_resource_late_view",
+        const lateRoute = lx.worlds.get("examples.lobby").registerView({ id: "__ui_resource_late_view",
             url: "__lx_resource_prefab.lh?case=scene-view&slow=1&ui=1",
             bind() { throw new Error("cancelled UI must never bind"); } });
         const opening = scope.show(lateRoute, undefined).then(() => false, () => true);
-        const next = await lx.scenes.open("examples.lobby", { status: "READY", detail: "Async resource regression" });
+        await lx.worlds.exit("examples.lobby");
+        await lx.worlds.enter("examples.lobby");
+        const next = lx.scenes.get("examples.lobby");
         assert(old.signal.aborted && old.destroyed && next !== old, "scene lifetime did not cancel");
         assert(await opening && await acquisition && lateCreates === 0, "late scene work created an instance");
         await lx.pool.waitForPendingLoads(); await collect();
         assert(scope.snapshot().views.length === 0, "disposed scene retained UI records");
-        results.push("scene-exit-with-pending-work");
-        return { passed: true, cases: results, listCycles: 6, listRefreshes: 144 };
+        results.push("world-exit-with-pending-work");
+        return { passed: true, cases: results, listCycles: 6, listRefreshes: 144, worldAtlasCycles: 3 };
     } finally {
         for (const node of owned) if (!node.destroyed) node.destroy();
         await lx.ui.unregisterView("__ui_resource_binding");

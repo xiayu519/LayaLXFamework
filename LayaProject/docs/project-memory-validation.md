@@ -6,7 +6,7 @@
 
 - [GPT-6 prompting best practices](https://developers.openai.com/api/docs/guides/latest-model?model=gpt-6-astra#prompting-best-practices) 强调检查 Skill/AGENTS 中可能导致停顿、过量测试的冲突指令。它支持清理项目提示，不能证明任何本地记忆都会降低模型能力。
 - [GPT-6 模型页](https://developers.openai.com/api/docs/models/gpt-6-astra) 描述模型上下文与工具能力；不能据此认定升级模型会自动接管仓库记忆。
-- [Codex Memories](https://learn.chatgpt.com/docs/customization/memories) 将记忆定位为辅助回忆，团队必守规则仍放在 AGENTS 或版本化文档。官方本地记忆在启用后从符合条件的既往会话后台生成，默认目录为 `~/.codex/memories/`；这是客户端功能，与仓库 `.codex/memory/` 不同。
+- [Codex Memories](https://learn.chatgpt.com/docs/customization/memories) 将记忆定位为辅助回忆，项目必守规则仍放在 AGENTS 或版本化文档。官方本地记忆在启用后从符合条件的既往会话后台生成，默认目录为 `~/.codex/memories/`；这是客户端功能，与仓库 `.codex/memory/` 不同。
 - 本机默认 Codex home 的 memories 目录为空，用户/项目配置均未显式设置 memories。未观察桌面客户端实际开关或后台任务，因此不声明所有客户端都关闭了官方记忆。未手改全局配置、官方生成文件或同步两套存储。
 
 ## 发现与处理

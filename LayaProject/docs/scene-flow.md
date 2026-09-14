@@ -13,16 +13,11 @@ class BattleWorld extends BaseWorld<WorldScope> {
     public readonly id = "battle";
     private scene?: typeof battleScene;
 
-    protected override onRegister(world: WorldScope): void {
-        this.registerUI(world);
-        this.registerScenes(world);
-    }
-
-    private registerUI(world: WorldScope): void {
+    protected override registerUI(world: WorldScope): void {
         world.registerView(battleHud);
     }
 
-    private registerScenes(world: WorldScope): void {
+    protected override registerScenes(world: WorldScope): void {
         this.scene = world.registerScene(battleScene);
     }
 
@@ -38,11 +33,11 @@ lx.worlds.register({ id: "battle", create: () => new BattleWorld() });
 await lx.worlds.enter("battle");
 ```
 
-真实 [LobbyWorld](../src/game/logic/bootstrap/worlds/LobbyWorld.ts) 和 [BattleWorld](../src/game/logic/bootstrap/worlds/BattleWorld.ts) 还在 registerEvents 中登记各自的局部导航事件，onRegister 只保留三个方法调用。上面省略事件业务以突出 UI/Scene 路由；新增事件时同样在本类单独登记，复杂场景注册可在 registerScenes 中继续按功能分组。小 World 订阅 lx.events 或 lx.net 时也用 world.listen，由自身退出卸载。
+真实 [LobbyWorld](../src/game/logic/bootstrap/worlds/LobbyWorld.ts) 和 [BattleWorld](../src/game/logic/bootstrap/worlds/BattleWorld.ts) 还覆写 registerEvents 登记各自的局部导航事件。父类固定调度这些阶段，子类不再覆写 onRegister 拼接公共顺序；复杂场景可在 registerScenes 内继续按功能分组。小 World 订阅 lx.events 或 lx.net 时也用 world.listen，由自身退出卸载。
 
-BaseWorld 位于 framework/application/world/BaseWorld，普通 TypeScript 类，不继承引擎组件。子类重写 onRegister/onEnter，可选重写 onExit，不重写 initialize。基类先登记 onExit 补偿，再执行注册和进入；取消后跳过尚未开始的 onEnter。onExit 在当时已登记的 own 逆序清理后执行，也会在部分初始化失败时执行。若退出时初始化仍未结束，晚到 own 继续由 WorldRegistry 排空；onExit 不代表所有异步工作已经结束，也不要在其中等待自身初始化完成。
+BaseWorld 位于 framework/application/world/BaseWorld，是普通 TypeScript 类。initialize 先登记 onExit 补偿，然后依次调用可选 onRegister（准备资源、局部模块与 caller）、registerEvents、registerUI、registerScenes、onEnter；每一步前检查取消。子类只覆写需要的钩子，不重写 initialize，也不依赖调用 super 才能执行公共流程。onExit 在当时已登记的 own 逆序清理后执行，部分初始化失败也会执行；晚到 own 仍由 WorldRegistry 排空，onExit 不代表全部异步工作已结束。
 
-运行时 WorldScope 在纯 WorldContext 上增加原生 events、listen、ownCaller、registerView/registerScene/openScene、startServices、track 和 ownResource。退出时先按 signal 失效并清除已登记事件/timer/Tween，再逆依赖关闭内容；资源和模块先登记，依赖它们的 UI/Scene 后登记。公共定义不交给子 World；公共 UI 的实例仍由打开它的 Scene 或父窗口清理。每次激活克隆专属 route，后续调用使用返回的 route，防止旧 owner 撤销新定义。
+运行时 WorldScope 在纯 WorldContext 上增加原生 events、listen、ownCaller、registerView/registerScene/openScene、startServices、track 和 ownResource。退出时先按 signal 失效并清除已登记事件/timer/Tween，立即启动全部所属 Scene 的注销，再按已登记顺序等待清理；后登记的慢 UI 清理不能延后 Scene 的取消。资源和模块先登记，依赖它们的 UI/Scene 后登记。公共定义不交给子 World；公共 UI 的实例仍由打开它的 Scene 或父窗口清理。每次激活克隆专属 route，后续调用使用返回的 route，防止旧 owner 撤销新定义。
 
 `enter(id)` 合并同一 World 的并发初始化；`get(id)` 只返回已完成初始化的活动 World 上下文。不同 World 可以共存，不隐含“当前 World”。`exit(id)` 取消初始化、运行已登记的清理，并等待原始初始化和晚到清理完成；晚到 own 会立即进入清理。初始化失败执行同样的补偿；清理失败保留诊断并阻止该条目重新进入。
 
@@ -72,6 +67,8 @@ await lx.scenes.unregister(battle); // 撤销定义；world.registerScene 已自
 ```
 
 保存 register 返回的 route，或使用原注册对象，才能保留参数类型与注册身份。旧注册对象不能卸载后来同 ID 的新注册。字符串入口没有相同的参数类型检查。
+
+`SceneRoute<TArgs>` 的可选 `argsType` 只用于关联 TypeScript 参数类型，登记对象不需要填写它。不同参数类型的路由不能相互赋值；`register`、`open`、World 的 `registerScene/openScene` 均保留该约束。只保存 `{ id, url }` 而丢失类型声明，或显式使用字符串/`unknown`，无法恢复原来的参数类型。
 
 没有全局 current 场景猜测。`scene.ui` 始终属于左侧的实例；需要哪个场景，就通过对应 route 或 ID 获取。普通独立 Scene 直接使用 `Laya.Scene`，不需要额外原生别名。
 

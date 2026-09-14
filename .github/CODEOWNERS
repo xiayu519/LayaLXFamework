@@ -11,8 +11,8 @@
 /LayaProject/AGENTS.md @xiayu519
 /LayaProject/docs/ @xiayu519
 /LayaProject/engine/types/ @xiayu519
-/LayaProject/src/Main.ts @xiayu519
-/LayaProject/src/Main.ts.meta @xiayu519
+/LayaProject/src/AppEntry.ts @xiayu519
+/LayaProject/src/AppEntry.ts.meta @xiayu519
 /LayaProject/src/framework/ @xiayu519
 /LayaProject/tests/framework/ @xiayu519
 /LayaProject/tests/workflow/ @xiayu519

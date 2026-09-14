@@ -10,7 +10,7 @@
 
 `src/framework/` 不依赖 game，业务只经 `lx`。`src/game/logic/` 是不可删除的可调用脚本库，不是游戏。用户开始业务并命名后，将名称译为英文 kebab-case，用 `npm run game:create -- --name <原名> --id <id>` 创建 `src/game/<id>/` 业务与 Codex 层；领域路径均相对此游戏，游戏间不互相依赖。
 
-根目录存在 `.framework-lock.json` 即下游模式：禁止手改 manifest 管理文件和 lock；缺口反馈上游，只同步已确认 Tag 或已提交的 channel snapshot。
+下游有 `.framework-lock.json`：框架类型/公共功能改动先确认上游分支或当前项目，已选范围不重问；lock 记来源，差异只提示，同步覆盖另确认。
 
 优先 LayaAir 3.4.1 原生 Event、timer、Tween、Pool、Loader、LocalStorage、Scene、SoundManager、ui2，不建同义层。`lx.res` 即原生 Loader；原生场景用 `Laya.Scene`，受管场景用 `lx.scenes`。固定 UI 来自 `.ls/.lh`，UI Prefab 与对应 Runtime 使用 `UI` 前缀。异步回写用失效令牌。先停副作用、销毁 owner，稳定后 `Laya.Scene.gc()`；禁用私有引用 API。
 

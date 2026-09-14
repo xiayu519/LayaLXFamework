@@ -1,5 +1,5 @@
 import { BaseWorld } from "../../../../framework/application/world/BaseWorld";
-import { xlog } from "../../../../framework/xlog";
+import { logger } from "../../../../framework/application/diagnostics/Logger";
 import type { WorldScope } from "../../../../framework/bootstrap/WorldScope";
 import type { SceneOpenOptions } from "../../../../framework/presentation/scene/SceneFlow";
 import type { UIViewRoute } from "../../../../framework/presentation/ui/UIViewRoute";
@@ -26,18 +26,12 @@ export class LobbyWorld extends BaseWorld<WorldScope> {
         super();
     }
 
-    protected override onRegister(world: WorldScope): void {
-        this.registerEvents(world);
-        this.registerUI(world);
-        this.registerScenes(world);
-    }
-
-    private registerEvents(world: WorldScope): void {
+    protected override registerEvents(world: WorldScope): void {
         // 监听由大厅自己持有；退出开始时自动 off，不登记到 lx.events 或 GameApplication。
         world.listen(world.events, LobbyWorld.ENTER_BATTLE, this, this.onEnterBattle);
     }
 
-    private registerUI(world: WorldScope): void {
+    protected override registerUI(world: WorldScope): void {
         // 先登记 UI，再登记 Scene；退出会先卸载 Scene 及其 UI，再注销专属定义。
         world.registerView<UILobbyArgs, UILobby>({
             id: "lx.status",
@@ -49,7 +43,7 @@ export class LobbyWorld extends BaseWorld<WorldScope> {
         });
     }
 
-    private registerScenes(world: WorldScope): void {
+    protected override registerScenes(world: WorldScope): void {
         this.scene = world.registerScene(LOBBY_SCENE);
     }
 
@@ -73,6 +67,6 @@ export class LobbyWorld extends BaseWorld<WorldScope> {
 
     private onEnterBattle(): void {
         // 原生事件不等待异步监听；由所属 World 处理请求失败。
-        void this.enterBattle().catch(error => xlog.error("[World examples] enter battle failed", error));
+        void this.enterBattle().catch(error => logger.error("[World examples] enter battle failed", error));
     }
 }
