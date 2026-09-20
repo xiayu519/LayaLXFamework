@@ -1,6 +1,6 @@
-# LXFamework GPT-6 开发工作流
+# LXFamework Codex 开发工作流
 
-本工作流面向 GPT-6 的各标准推理档位，共用同一套 Skill、授权边界和验收标准。`medium` 只是当前可覆盖的默认选择，不是工作流要求或支持下限；项目模型与强度默认值只在 [config.toml](../LayaProject/.codex/config.toml) 维护。用户当前显式选择优先，工作流不自动升降档。项目不额外设置 Plan 专用强度覆盖；客户端 Plan 有自己的预设，切换模式后以实际选择器为准，不能仅凭项目配置声称继承当前档位。修改配置不能切换正在运行的模型。
+本工作流以 GPT-5.6 Sol 的 `medium/high/xhigh` 为正式兼容基线，共用同一套 Skill、授权边界和验收标准。项目不在 [config.toml](../LayaProject/.codex/config.toml) 指定开发者模型或 reasoning effort，当前客户端选择优先，Skill 和任务过程不自动切换；其他模型和档位可以使用，不属于现行兼容结论。
 
 ## 仓库与工作目录
 
@@ -37,9 +37,9 @@ Codex 对两类文件采用不同的官方发现顺序：`AGENTS.md` 从 Git 根
 
 ## 模型与成本
 
-支持 `low`（Light）、`medium`、`high`、`xhigh`、`max`，可按个人偏好与任务选择，无需切换或重写工作流。较低档位可优先考虑速度，较高档位可用于深入分析；这不是任务与档位的强制映射，也不承诺相同的一次成功率。Ultra 包含自动委派，不属于本项目单代理评测范围。
+Sol 兼容范围为 `medium/high/xhigh`：普通执行可优先选择 `medium`，复杂任务选择 `high`，最高复杂度任务选择 `xhigh`。这是开发者开始任务时的选择建议，不是代理自动路由，也不承诺三档有相同的一次成功率。项目不禁止 `low`、`max`、Ultra 或其他模型，只不把它们计入当前兼容结论。
 
-先减少无关读取、重复指令和重复验证，再考虑档位成本。文本长度只是冗余检查，不等于 token；阈值集中在 [policy.json](../LayaProject/.agents/skills/codex-workflow/evals/policy.json)，公共与游戏 Skill description 分开计量。只有真实比较任务质量、总 token 与耗时后才声称性价比改善。
+先减少无关读取、重复指令和重复验证，再考虑档位成本。文本长度只是冗余检查，不等于 token；兼容模型、档位和评测阈值集中在 [policy.json](../LayaProject/.agents/skills/codex-workflow/evals/policy.json)，与开发者配置分离，公共与游戏 Skill description 分开计量。只有真实比较任务质量、总 token 与耗时后才声称性价比改善。
 
 ## 公共变更与协作
 
@@ -53,7 +53,7 @@ Codex 对两类文件采用不同的官方发现顺序：`AGENTS.md` 从 Git 根
 
 ## 验证
 
-按影响与风险选择最小命令，不按改动行数；已有通过证据只在相关输入、依赖、配置变化或新失败时重跑。新增测试证明行为与失败边界，不复刻实现。组合命令已包含的检查不预跑一遍。
+先完成当前任务授权范围内的全部改动，再按影响与风险集中执行一次最小充分验收；不要每改一个文件或完成一个子步骤就预跑检查。只有最终验收发现新失败、开发者明确要求阶段性交付，或相关输入、依赖、配置变化使证据失效时，才追加受影响项。新增测试证明行为与失败边界，不复刻实现；组合命令已包含的检查不预跑一遍。
 
 | 改动 | 验证入口 |
 | --- | --- |
@@ -75,9 +75,9 @@ Headless 默认仍为全部探针。局部任务可选 `lifecycle`、`network`�
 
 Windows 与 macOS 共用同一套 AGENTS、Skills 和 npm 命令。GitHub Actions 只运行 framework manifest、lock、upstream 与同步工具的纯 Node 契约检查，不安装或检测 LayaAir、.NET、Python、浏览器和 Codex CLI。快速门禁、领域检查及 `npm run verify:release` 全部由开发者在相关本机按需执行；缺少环境时按 [开发环境说明](LXFamework-Environment.md) 准备。
 
-模型调用只用于模型/CLI 迁移、AGENTS、Skill 决策/description 或路由变化的验收，详见 [工作流评测](../LayaProject/.agents/skills/codex-workflow/references/evaluation.md)。`test:skill-routing -- --case <id>` 可重复选择受影响正负例，`--group verification` 专测过量/不足验证；无参数才跑全套。分类测试与实际执行分别报告；日常开发不反复跑模型评测。普通排版、展示 YAML 或无语义脚本变化只跑确定性检查。
+模型调用只用于模型/CLI 迁移、AGENTS、Skill 决策/description 或路由变化的验收，详见 [工作流评测](../LayaProject/.agents/skills/codex-workflow/references/evaluation.md)。`test:skill-routing -- --case <id>` 可重复选择受影响正负例，`--group verification` 专测过量/不足验证；无参数才跑全套。所有规则与案例改完后一次性执行所选模型评测；日常开发和中间状态不反复跑。分类测试与实际执行分别报告，普通排版、展示 YAML 或无语义脚本变化只跑确定性检查。
 
-本次迁移的分类、真实 Laya 执行证据和成本计量限制统一记录在 [GPT-6 工作流迁移验收](../LayaProject/docs/gpt6-workflow-validation.md)，不在使用手册中重复维护成绩。
+当前分类、真实执行证据和成本计量限制统一记录在 [Sol 工作流兼容验收](../LayaProject/docs/sol-workflow-validation.md)，不在使用手册中重复维护成绩。此前 GPT-6 迁移结果保留在 [历史验收](../LayaProject/docs/gpt6-workflow-validation.md)。
 
 后续按影响选择检查、探针分组和模型案例筛选的证据见 [验证粒度优化验收](../LayaProject/docs/verification-scope-validation.md)。
 
@@ -97,8 +97,7 @@ Codex 官方 [Memories](https://learn.chatgpt.com/docs/customization/memories) �
 
 ## 依据
 
-- [OpenAI：GPT-6 提示与迁移](https://developers.openai.com/api/docs/guides/latest-model?model=gpt-6-astra#prompting-best-practices)
-- [OpenAI：GPT-6 模型能力](https://developers.openai.com/api/docs/models/gpt-6-astra)
+- [OpenAI：GPT-5.6 Sol 模型能力](https://developers.openai.com/api/docs/models/gpt-5.6-sol)
 - [OpenAI：Codex 模型与强度](https://learn.chatgpt.com/docs/models)
 - [OpenAI：Codex AGENTS.md 分层项目指令](https://learn.chatgpt.com/docs/agent-configuration/agents-md)
 - [OpenAI：Codex 项目配置层级](https://learn.chatgpt.com/docs/config-file/config-basic)

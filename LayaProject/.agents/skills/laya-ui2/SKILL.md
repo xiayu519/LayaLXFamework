@@ -1,6 +1,6 @@
 ---
 name: laya-ui2
-description: 按示意图制作窗口、选择全屏或弹窗骨架与 GList 功能模板，或修改 LayaAir ui2 分层、动画、场景归属、原生绑定、窗口异步展示生命周期与红点时使用；普通 Scene 与非 UI 资源不触发。
+description: 按示意图制作窗口、选择全屏或弹窗骨架与 GList 功能模板，或修改 LayaAir ui2 分层、动画、场景归属、原生绑定、窗口实例/session 订阅、异步展示生命周期与红点时使用；普通 Scene、非 UI 资源及窗口内仅清理 Event/timer/Tween 不触发。
 ---
 
 # Laya ui2

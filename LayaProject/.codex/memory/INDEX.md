@@ -29,7 +29,6 @@
 
 ## Feedback
 
-- [GPT-6 effort compatibility](feedback/gpt6-effort-compatibility.md)：各标准档位共用工作流，Medium 只是可覆盖的个人选择。
 - [Risk-scoped validation](feedback/risk-scoped-validation.md)：按影响选最小充分验收，保留原地 Headless 与可追溯构建复用。
 - [Single-maintainer collaboration](feedback/single-maintainer-collaboration.md)：项目单人开发与维护；Codex 默认单代理，潜在使用者数量不决定委派策略。
 - [Laya-focused documentation](feedback/laya-focused-documentation.md)：只记录已验证的 LayaAir 规则。

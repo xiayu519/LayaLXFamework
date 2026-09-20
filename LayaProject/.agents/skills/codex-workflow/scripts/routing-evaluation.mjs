@@ -51,7 +51,8 @@ export function loadRoutingEvaluation(projectRoot, environment = process.env, ar
         ...JSON.parse(readFileSync(join(skillRoot, "evals", "cases.json"), "utf8")),
         verification: JSON.parse(readFileSync(join(skillRoot, "evals", "verification-cases.json"), "utf8")),
     }, args);
-    const policy = evaluationPolicy(readFileSync(join(projectRoot, ".codex", "config.toml"), "utf8"), environment);
+    const settings = JSON.parse(readFileSync(join(skillRoot, "evals", "policy.json"), "utf8"));
+    const policy = evaluationPolicy(settings, environment);
     const skills = definition.cases.length ? readSkillCatalog(join(projectRoot, ".agents", "skills")) : [];
     const ruleTexts = ["AGENTS.md",
         ...(definition.decisions.length ? WORKFLOW_RULE_PATHS : []),
@@ -81,11 +82,27 @@ export function buildRoutingPrompt({ cases, decisions, verification = [], skills
 为每个 case 返回完成请求所需的最小项目 Skill 集合。仅在语义确实跨独立边界时返回多个；不要返回系统 Skill、相邻但不需要的 Skill 或解释。保留 case id。
 skills: ${JSON.stringify(skills)}
 cases: ${JSON.stringify(requests)}
-另外根据下面真实规则为 decisions 选择下一步 action，取值为 inspect_only、implement、realign、pause_conflict、stay_in_scope、reuse_evidence、respect_user_model、execute_single_agent、delegate_independent。不要执行任务，不返回解释。
+另外根据下面真实规则为 decisions 选择下一步 action，取值为 inspect_only、implement、realign、pause_conflict、stay_in_scope、reuse_evidence、respect_user_model、execute_single_agent、delegate_independent。implement 表示在已授权范围继续执行；stay_in_scope 表示跳过明确排除或越界的相邻事项。不要执行任务，不返回解释。
 规则：${workflowRules}
 decisions: ${JSON.stringify(decisionRequests)}
-另外为 verification 选择完成本次变更所需的最小 checks 集合，不返回未触发的检查。可用值：diff_links（差异与相关链接）、typecheck、related_tests（相关测试文件）、architecture、skills、memory、game_template、model_subset（受影响模型案例）、engine_targeted_build（一次当前构建+专项引擎探针）、engine_targeted_reuse（复用本轮未变构建+专项探针）、verify（全项目快速回归）、release（完整发布验收，已包含其内部检查）。不要重复选择被其他检查包含的命令；允许无需重跑时返回空集合。没有案例的组返回空数组。
+另外为 verification 选择当前时点所需的最小 checks 集合：范围内改动尚未全部完成时不预跑；全部完成后集中验收一次。可用值：diff_links（差异与相关链接）、typecheck、related_tests（相关测试文件）、architecture、skills、memory、game_template、model_subset（受影响模型案例）、engine_targeted_build（一次当前构建+专项引擎探针）、engine_targeted_reuse（复用本轮未变构建+专项探针）、verify（全项目快速回归）、release（完整发布验收，已包含其内部检查）。不要返回未触发的检查或重复选择被其他检查包含的命令；允许无需重跑时返回空集合。每个输入 id 只能在所属数组返回一次，禁止复制到其他组；没有输入的组返回空数组。
 verification: ${JSON.stringify(verificationRequests)}`;
+}
+
+/** 用本次选择收紧结构化输出，避免模型把 id 复制到不属于它的组。 */
+export function buildRoutingSchema(template, definition) {
+    const schema = JSON.parse(JSON.stringify(template));
+    for (const [property, items] of [
+        ["results", definition.cases],
+        ["decisions", definition.decisions],
+        ["verification", definition.verification ?? []],
+    ]) {
+        const group = schema.properties[property];
+        group.minItems = items.length;
+        group.maxItems = items.length;
+        if (items.length) group.items.properties.id.enum = items.map(({ id }) => id);
+    }
+    return schema;
 }
 
 export function assertRoutingResult(actual, definition) {

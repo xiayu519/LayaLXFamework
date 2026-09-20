@@ -1,16 +1,13 @@
-/** 只读取评测使用的根级标量字段，不重新实现 TOML 解析器。 */
-export function evaluationPolicy(config, environment = {}) {
-    const root = config.split(/^\s*\[/m, 1)[0];
-    const field = (name) => {
-        const values = [...root.matchAll(new RegExp(`^${name}\\s*=\\s*"([^"\\r\\n]+)"\\s*(?:#.*)?$`, "gm"))];
-        if (values.length !== 1) throw new Error(`Expected one root string '${name}' in .codex/config.toml.`);
-        return values[0][1];
-    };
-    const model = environment.LX_CODEX_EVAL_MODEL ?? field("model");
-    const effort = environment.LX_CODEX_EVAL_EFFORT ?? field("model_reasoning_effort");
-    if (!/^[a-zA-Z0-9._-]+$/.test(model)) throw new Error("Invalid evaluation model.");
-    if (!["low", "medium", "high", "xhigh", "max"].includes(effort)) {
-        throw new Error("Invalid evaluation effort: use low, medium, high, xhigh or max; Ultra is a delegation mode.");
+/** 评测基线独立于开发者的日常模型选择；环境变量只用于显式比较。 */
+export function evaluationPolicy(settings, environment = {}) {
+    const model = environment.LX_CODEX_EVAL_MODEL ?? settings?.compatibility?.model;
+    const effort = environment.LX_CODEX_EVAL_EFFORT ?? settings?.compatibility?.defaultEffort;
+    const efforts = settings?.compatibility?.efforts;
+    if (typeof model !== "string" || !/^[a-zA-Z0-9._-]+$/.test(model)) {
+        throw new Error("Invalid evaluation model.");
+    }
+    if (!Array.isArray(efforts) || typeof effort !== "string" || !efforts.includes(effort)) {
+        throw new Error(`Invalid evaluation effort: use ${Array.isArray(efforts) ? efforts.join(", ") : "configured efforts"}.`);
     }
     return { model, effort };
 }
@@ -37,7 +34,19 @@ export function validateEvaluationSettings(settings) {
     if (!/^\d+\.\d+\.\d+$/.test(settings?.codexCliVersion ?? "")) {
         throw new Error("Invalid Codex CLI version in evaluation policy.");
     }
-    assertUsage({ input_tokens: 0, output_tokens: 0 }, settings.routing?.inputTokens, settings.routing?.outputTokens);
+    const compatibility = settings?.compatibility;
+    if (!/^[a-zA-Z0-9._-]+$/.test(compatibility?.model ?? "")) {
+        throw new Error("Invalid compatibility model in evaluation policy.");
+    }
+    const efforts = compatibility?.efforts;
+    if (!Array.isArray(efforts) || JSON.stringify(efforts) !== JSON.stringify(["medium", "high", "xhigh"])
+        || !efforts.includes(compatibility.defaultEffort)) {
+        throw new Error("Compatibility efforts must be medium, high and xhigh with a supported default.");
+    }
+    for (const effort of efforts) {
+        assertUsage({ input_tokens: 0, output_tokens: 0 }, settings.routing?.inputTokens,
+            settings.routing?.outputTokens?.[effort]);
+    }
     if (!Number.isSafeInteger(settings.routing?.timeoutMs) || settings.routing.timeoutMs <= 0) {
         throw new Error("Invalid evaluation timeout.");
     }

@@ -16,4 +16,12 @@ export function buildRoutingPrompt(input: {
     skills: Array<{name: string; description: string}>;
     workflowRules: string;
 }): string;
+export interface RoutingSchema {
+    properties: Record<"results" | "decisions" | "verification", {
+        minItems?: number;
+        maxItems?: number;
+        items: {properties: {id: {enum?: string[]}}};
+    }>;
+}
+export function buildRoutingSchema(template: RoutingSchema, definition: RoutingDefinition): RoutingSchema;
 export function assertRoutingResult(actual: unknown, definition: RoutingDefinition): {routing: number; decisions: number; verification: number};

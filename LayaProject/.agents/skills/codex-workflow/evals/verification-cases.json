@@ -8,5 +8,7 @@
   { "id": "verify_engine_rebuild", "request": "本轮旧构建通过后又修改了局部窗口的真实 ui2 行为；类型检查和相关单测已针对新代码通过，现在验收专项引擎行为。选什么？", "expected": ["engine_targeted_build"] },
   { "id": "verify_release_chain", "request": "只改一行发布构建工具的库收集规则，已授权并准备正式发布；相关工具单测已通过，现在做发布门禁。选什么？", "expected": ["release"] },
   { "id": "verify_unchanged_evidence", "request": "相关测试和本轮完整 Headless 已通过，所有相关输入未变也没有新失败；用户只问是否验证过，需要重新运行什么？", "expected": [] },
+  { "id": "verify_defer_until_complete", "request": "一个已授权任务要连续修改实现、测试和文档；现在只完成实现文件，测试与文档仍待修改，没有既有失败需要定位，用户也未要求阶段性交付。此时先运行什么验收？", "expected": [] },
+  { "id": "verify_once_after_complete", "request": "同一局部纯 TS 任务的实现、测试和 README 入口现已全部完成，接口与依赖不变；README 新增了相关文档链接，尚未运行本轮验收。现在一次性选择什么？", "expected": ["diff_links", "typecheck", "related_tests"] },
   { "id": "verify_boundary_ts", "request": "已授权调整两个纯 TS 模块的依赖方向，未改引擎与发布链；现在做类型、行为和依赖边界专项验收，不要求全项目回归。选什么？", "expected": ["typecheck", "related_tests", "architecture"] }
 ]

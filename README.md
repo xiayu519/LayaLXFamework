@@ -4,11 +4,11 @@ LayaLXFamework 是基于 **LayaAir 3.4.1** 的 2D 游戏客户端框架，提供
 
 项目继续使用 LayaAir 原生 `.ls/.lh`、ui2、`Laya.loader`、`Laya.Scene`、`Laya.timer`、`Laya.Tween`、`Laya.Pool` 和 `Laya.SoundManager`。业务通过 `lx` 访问已组装的公共能力。
 
-## GPT-6 开发工作流
+## Codex 开发工作流
 
-项目配套面向 GPT-6 的 Codex 工作流，兼容 Light（`low`）、`medium`、`high`、`xhigh` 和 `max`，共用 Skill、授权边界与验收标准。用户显式选择优先，不自动升降档；模型与强度默认值只在 [项目配置](LayaProject/.codex/config.toml) 维护。
+项目 Codex 工作流以 GPT-5.6 Sol 的 `medium/high/xhigh` 为正式兼容基线，共用 Skill、授权边界与验收标准；普通、复杂和最高复杂度任务可分别优先考虑三档。项目不指定开发者的模型或 reasoning effort，当前客户端选择优先，工作流不自动切换。
 
-任务按需加载领域知识、检索有效项目记忆，并按风险选择验证，减少无关上下文和重复检查。使用方式见 [开发工作流](Books/LXFamework-Codex-Workflow.md)，分类评测、实际 Laya 执行样例及未验证项见 [GPT-6 迁移验收](LayaProject/docs/gpt6-workflow-validation.md)。兼容不代表各档能力或一次成功率相同。
+任务按需加载领域知识、检索有效项目记忆，并按风险选择验证，减少无关上下文和重复检查。使用方式见 [开发工作流](Books/LXFamework-Codex-Workflow.md)，分类评测、实际执行样例及未验证项见 [Sol 兼容验收](LayaProject/docs/sol-workflow-validation.md)。兼容不代表三档能力或一次成功率相同；其他模型和档位可以使用，不属于当前验证结论。
 
 ## 环境与打开方式
 
@@ -313,7 +313,7 @@ lx.performance.assertBudget({
 
 ## 验证
 
-以下命令均在 `LayaProject/` 执行。按改动影响选择最小充分验证；已通过的检查仅在相关输入、依赖、配置变化或出现新失败时需要重跑。
+以下命令均在 `LayaProject/` 执行。完成当前任务的全部改动后，再按影响一次性执行最小充分验证；不要逐文件或逐子步骤预跑。只有最终验收发现新失败、明确要求阶段性交付，或相关输入、依赖、配置变化时才追加受影响项。
 
 | 改动或目的 | 验证入口与选择 |
 | --- | --- |

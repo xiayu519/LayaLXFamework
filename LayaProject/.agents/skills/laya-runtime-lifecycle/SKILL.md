@@ -1,6 +1,6 @@
 ---
 name: laya-runtime-lifecycle
-description: 处理 Event、Laya.timer、Tween、异步回写、句柄和服务启停的 owner 清理时使用；单纯资源加载与纯状态机不触发。
+description: 处理 Event、Laya.timer、Tween、通用异步回写、句柄和服务启停的 owner 清理时使用；ui2 窗口实例与 session 展示绑定自身生命周期不触发。
 ---
 
 # Runtime Lifecycle

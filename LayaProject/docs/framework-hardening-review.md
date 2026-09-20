@@ -25,7 +25,7 @@
 - 存储/状态：直接 save 也保护未来版本，读回发现静默写失败；不改变 envelope。状态机 guard/can/effect 全边界防重入。
 - 性能：等待统计首窗口，GPU 使用 driver 计量；拒绝非法数值及超预算，不把零值或平均值说成峰值证据。
 - 工具：AST 模块解析覆盖 alias、动态/side-effect import、export/require；发布标题跟随 BuildSettings.name。
-- 工作流：默认模型只在配置维护、尊重用户显式选择；默认单代理，只有独立风险边界或用户明确要求才委派；已批准边界不重复审批。评测禁止工具取答案，并只在开发者已登录的本地 Codex CLI 环境执行；GitHub CI 只保留确定性检查。
+- 工作流（当时）：模型选择集中在配置并尊重用户显式选择；默认单代理，只有独立风险边界或用户明确要求才委派；已批准边界不重复审批。现行模型边界见 [Sol 工作流适配与验证记录](sol-workflow-validation.md)。评测禁止工具取答案，并只在开发者已登录的本地 Codex CLI 环境执行；GitHub CI 只保留确定性检查。
 - 环境：修正 CI Node 20 与锁定 Vitest 5 不兼容的基线，package/lock/doctor/CI/文档统一 Node 24.x；新增一致性回归，不安装或更改本机系统环境。
 
 Skill 对实施的影响：领域 Skill 约束原生 API 与 owner 顺序；sdd-explore 保留批准边界；codex-workflow/skill-creator 要求正负触发和独立审查；project-memory 保留旧模型决定并显式替代；framework-sync 保证新增 CI 不漏发下游。
@@ -37,7 +37,7 @@ Skill 对实施的影响：领域 Skill 约束原生 API 与 owner 顺序；sdd-
 - 一次原地 CLI 发布构建成功，Headless Chromium + SwiftShader 真包通过，无项目复制、IDE 或可见浏览器。
 - HTTP 201/202/204/205、HEAD、JSON/二进制、响应校验、timeout/abort 探针通过。一次有效统计样本：2D drawCalls=1，triangles=137，GPU driver=4,465,643 bytes；Resource CPU=0，仅为该账面计量，不代表无 CPU 内存。
 - UI 旧代先完成/后完成/失败、取消、跨层 modal 与 100 轮 UI/Pool 循环通过。窗口创建/销毁各100，Pool创建/获取/归还各100，根节点及 managed 数从1回到1；正常停机解绑与缓存释放通过。
-- 最终语义评测：38 个路由 + 10 个决策通过，无工具调用；项目默认评测模型 `gpt-5.6-sol/high`，input 19,075 / output 1,444（其中 reasoning output 795，cached input 0）。新增默认单代理与独立风险委派正反例，未放宽 expected。
+- 当时的最终语义评测：38 个路由 + 10 个决策通过，无工具调用；评测使用 `gpt-5.6-sol/high`，input 19,075 / output 1,444（其中 reasoning output 795，cached input 0）。这是历史快照，现行三档兼容范围与结果见 [Sol 工作流适配与验证记录](sol-workflow-validation.md)。新增默认单代理与独立风险委派正反例，未放宽 expected。
 
 语义评测 token 是执行后阈值，不是服务端硬花费限制。上述模型是独立评测所用模型，不是对当前会话模型的声明。
 

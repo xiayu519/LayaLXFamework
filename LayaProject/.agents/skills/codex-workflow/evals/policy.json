@@ -1,5 +1,10 @@
 {
   "codexCliVersion": "0.153.2",
+  "compatibility": {
+    "model": "gpt-5.6-sol",
+    "defaultEffort": "medium",
+    "efforts": ["medium", "high", "xhigh"]
+  },
   "textBudgets": {
     "projectAgentsBytes": 3072,
     "gameAgentsBytes": 2048,
@@ -8,7 +13,11 @@
   },
   "routing": {
     "inputTokens": 25000,
-    "outputTokens": 2500,
+    "outputTokens": {
+      "medium": 3200,
+      "high": 4000,
+      "xhigh": 5200
+    },
     "timeoutMs": 240000
   }
 }

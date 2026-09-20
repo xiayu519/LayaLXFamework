@@ -5,15 +5,17 @@ import { describe, expect, it } from "vitest";
 import {
     assertRoutingResult,
     buildRoutingPrompt,
+    buildRoutingSchema,
     loadRoutingEvaluation,
     selectEvaluationCases,
 } from "../../.agents/skills/codex-workflow/scripts/routing-evaluation.mjs";
 import { evaluationArguments, evaluationPolicy } from "../../.agents/skills/codex-workflow/scripts/evaluation-policy.mjs";
 
 describe("Codex workflow policy", () => {
-    it("loads the current config and complete cases without exposing answer fields", () => {
+    it("loads the compatibility policy and complete cases without exposing answer fields", () => {
         const evaluation = loadRoutingEvaluation(resolve("."), {});
-        expect(evaluation.policy).toEqual(evaluationPolicy(readFileSync(".codex/config.toml", "utf8")));
+        const settings = JSON.parse(readFileSync(".agents/skills/codex-workflow/evals/policy.json", "utf8"));
+        expect(evaluation.policy).toEqual(evaluationPolicy(settings));
         for (const group of [evaluation.definition.cases, evaluation.definition.decisions, evaluation.definition.verification ?? []]) {
             expect(new Set(group.map((item) => item.id)).size).toBe(group.length);
             for (const item of group) expect(evaluation.prompt).toContain(JSON.stringify({ id: item.id, request: item.request }));
@@ -142,6 +144,16 @@ describe("structured routing evaluation", () => {
         expect(prompt).not.toContain('"expected"');
     });
 
+    it("constrains structured output to the selected groups and ids", () => {
+        const template = JSON.parse(readFileSync(".agents/skills/codex-workflow/evals/routing-output.schema.json", "utf8"));
+        const schema = buildRoutingSchema(template, definition);
+        expect(schema.properties.results).toMatchObject({ minItems: 1, maxItems: 1 });
+        expect(schema.properties.results.items.properties.id.enum).toEqual(["route"]);
+        expect(schema.properties.decisions.items.properties.id.enum).toEqual(["decision"]);
+        expect(schema.properties.verification).toMatchObject({ minItems: 0, maxItems: 0 });
+        expect(schema.properties.verification.items.properties.id).not.toHaveProperty("enum");
+    });
+
     it("accepts exact unordered skills and rejects missing, duplicate or unexpected results", () => {
         const valid = {
             results: [{ id: "route", skills: ["a", "b"] }],
@@ -174,6 +186,22 @@ describe("structured routing evaluation", () => {
         expect(evaluation.prompt).not.toContain('"expected"');
         expect(evaluation.prompt).toContain("## Verification");
         expect(evaluation.prompt).not.toContain("## Official references");
+    });
+
+    it("defers checks until all authorized changes are complete", () => {
+        const evaluation = loadRoutingEvaluation(resolve("."), {}, [
+            "--case", "verify_defer_until_complete",
+            "--case", "verify_once_after_complete",
+        ]);
+        expect(evaluation.definition.verification).toEqual([
+            expect.objectContaining({ id: "verify_defer_until_complete", expected: [] }),
+            expect.objectContaining({
+                id: "verify_once_after_complete",
+                expected: ["diff_links", "typecheck", "related_tests"],
+            }),
+        ]);
+        expect(evaluation.prompt).toContain("范围内改动尚未全部完成时不预跑");
+        expect(evaluation.prompt).toContain("先完成当前授权范围内的全部改动");
     });
 
     it("unions selectors without running selected cases twice", () => {
