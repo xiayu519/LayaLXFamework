@@ -71,13 +71,10 @@ export async function runFrameworkProbes(validation) {
             `layout viewport ${JSON.stringify(layout.viewport)} differs from GRoot ${root.width}x${root.height}`);
         assert(fullBleed?.width === root.width && fullBleed?.height === root.height,
             "full-bleed content did not fill the live GRoot");
-        assert(safeContent?.x === layout.safeArea.x && safeContent?.y === layout.safeArea.y
-            && safeContent?.width === layout.safeArea.width && safeContent?.height === layout.safeArea.height,
-            "safe content differs from the current platform safe area");
+        assert(safeContent?.x === layout.viewport.x && safeContent?.y === layout.viewport.y
+            && safeContent?.width === layout.viewport.width && safeContent?.height === layout.viewport.height,
+            "safeContent must retain the full stage coordinate space");
         assert(middle, "full-screen content is missing its middle slot");
-        assert(Math.abs(middle.x - (layout.safeArea.width - middle.width) / 2) <= 1
-            && Math.abs(middle.y - (layout.safeArea.height - middle.height) / 2) <= 1,
-            "middle content is not centered in the current safe area");
 
         for (const order of ["old-first", "new-first", "old-reject"]) {
             const route = register(ui, `binding_${order}`, { retention: "hide" });

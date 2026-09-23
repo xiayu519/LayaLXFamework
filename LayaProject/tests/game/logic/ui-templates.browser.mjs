@@ -11,7 +11,6 @@ export default function uiTemplatesProbe() {
 async function runTemplates() {
     const { lx, Laya } = globalThis;
     const ui = lx.ui, root = Laya.GRoot.inst, platform = lx.platform;
-    const Base = Object.getPrototypeOf(ui.listManaged().find(entry => entry.routeId === "lx.scene-loading").window.constructor);
     const assert = (ok, message) => { if (!ok) throw new Error(`UI templates: ${message}`); };
     const wait = async (condition, message) => {
         const end = performance.now() + 4000;
@@ -20,6 +19,16 @@ async function runTemplates() {
             await new Promise(resolve => setTimeout(resolve, 10));
         }
     };
+    // targeted 探针启动时 Loading 可能已经销毁；显式取得一次实例，不能依赖其他 suite 的执行顺序。
+    const managedLoading = ui.listManaged().find(entry => entry.routeId === "lx.scene-loading")?.window;
+    const baseSource = managedLoading ?? await ui.show("lx.scene-loading", {
+        phase: "ready", scene: 1, resources: 1, overall: 1,
+    });
+    const Base = Object.getPrototypeOf(baseSource.constructor);
+    if (!managedLoading) {
+        ui.close("lx.scene-loading", baseSource);
+        await wait(() => !baseSource.isShowing, "temporary loading close");
+    }
     const frame = () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     const click = (node, x = node.width / 2, y = node.height / 2) => {
         const point = Laya.SpriteUtils.getTransformRelativeToWindow(node, x, y);

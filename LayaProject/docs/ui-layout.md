@@ -19,27 +19,27 @@ Root
 ├─ full
 └─ safeContent
    ├─ top
-   ├─ full（上下栏之间的拉伸内容区）
+   ├─ full（保持源资产坐标的全屏内容区）
    ├─ mid
    └─ bottom
 ```
 
 - `Root/full`：铺满当前屏幕，适合背景、自定义遮罩和边缘特效。
-- `safeContent`：铺满平台安全区，交互内容放在这里。
+- `safeContent`：铺满运行时舞台，作为 `top/full/mid/bottom` 的结构容器；自身不应用安全区位移。
 - `top`：保持自身设计高度、横向铺满，并移动到刘海和微信胶囊下方。
-- `safeContent/full`：横向填满安全区，纵向从 top 下沿铺到 bottom 上沿；无 top 时避开胶囊，无 bottom 时到安全区底部。用于全屏滚动列表，通过原生宽高 Relation 让面板和 GList 拉伸，保持 scale=1、行高与字号不变。
-- `mid`：用于固定尺寸居中内容，保持设计尺寸和安全区中心；空间不足时整体等比缩小，同时避开 top、bottom。全屏滚动列表应使用 full。
-- `bottom`：保持自身设计高度、横向铺满，并贴安全区底部。
+- `safeContent/full`：保持 `.lh` 中声明的位置、尺寸和缩放；需要随舞台尺寸变化时由源资产 Relation 明确声明。
+- `mid`：fullscreen 下保持 `.lh` 中声明的位置、尺寸和缩放；center-popup 下在 `topSafeArea` 内等比适配和居中。
+- `bottom`：保持 `.lh` 中声明的位置、尺寸和缩放；需要贴舞台底部时由源资产 Relation 明确声明。
 
-空 top/bottom 的高度固定为 0；其他空槽位仍保留，空容器使用 mouseThrough 避免拦截输入。弹窗的空槽位也跟随安全区布局，只有 mid 参与开合动画。槽位内部的按钮、文本和列表使用 ui2 Relation 相对槽位布局，不需要逐控件计算刘海偏移。
+空 top/bottom 的设计高度固定为 0；其他空槽位仍保留，空容器使用 mouseThrough 避免拦截输入。只有 top 自动读取安全区；center-popup 的 mid 参与布局与开合动画。槽位内部的按钮、文本和列表使用 ui2 Relation 表达自身的响应式需求。
 
 两个 full 是固定的不同槽位，不能同时导出为同一 Runtime 的同名字段；需要脚本引用时用 `backgroundFull/contentFull` 原生属性引用，或者由独立 Runtime 管理各自作用域。
 
-全屏背景和安全内容必须分开：背景可以延伸到异形屏边缘，文字和可点击控件进入安全区。微信胶囊只改变 `top` 的起点，不会把 `mid` 和 `bottom` 一起下移。
+所有挂载 `UIViewLifecycle` 的 `.lh` 都由 `validate:assets` 检查上述完整顺序。对应 Runtime 不得运行时创建固定显示节点、直接写静态节点 `x/y` 或调用 `pos()`；固定结构和位置必须回到源资产。动态列表使用 GList 模板，动画使用 Tween，特效使用独立 Prefab，不把动态内容误写成固定窗口骨架。
 
-`mid` 的可用高度按安全区中心到上下槽位边界的较短距离确定。长屏恢复设计尺寸，短屏等比缩小，始终不改变安全区中心。如果上下固定区域已占到中心，中心内容就没有可用空间；此时需降低该界面的固定区域高度或调整项目的屏幕策略，不能靠遮盖内容完成适配。
+全屏背景和内容层分开：背景可以延伸到异形屏边缘，微信胶囊只改变 `top` 的起点，`full`、`mid` 和 `bottom` 不因平台安全区重排。需要整体限制在安全区的独立窗口使用 `safe-screen`；需要安全区内居中的弹窗使用 `center-popup`。
 
-`.lh` 必须拥有一个用于编辑器排版的设计宽高，但这个数值只属于该资源的创作画布。`fullscreen` 和 `safe-screen` 在显示时由 `UILayoutService` 按运行时 Stage 调整原生页面或窗口 Pane 及槽位；内置界面的创作尺寸不限制下游设计分辨率。
+`.lh` 必须拥有一个用于编辑器排版的设计宽高，但这个数值只属于该资源的创作画布。`fullscreen` 按运行时 Stage 调整原生页面、窗口 Pane、Root/full、safeContent 和 top；`safe-screen` 调整整个 Pane。内置界面的创作尺寸不限制下游设计分辨率。
 
 ## owner、host、layout
 
@@ -87,7 +87,7 @@ const resultRoute: UIViewRoute<ResultArgs, ResultView> = {
 };
 ```
 
-fullscreen 铺满屏幕并适配完整骨架。center-popup 的根与 safeContent 仍拉伸，mid 保留设计尺寸并在避开平台顶部占用后的安全区居中；空间不足等比缩小，只对 mid 播放开合动画。模态和布局分别配置；打开方式只影响全屏，弹窗保持叠加且仍归原场景或父展示。
+fullscreen 铺满屏幕，只让 top 适配平台顶部安全区，其余槽位保持源资产布局。center-popup 的根与 safeContent 铺满舞台，mid 保留设计尺寸并在 `topSafeArea` 内居中；空间不足等比缩小，只对 mid 播放开合动画。模态和布局分别配置；打开方式只影响全屏，弹窗保持叠加且仍归原场景或父展示。
 
 应用级 GWindow 继续由 UIRoute/register 配置和创建，用于 Loading 等跨场景窗口；其 safe-screen 将整个 Pane 限制在安全区。它与场景原生 GWidget 的 UIViewRoute 是两个明确用途，不能把应用创建器复制到普通场景 UI。
 
@@ -107,6 +107,6 @@ closeOnMaskClick:false 保留遮挡但不允许点空白关闭。modal:false 不
 
 ## 当前公共界面
 
-`UISceneLoading.lh` 和 `UILobby.lh` 使用完整骨架，内容填入 mid，top/full/bottom 留空；背景覆盖屏幕，卡片保持安全区居中。Loading 使用 GRoot，UILobby 是场景内原生页面。UIFullscreen/UIPopup 模板、UIInventory、UIFullscreenMid、UIBattle 和 UIConfirmation 同样保留全部节点。按钮、列表项、UIPanelChrome 和池化 UITip 是组合组件，按各自职责嵌入或由对应服务呈现。
+`UISceneLoading.lh` 和 `UILobby.lh` 使用完整骨架，内容填入 mid，top/full/bottom 留空；背景覆盖屏幕，fullscreen 内容保持源坐标。Loading 使用 GRoot，UILobby 是场景内原生页面。UIFullscreen/UIPopup 模板、UIInventory、UIFullscreenMid、UIBattle 和 UIConfirmation 同样保留全部节点。按钮、列表项、UIPanelChrome 和池化 UITip 是组合组件，按各自职责嵌入或由对应服务呈现。
 
-[旅行背包示例](ui-examples.md) 保留 `safeContent(top / full / mid / bottom)`，mid 留空：顶部标题和汇总、上下拉伸的虚拟列表、底部选择信息和操作按钮。`node tests/game/logic/ui-examples-resolutions.mjs` 在当前构建上检查多种浏览器分辨率及模拟安全区，包含固定行高、字号和重排后的实际鼠标操作。
+[旅行背包示例](ui-examples.md) 保留 `safeContent(top / full / mid / bottom)`，mid 留空：顶部标题和汇总、源资产确定范围的虚拟列表、底部选择信息和操作按钮。Headless 探针检查模拟安全区只改变 top，其他槽位不发生安全区重排。

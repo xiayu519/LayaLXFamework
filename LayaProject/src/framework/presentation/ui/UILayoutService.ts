@@ -176,9 +176,7 @@ export class UILayoutService {
             if (!safe || !mid) {
                 throw new Error("center-popup requires safeContent/mid under its fullscreen root.");
             }
-            setRect(safe, layout.safeArea);
-            this.fitContent(mid, freezeRect(0, layout.topSafeArea.y - layout.safeArea.y,
-                layout.topSafeArea.width, layout.topSafeArea.height));
+            this.fitContent(mid, layout.topSafeArea);
             // 空白全屏容器将输入传给 GRoot.modalLayer；卡片内部自行接收点击。
             pane.mouseThrough = safe.mouseThrough = true;
             mid.mouseThrough = false;
@@ -198,43 +196,18 @@ export class UILayoutService {
         if (!safe) {
             return;
         }
-        setRect(safe, layout.safeArea);
+        // 全屏界面保持设计舞台坐标；安全区只影响明确声明的 top 槽位。
+        // full、mid、bottom 由源资产决定位置，不能因刘海或小游戏胶囊整体重排。
+        setRect(safe, layout.viewport);
         const top = childWidget(safe, UI_LAYOUT_NODE_NAMES.top);
         if (top) {
             const size = this.captureSize(top);
-            const relativeY = layout.topSafeArea.y - layout.safeArea.y;
             setRect(top, freezeRect(
-                0,
-                relativeY,
+                layout.topSafeArea.x,
+                layout.topSafeArea.y,
                 layout.topSafeArea.width,
-                Math.min(size.height, Math.max(0, layout.safeArea.height - relativeY)),
+                Math.min(size.height, layout.topSafeArea.height),
             ));
-        }
-
-        const bottom = childWidget(safe, UI_LAYOUT_NODE_NAMES.bottom);
-        if (bottom) {
-            const size = this.captureSize(bottom);
-            const height = Math.min(size.height, layout.safeArea.height);
-            setRect(bottom, freezeRect(0, layout.safeArea.height - height, layout.safeArea.width, height));
-        }
-        // 可滚动内容保持原始缩放，填满剩余安全区。
-        // 此处的 full 槽位只覆盖当前区域，pane/full 则覆盖整个屏幕。
-        const contentFull = childWidget(safe, UI_LAYOUT_NODE_NAMES.full);
-        if (contentFull) {
-            const start = top ? top.y + top.height : layout.topSafeArea.y - layout.safeArea.y;
-            const end = bottom?.y ?? safe.height;
-            setRect(contentFull, freezeRect(0, start, safe.width, Math.max(0, end - start)));
-            contentFull.scaleX = contentFull.scaleY = 1;
-        }
-
-        const mid = childWidget(safe, UI_LAYOUT_NODE_NAMES.mid);
-        if (mid) {
-            // 保留安全区中心，即使胶囊只推动了顶部槽位也不改变中心。
-            // 在中心两侧预留等量空间，防止槽位重叠。
-            const reservedHeight = Math.max(top && top.height > 0 ? top.y + top.height : 0, bottom?.height ?? 0);
-            const availableHeight = Math.max(0, layout.safeArea.height - 2 * reservedHeight);
-            this.fitContent(mid, freezeRect(0, reservedHeight,
-                layout.safeArea.width, availableHeight));
         }
     }
 

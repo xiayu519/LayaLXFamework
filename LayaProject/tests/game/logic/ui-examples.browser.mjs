@@ -2,7 +2,6 @@
 export default function uiExamplesProbe() {
     return `(${runUIExamples.toString()})()`;
 }
-
 async function runUIExamples() {
     const { lx, Laya } = globalThis;
     const ui = lx.scenes.get('examples.lobby').ui;
@@ -58,6 +57,7 @@ async function runUIExamples() {
     const originalViewport = Object.getOwnPropertyDescriptor(platform, "viewport");
     const hostViewport = platform.viewport;
     const layouts = [];
+    let fixedInventorySlots;
     const frame = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     const rect = (node) => {
         const start = node.localToGlobal(new Laya.Point(0, 0));
@@ -84,16 +84,19 @@ async function runUIExamples() {
             && Math.abs(bleed.height - Laya.GRoot.inst.height) < 1 && bleed.x === 0 && bleed.y === 0,
             "fullBleed must cover the live viewport");
         const safeRect = rect(safe);
-        within(safeRect, layout.safeArea, "safeContent");
-        assert(Math.abs(safeRect.width - layout.safeArea.width) < 1
-            && Math.abs(safeRect.height - layout.safeArea.height) < 1, "safeContent must fill the safe area");
+        assert(Math.abs(safeRect.x - layout.viewport.x) < 1 && Math.abs(safeRect.y - layout.viewport.y) < 1
+            && Math.abs(safeRect.width - layout.viewport.width) < 1
+            && Math.abs(safeRect.height - layout.viewport.height) < 1,
+        "safeContent must retain the full stage coordinate space");
         const t = rect(top), m = rect(content), b = rect(bottom);
-        assert(Math.abs(t.y - layout.topSafeArea.y) < 1, "top must start below the notch and capsule");
-        assert(Math.abs(b.y + b.height - safeRect.y - safeRect.height) < 1, "bottom must remain anchored");
-        assert(Math.abs(m.y - t.y - t.height) < 1 && Math.abs(m.y + m.height - b.y) < 1,
-            "full content must fill the exact space between top and bottom");
-        assert(Math.abs(m.x - safeRect.x) < 1 && Math.abs(m.width - safeRect.width) < 1,
-            "full content width must follow the safe area");
+        assert(Math.abs(t.x - layout.topSafeArea.x) < 1
+            && Math.abs(t.y - layout.topSafeArea.y) < 1
+            && Math.abs(t.width - layout.topSafeArea.width) < 1,
+        "top must follow the notch and capsule safe area");
+        const currentFixedSlots = { content: m, bottom: b };
+        if (!fixedInventorySlots) fixedInventorySlots = currentFixedSlots;
+        else assert(JSON.stringify(currentFixedSlots) === JSON.stringify(fixedInventorySlots),
+            `safe-area change moved full or bottom ${JSON.stringify({ currentFixedSlots, fixedInventorySlots })}`);
         assert(content.scaleX === 1 && content.scaleY === 1, "scrolling content must resize without scaling rows");
         within(rect(view.frame), t, "header frame");
         within(rect(closeButtonOf(window)), t, "close button");
@@ -155,11 +158,6 @@ async function runUIExamples() {
             Laya.stage.event(Laya.Event.RESIZE);
             await frame();
             layouts.push({ profile: profile.name, ...checkLayout(window) });
-            // 被遮挡页面仍按资源配置调整布局，但保持数据订阅暂停。
-            const statusArea = layoutService.snapshot().topSafeArea;
-            for (const name of ["examplesButton", "rewardButton", "snapshotButton", "replayButton", "inventoryText", "feedbackText"]) {
-                within(rect(status[name]), statusArea, `status ${name}`);
-            }
             const selected = await inspectRow(list, 9);
             click(selected);
             assert(list.selection.index === 9 && view.selectionText.text.includes("010"), `${profile.name}: select after reflow`);
@@ -186,27 +184,28 @@ async function runUIExamples() {
             "centered fullscreen must use mid while preserving its empty full slot");
         const action = centerPane.findChild("actionButton", Laya.GButton);
         const counter = centerPane.findChild("counterText", Laya.GTextField);
-        const centeredScales = [];
+        let fixedCenteredRect;
         let clicks = 0;
         for (const profile of profiles) {
             Object.defineProperty(platform, "viewport", { configurable: true, get: () => profile.viewport });
             Laya.stage.event(Laya.Event.RESIZE);
             await frame();
             const snapshot = layoutService.snapshot(), s = rect(centerSafe), m = rect(centerMid);
-            const top = rect(centerSafe.getChild("top")), bottom = rect(centerSafe.getChild("bottom"));
-            within(m, snapshot.safeArea, "fullscreen mid");
-            assert(Math.abs(m.x + m.width / 2 - s.x - s.width / 2) < 1
-                && Math.abs(m.y + m.height / 2 - s.y - s.height / 2) < 1, "fullscreen mid lost its center");
-            assert(m.y >= top.y + top.height - 1 && m.y + m.height <= bottom.y + 1, "fullscreen mid overlaps edge slots");
+            assert(Math.abs(s.x - snapshot.viewport.x) < 1 && Math.abs(s.y - snapshot.viewport.y) < 1
+                && Math.abs(s.width - snapshot.viewport.width) < 1
+                && Math.abs(s.height - snapshot.viewport.height) < 1,
+            "fullscreen safeContent left the stage coordinate space");
+            const currentCenteredRect = { ...m, scale: centerMid.scaleX };
+            if (!fixedCenteredRect) fixedCenteredRect = currentCenteredRect;
+            else assert(JSON.stringify(currentCenteredRect) === JSON.stringify(fixedCenteredRect),
+                "safe-area change moved fullscreen mid");
             assert(centerPane.width === Laya.GRoot.inst.width && centerPane.height === Laya.GRoot.inst.height
                 && centerPane.scaleX === 1, "fullscreen centered root changed scale or screen coverage");
             within(rect(action), m, "centered action");
             within(rect(closeButtonOf(centered)), m, "centered close button");
             click(action); clicks++;
             assert(counter.text.endsWith(String(clicks)), "empty full slot blocked centered content input");
-            centeredScales.push(centerMid.scaleX);
         }
-        assert(Math.abs(centeredScales[0] - centeredScales.at(-1)) < 0.001, "centered scale did not restore");
         click(closeButtonOf(centered));
         await wait(() => centered.destroyed, "centered native frame close");
         click(view.midExampleButton);
@@ -280,7 +279,8 @@ async function runUIExamples() {
         window.destroy();
         await frame();
         assert(list.itemPool.count === 0 && [...rows].every((row) => row.destroyed), "native rows survived owner destruction");
-        return { passed: true, viewport: `${innerWidth}x${innerHeight}`, layouts, centeredScales, items: 100, renderedRows,
+        return { passed: true, viewport: `${innerWidth}x${innerHeight}`, layouts,
+            centeredRect: fixedCenteredRect, items: 100, renderedRows,
             reopenCycles: 8, confirmation: "cancel / once / owner close", pendingOpen: "cancelled" };
     } finally {
         ui.close(confirmId);

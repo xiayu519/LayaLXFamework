@@ -14,12 +14,12 @@
 
 - UI Prefab 文件名、根节点名及对应 Runtime 类名使用 UI 前缀。启动 UI 资产由游戏维护，放 assets/bootstrap/ui；示例、可复制模板和组件放其 examples/templates/components 对应目录，不另设临时资产分类。移动保留 UUID，复制新 UI 才分配新 UUID；具体归属见资源布局文档。
 
-- 功能选型同时判断是否需要拉伸。全屏列表放 safeContent/full，填满 top 下沿至 bottom 上沿，宽度跟随安全区；改变列表视口，保留行高、字号和 scale=1，不能整体缩放列表适配短屏。固定尺寸居中内容才用 mid。弹窗列表仍属于动画 mid，在 mid 内用 Relation 拉伸。
-- Root/full 覆盖屏幕背景，safeContent/full 填充安全区内上下栏之间的剩余空间，同名节点靠父级确定职责。两个 full 不能导出为同一 Runtime 的同名字段；需要引用时使用 backgroundFull/contentFull 原生属性引用或独立 Runtime 作用域。full 与 mid 都保留。宽高关联使用原生 RelationType.Size；源资产分别声明 Width=1、Height=2，不猜枚举值。
-- 全屏与弹窗的节点及顺序完全相同：Root 下 full、safeContent；safeContent 下 top、full、mid、bottom。全部在 .lh 声明，不裁剪、不由运行时补建。空 top/bottom 高度为 0，空容器使用 mouseThrough 避免拦截输入；填入内容时设置所需设计高度与关系。safeContent 适配安全区，top 避开胶囊，bottom 贴安全区底部。弹窗全部面板内容放 mid，并在避开胶囊的安全区域内居中；全屏 mid 保持安全区中心并避让上下区域。
+- 功能选型同时判断是否需要拉伸。全屏列表放 safeContent/full，在 `.lh` 中声明位置、尺寸和所需 Relation；改变列表视口时保留行高、字号和 scale=1，不能整体缩放列表适配短屏。固定内容可放 mid，但 fullscreen 不自动居中它。弹窗列表属于动画 mid，在 mid 内用 Relation 拉伸。
+- Root/full 覆盖屏幕背景，safeContent 铺满舞台并只作为 top/full/mid/bottom 的结构容器；safeContent/full 保持源资产布局。同名节点靠父级确定职责。两个 full 不能导出为同一 Runtime 的同名字段；需要引用时使用 backgroundFull/contentFull 原生属性引用或独立 Runtime 作用域。full 与 mid 都保留。宽高关联使用原生 RelationType.Size；源资产分别声明 Width=1、Height=2，不猜枚举值。
+- 全屏与弹窗的节点及顺序完全相同：Root 下 full、safeContent；safeContent 下 top、full、mid、bottom。全部在 .lh 声明，不裁剪、不由运行时补建。空 top/bottom 高度为 0，空容器使用 mouseThrough 避免拦截输入；填入内容时设置所需设计高度与关系。fullscreen 只让 top 避开刘海或小游戏胶囊，full、mid、bottom 不因平台安全区重排。弹窗全部面板内容放 mid，并在 `topSafeArea` 内居中。
 - 场景使用 uiRoot 内的局部 Sprite 遮罩，应用复用 GRoot.modalLayer，均放在最高模态窗口正下方。Popup 模板静态设置 modal: true、closeOnMaskClick: true；单独切换 layout 不覆盖其他属性；禁用点击关闭只设置后者为 false。modal: false 可由 full 内全屏按钮自定义关闭，但不能移除其他窗口的遮罩。透明 Root/safeContent 穿透到 Mask，mid 内点击不触发 Mask；不要重复叠加暗色背景，也不为每个场景创建 GRoot。
 - 先选骨架，再按数据形态选纵向列表或网格。模板复制到当前业务资产目录时生成新 UUID，保留本资产内部引用；引用视觉 Prefab 时复用其 UUID，不复制脚本注册 ID 或业务 route ID。
-- 按示意图使用已有散图拼装独立节点，分别处理底板、图标、文字和按钮；清点缺少的素材及来源。固定内容保留在 .lh，尺寸关系用原生 Relation，安全区换算交给布局服务。
+- 按示意图使用已有散图拼装独立节点，分别处理底板、图标、文字和按钮；清点缺少的素材及来源。固定内容保留在 .lh，尺寸关系用原生 Relation；布局服务只为 top 换算平台顶部安全区。
 - GList 的 itemRenderer 完整刷新复用状态，先 setVirtual 再设置 numItems；模板含 Scroller 和 itemTemplate。按稳定业务 ID 更新数据，不保存某个显示行作为长期数据身份。
 - 节点引用优先 Runtime + IDE 生成字段，少量引用用静态 Script 的 @property；生成文件不手改，不额外建立 Binder。构造期间不能访问尚未反序列化的引用；Native Runtime 可继承符合该根节点类型的业务基类，不为使用生成代码强行增加转发层。
 - 窗口根静态挂载启用 UIViewLifecycle，在 IDE 配置 layout/layer/openMode/modal/closeOnMaskClick/multiplicity/retention。场景注册 UIViewRoute 只提供 id/url 和可选 bind/onClosed；未提供 bind 默认执行静态 Runtime.onBind，需要依赖时 bind 调用并返回它。Runtime 负责逻辑及原生导出字段，可编辑参数放静态 Script，不把 Runtime 新增属性当作 IDE 可保存字段。openMode:replace/stack 只决定全屏关闭下层或叠加；弹窗强制 stack，modal 独立决定输入遮挡。replace 页需显式返回流程；父展示拥有的全屏子 UI 使用 stack。展示事件归 session.lifetime，关闭调用 session.close()；子窗口用 session.show，独立场景窗口用 session.ui.show。应用窗口保留 BaseGameWindow 的 presentation/onClosed；嵌套 frame.closeButton 需显式绑定。
@@ -31,9 +31,9 @@
 
 以下是各风险的验收要求，按本次实际影响选择。只有布局/宿主矩形、安全区换算、行几何或可改变尺寸的资源发生变化时才做对应分辨率测试。纯命名、事件订阅、取消与资源释放用相关类型/依赖/生命周期探针，不能把窗口制作的整套矩阵作为所有 UI 修改的固定收尾；布局输入未变时保留其已有通过证据。
 
-- 根据用户需求先列期望结构，再扫描项目全部窗口 .lh，检查节点完整性与精确顺序、内容归属、引用和脚本绑定；禁止从已写实现反推验收要求。示例必须同时覆盖全屏 full 拉伸、全屏 mid 居中和弹窗 mid 动画；装饰窗框不充当窗口示例。
+- 根据用户需求先列期望结构，再扫描项目全部挂载 UIViewLifecycle 的窗口 .lh，检查节点完整性与精确顺序、内容归属、引用和脚本绑定；`validate:assets` 同时拒绝 Runtime 创建固定显示节点或重写静态坐标。禁止从已写实现反推验收要求。示例必须同时覆盖 fullscreen 只移动 top、其他槽位保持源坐标和弹窗 mid 动画；装饰窗框不充当窗口示例。
 - 验证 Runtime/属性引用真实反序列化、两个 full 无字段冲突、场景内页面和弹窗不受 Camera2D 影响；覆盖应用/场景/父展示归属、跨 owner 单例、父关子关、独立场景弹窗保留、隐藏缓存和待加载清理。数据与红点覆盖首次快照、同帧合并、暂停恢复、列表重绑、界面离开后的业务结果及旧回调失效。
 - 动画实际只改变 mid；Root/full 与宿主遮罩尺寸和缩放稳定。覆盖开合、重复关闭、销毁、动画期间 resize 及旧回调失效。
 - 用真实鼠标事件验证 Mask 只关闭最上层可交互模态窗口、关闭动画期间重复点击不误关下层、禁用点击关闭、modal:false 自定义关闭与堆叠恢复；关闭后钩子按生命周期执行。
-- 多分辨率检查顶部避让、底部定位、mid 居中与缩小恢复；列表验证 full 紧贴上下栏、无多余空隙，行高/字号/scale 不变，视口和可见行数随剩余空间变化。视觉与点击区域均不越界、不覆盖；虚拟列表检查滚动复用、选择更新和池回收。
+- 多分辨率检查普通环境 top 不偏移、刘海/胶囊环境只移动 top、full/mid/bottom 不发生安全区重排；center-popup 单独检查 mid 居中与缩小恢复。列表保持源资产声明的行高、字号和 scale；视觉与点击区域均不越界、不覆盖，虚拟列表检查滚动复用、选择更新和池回收。
 - 规则验证与实际模板/引擎验证分别报告。Skill 路由命中不等于执行正确；模拟安全区不等于真机验收。

@@ -90,7 +90,7 @@ owner 决定生命周期，host 决定实际父节点，layout 决定适配。�
 
 场景窗口的 layer、layout、openMode、modal、closeOnMaskClick、multiplicity、retention 在 Prefab 根节点的 UIViewLifecycle 静态组件中配置；UIViewRoute 只保留 id/url、可选 bind 与 onClosed(view,args)。Popup 模板预置模态和空白点击关闭；场景用 uiRoot 内的局部 Sprite 遮罩，应用用原生 GRoot.modalLayer，都放在最高可见模态窗口正下方。框架按层级与展示请求顺序设置有界 zOrder，并同步原生子节点顺序；内部 top/full/mid/bottom 不代替窗口层级。应用关闭钩子使用 BaseGameWindow.onClosed()，均不假定关闭后节点仍可用。
 
-场景 UIViewLifecycle 显式选择 fullscreen 或 center-popup，不用 layer 推断布局。应用 GWindow 的 UIRoute 保留独立配置，并支持 safe-screen。窗口固定 Root 下 full、safeContent；safeContent 下依次为 top、full、mid、bottom。节点始终保留，空 top/bottom 高度为 0，空容器不拦截输入。center-popup 只对 mid 播放缩放开合动画，全屏布局不播放；关闭/销毁取消旧 Tween，并隔离晚到回调。UILayoutService 以运行时逻辑尺寸为边界换算平台坐标，项目可自由选择设计分辨率；完整约定见 [ui-layout.md](ui-layout.md)。
+场景 UIViewLifecycle 显式选择 fullscreen 或 center-popup，不用 layer 推断布局。应用 GWindow 的 UIRoute 保留独立配置，并支持 safe-screen。窗口固定 Root 下 full、safeContent；safeContent 下依次为 top、full、mid、bottom。节点始终保留，空 top/bottom 高度为 0，空容器不拦截输入。fullscreen 的平台安全区只移动 top，其他槽位保持源资产布局；center-popup 只对 mid 做安全区适配与缩放开合动画。关闭/销毁取消旧 Tween，并隔离晚到回调。UILayoutService 以运行时逻辑尺寸为边界换算平台坐标，项目可自由选择设计分辨率；完整约定见 [ui-layout.md](ui-layout.md)。
 
 `register/registerView` 返回保留参数类型的 route，`show(route,args,{signal})` 检查参数；字符串入口不具有同等类型保证。原生 `bind(view,args,session)` 提供展示期 lifetime/token、子窗口 show 和数据/红点绑定。同步赋值直接执行，跨 await 的表现回写检查 token；业务结果先落独立模型，不因 UI 离开丢失。取消只结束框架等待，不可取消的原生加载继续被追踪，晚到完成不能重新显示已离场 UI。
 

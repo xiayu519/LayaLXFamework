@@ -85,7 +85,7 @@ if (scene) {
 }
 ```
 
-坐标采用 Laya Stage 逻辑单位；宿主祖先保持无变换的屏幕坐标空间。宿主不重复扣安全区，安全区只应用在窗口骨架的 safeContent 内。全屏页面、HUD、场景独立弹窗都归该宿主；跨场景 Loading 等应用窗口进入原生 GRoot。
+坐标采用 Laya Stage 逻辑单位；宿主祖先保持无变换的屏幕坐标空间。宿主不重复扣安全区，fullscreen 只把顶部避让应用到 safeContent/top，其他槽位保持源资产布局。全屏页面、HUD、场景独立弹窗都归该宿主；跨场景 Loading 等应用窗口进入原生 GRoot。
 
 场景在 onPrepare(context) 内可通过 `this.ui.show(route, context.args, { signal: context.signal })` 打开 UI，也可在 onWaitUntilReady(context) 等待首屏展示。根 Runtime、节点导出和静态 UIViewLifecycle 来自 .lh，注册只声明 id/url，需要额外依赖注入时增加 bind。场景销毁清理可见、隐藏缓存、父展示子 UI 和待加载，再等待异步收尾。详见 [UI 布局与归属](ui-layout.md)。
 

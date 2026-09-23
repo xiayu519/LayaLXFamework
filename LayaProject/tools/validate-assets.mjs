@@ -2,6 +2,8 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, extname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { resolveComponentScript } from "./asset-script-reference.mjs";
+import { collectStaticUIRuntimeFailures,
+    collectStaticUIViewAssetFailures } from "./ui-static-contract.mjs";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const assetsRoot = join(projectRoot, "assets");
@@ -54,6 +56,8 @@ function visit(value, callback) {
 const allFiles = walk(assetsRoot);
 const metadataFiles = allFiles.concat(walk(sourceRoot)).filter((file) => file.endsWith(".meta"));
 const metaByUuid = new Map();
+const lifecycleScriptPath = resolve(sourceRoot, "framework", "presentation", "ui", "UIViewLifecycle.ts");
+const staticUIRuntimes = new Map();
 for (const path of metadataFiles) {
     const meta = readJson(path);
     if (!meta || typeof meta.uuid !== "string") {
@@ -88,6 +92,7 @@ for (const path of hierarchyFiles) {
 
     const ids = new Set();
     const refs = [];
+    let hasRootLifecycle = false;
     visit(asset, (node) => {
         if (typeof node._$id === "string") {
             if (ids.has(node._$id)) {
@@ -112,11 +117,13 @@ for (const path of hierarchyFiles) {
                 continue;
             }
             try {
-                resolveComponentScript(assetsRoot, path, component.scriptPath, component._$type, (scriptPath) => {
-                    const metaPath = `${scriptPath}.meta`;
-                    if (!existsSync(scriptPath) || !existsSync(metaPath)) return undefined;
-                    return readJson(metaPath)?.uuid;
-                });
+                const resolvedScript = resolveComponentScript(
+                    assetsRoot, path, component.scriptPath, component._$type, (scriptPath) => {
+                        const metaPath = `${scriptPath}.meta`;
+                        if (!existsSync(scriptPath) || !existsSync(metaPath)) return undefined;
+                        return readJson(metaPath)?.uuid;
+                    });
+                if (node === asset && resolvedScript === lifecycleScriptPath) hasRootLifecycle = true;
             } catch (error) {
                 failures.push(`${localPath}: ${error.message}`);
             }
@@ -126,6 +133,31 @@ for (const path of hierarchyFiles) {
         if (!ids.has(ref)) {
             failures.push(`${localPath}: unresolved local _$ref '${ref}'.`);
         }
+    }
+    if (hasRootLifecycle) {
+        for (const failure of collectStaticUIViewAssetFailures(asset)) {
+            failures.push(`${localPath}: ${failure}`);
+        }
+        const runtimeUuid = typeof asset._$runtime === "string"
+            ? asset._$runtime.replace(/^res:\/\//, "") : undefined;
+        const runtimeMeta = runtimeUuid ? metaByUuid.get(runtimeUuid) : undefined;
+        if (runtimeMeta) {
+            if (!runtimeMeta.endsWith(".ts.meta")) {
+                failures.push(`${localPath}: UIViewLifecycle Runtime must resolve to a TypeScript source file.`);
+            } else {
+                const runtimePath = resolve(projectRoot, runtimeMeta.slice(0, -".meta".length));
+                const owners = staticUIRuntimes.get(runtimePath) ?? [];
+                owners.push(localPath);
+                staticUIRuntimes.set(runtimePath, owners);
+            }
+        }
+    }
+}
+
+for (const [runtimePath, owners] of staticUIRuntimes) {
+    const runtimeLocalPath = relative(projectRoot, runtimePath);
+    for (const failure of collectStaticUIRuntimeFailures(readFileSync(runtimePath, "utf8"), runtimeLocalPath)) {
+        failures.push(`${runtimeLocalPath}: ${failure} Referenced by ${owners.join(", ")}.`);
     }
 }
 

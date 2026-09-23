@@ -27,15 +27,15 @@ assets/bootstrap/ui/
 
 | 模板 | 路径 | 结构与用途 |
 | --- | --- | --- |
-| Fullscreen | [UIFullscreen.lh](../assets/bootstrap/ui/examples/templates/UIFullscreen.lh) | 固定 full + safeContent(top/full/mid/bottom)，顺序不变，不用的槽位留空。拉伸内容放 full，固定居中内容放 mid。UIViewLifecycle.layout = fullscreen。 |
+| Fullscreen | [UIFullscreen.lh](../assets/bootstrap/ui/examples/templates/UIFullscreen.lh) | 固定 full + safeContent(top/full/mid/bottom)，顺序不变，不用的槽位留空。内容放 full，固定内容放 mid；fullscreen 只自动移动 top。UIViewLifecycle.layout = fullscreen。 |
 | Popup | [UIPopup.lh](../assets/bootstrap/ui/examples/templates/UIPopup.lh) | 与全屏相同的完整骨架；mid 默认 560×390。面板内容全部放 mid，其余槽位留空保留。UIViewLifecycle.layout = center-popup；框架只动画 mid。 |
 
 ```text
 Root（所有窗口共用）
 ├─ full（背景或自定义全屏按钮）
-└─ safeContent（平台安全区）
+└─ safeContent（舞台结构容器）
    ├─ top（空槽位高度 0）
-   ├─ full（上下栏之间的拉伸内容）
+   ├─ full（保持源资产布局的内容）
    ├─ mid（固定居中内容／弹窗动画）
    └─ bottom（空槽位高度 0）
 ```
@@ -50,7 +50,7 @@ Root（所有窗口共用）
 | 物品网格 | [UIVirtualGrid.lh](../assets/bootstrap/ui/examples/templates/UIVirtualGrid.lh) | GList、FlowX、默认三列、纵向 Scroller、行列间距与单选；列数可调整 |
 | 默认列表项 | [UIListItem.lh](../assets/bootstrap/ui/examples/templates/UIListItem.lh) | 原生 GButton，Radio 选择模式、标题、选中边框；不含业务 Runtime |
 
-全屏列表选择 safeContent/full，并通过宽高 Relation 填充 top 与 bottom 间的剩余空间，保持行高、字号及 scale=1。弹窗列表归 safeContent/mid；固定尺寸居中内容才选 mid。Root/full 保持全屏背景职责。
+全屏列表选择 safeContent/full，并在源资产中设置坐标与所需 Relation，保持行高、字号及 scale=1。安全区只自动移动 top；弹窗列表归 safeContent/mid。Root/full 保持全屏背景职责。
 
 将功能模板引用或规范复制到窗口的内容区，按需求替换行模板的图标、文字和 Runtime。资产已声明 Scroller 和 itemTemplate，运行时绑定原生 API：
 
@@ -77,7 +77,7 @@ session.lifetime.defer(() => list.off(Laya.UIEvent.ClickItem, view, select));
 - [UIActionButton.lh](../assets/bootstrap/ui/examples/components/UIActionButton.lh)：按钮样式组件。
 - [UIPanelChrome.lh](../assets/bootstrap/ui/examples/components/UIPanelChrome.lh)：底板、标题和关闭按钮的装饰组件，不是窗口骨架。
 - [UIInventoryItem.lh](../assets/bootstrap/ui/examples/components/UIInventoryItem.lh)：带数量和稳定 ID 的业务行示例。
-- [UIInventory.lh](../assets/bootstrap/ui/examples/UIInventory.lh)：已明确选择全屏的组合示例，top 标题、safeContent/full 自适应列表、bottom 操作区。
+- [UIInventory.lh](../assets/bootstrap/ui/examples/UIInventory.lh)：已明确选择全屏的组合示例，top 标题、safeContent/full 列表、bottom 操作区；平台安全区只移动 top。
 - [UIConfirmation.lh](../assets/bootstrap/ui/examples/UIConfirmation.lh)：弹窗组合示例，全屏 Root 下的 safeContent/mid 包含全部控件。
 - [UIFullscreenMid.lh](../assets/bootstrap/ui/examples/UIFullscreenMid.lh)：全屏 mid 示例，中央面板复用 PanelChrome。由背包中的“居中展示”按钮打开，展示居中、缩小恢复与按钮交互。
 
@@ -97,7 +97,7 @@ session.lifetime.defer(() => list.off(Laya.UIEvent.ClickItem, view, select));
 
 ## 可重复验收
 
-`npm test -- tests/framework/UIWindowTemplates.test.ts` 检查骨架与功能模板声明，`npm run validate:assets:laya` 使用官方解析器。
+`npm test -- tests/framework/UIWindowTemplates.test.ts tests/workflow/UIStaticContract.test.ts` 检查模板及静态 UI 契约，`npm run validate:assets:laya` 扫描所有挂载 UIViewLifecycle 的游戏窗口、对应 Runtime，并使用官方解析器。
 
 `npm run test:headless -- --suite framework --probe tests/game/logic/ui-templates.browser.mjs` 构建并验证模板组合、mid 动画和虚拟列表/网格。构建不变时，可运行 `node tests/game/logic/ui-examples-resolutions.mjs` 复用发布目录进行八分辨率验收。
 

@@ -1,6 +1,6 @@
 # 可调用 UI 示例
 
-启动模板后点击 **打开旅行背包**，进入旅行背包；顶部的 **居中展示** 打开中央面板。三个窗口分别演示全屏 full 拉伸列表、全屏 mid 居中面板、弹窗 mid 动画，全部保留完整骨架。列表提供选择、确认使用、取消、重置与重开；中央面板提供计数和返回。库存属于账号，登录消息先于 World 初始化；大厅、背包与战斗页共享，关闭窗口或切换 World 不清空数据。
+启动模板后点击 **打开旅行背包**，进入旅行背包；顶部的 **居中展示** 打开中央面板。三个窗口分别演示 fullscreen 只移动 top、其他槽位保持源资产布局和弹窗 mid 动画，全部保留完整骨架。列表提供选择、确认使用、取消、重置与重开；中央面板提供计数和返回。库存属于账号，登录消息先于 World 初始化；大厅、背包与战斗页共享，关闭窗口或切换 World 不清空数据。
 
 状态页可以模拟 6 秒后奖励到账、全量快照和旧包重放。初始 100 种物品各 3 件，两个入口红点都显示可用物品总量 300；选择行不改变计数。发出奖励后关闭背包或进入战斗，应用补给服务仍会更新库存，重新打开读取最新快照。详细数据流见 [数据绑定](ui-data-binding.md)。
 
@@ -55,12 +55,12 @@ await this.ui.show(inventoryRoute, { title: "旅行背包" });
 - [UIActionButton.lh](../assets/bootstrap/ui/examples/components/UIActionButton.lh)：原生 `GButton`、标题绑定和相对尺寸。
 - [UIPanelChrome.lh](../assets/bootstrap/ui/examples/components/UIPanelChrome.lh)：标题、关闭按钮与底板。全屏页的顶部标题区和确认弹窗引用同一个 Prefab，尺寸变化由 Relation 处理。
 - [UIInventoryItem.lh](../assets/bootstrap/ui/examples/components/UIInventoryItem.lh)：Radio 模式 `GButton`，由原生 `button` Controller 和 `GearDisplay` 展示选中边框。
-- [UIInventory.lh](../assets/bootstrap/ui/examples/UIInventory.lh)：完整声明 `full + safeContent(top / full / mid / bottom)`，mid 留空；标题和汇总归 top，虚拟列表归 safeContent/full，选择信息和操作按钮归 bottom。列表随上下区域和安全区拉伸，行高与字号不变；源资产声明 Scroller、模板节点及宽高 Relation。
+- [UIInventory.lh](../assets/bootstrap/ui/examples/UIInventory.lh)：完整声明 `full + safeContent(top / full / mid / bottom)`，mid 留空；标题和汇总归 top，虚拟列表归 safeContent/full，选择信息和操作按钮归 bottom。平台安全区只移动 top；列表和底部保持源资产布局，行高与字号不变。
 - [UIConfirmation.lh](../assets/bootstrap/ui/examples/UIConfirmation.lh)：根尺寸 `720×1280` 随屏幕拉伸，safeContent/mid 为 `560×390` 内容画布，对应 `center-popup`；frame、文字和按钮全部归入 mid，只有 mid 做开合动画。
 - [UIBattle.lh](../assets/bootstrap/ui/examples/UIBattle.lh)：战斗全屏页面，完整骨架、共享库存显示与返回大厅按钮。
 - [UIFullscreenMid.lh](../assets/bootstrap/ui/examples/UIFullscreenMid.lh)：全屏居中面板，top/bottom 放说明，full 留空，mid 复用 PanelChrome 并提供计数交互。
 
-所有窗口固定 Root/full、safeContent(top/full/mid/bottom)，未使用的节点留空。PanelChrome 提供底板、标题和关闭按钮，分别在 Inventory/top、FullscreenMid/mid、Confirmation/mid 复用；窗口显式绑定其嵌套 closeButton。固定节点始终来自 `.lh`。底部按钮通过 Relation 在侧边安全区收窄时保持间距。
+所有窗口固定 Root/full、safeContent(top/full/mid/bottom)，未使用的节点留空。PanelChrome 提供底板、标题和关闭按钮，分别在 Inventory/top、FullscreenMid/mid、Confirmation/mid 复用；窗口显式绑定其嵌套 closeButton。固定节点始终来自 `.lh`。底部按钮通过 Relation 在舞台尺寸变化时保持间距。
 
 ## 动态图标
 
@@ -113,7 +113,7 @@ ui-framework.browser.mjs 聚焦原生绑定、宿主、场景归属与数据生�
 
 模板专项探针通过浏览器鼠标事件验证启动入口、虚拟列表选择、确认/取消、模态阻挡、重复确认、父窗口关闭、8 次重开及立即取消打开。全屏 mid 示例在同一实例上切换安全区，验证居中、缩小恢复、按钮点击、返回与重开。扫描和运行时同时检查完整节点顺序，保留错误、404 和完整 owner 停机检查。
 
-分辨率矩阵复用上述构建，最多同时运行 2 个 Headless 浏览器，覆盖 `320×568`、`360×640`、`375×667`、`390×844`、`412×915`、`600×800`、`768×1024`、`1280×720`。每个视口均切换普通、刘海/胶囊、侧边安全区和恢复场景，断言槽位归属、背景覆盖、列表上下拉伸、固定行高/字号、底部定位、无重叠/越界，以及重排后的选择、弹窗和重置点击。项目 `screenMode: vertical` 会按引擎规则旋转横向浏览器视口；这验证的是本项目竖屏适配。
+分辨率矩阵复用上述构建，最多同时运行 2 个 Headless 浏览器，覆盖 `320×568`、`360×640`、`375×667`、`390×844`、`412×915`、`600×800`、`768×1024`、`1280×720`。每个视口均切换普通、刘海/胶囊、侧边安全区和恢复场景，断言槽位归属、背景覆盖、top 避让、其他槽位不受安全区重排、固定行高/字号以及实际交互。项目 `screenMode: vertical` 会按引擎规则旋转横向浏览器视口；这验证的是本项目竖屏适配。
 
 单个尺寸可复查：`node tools/test-browser.mjs --suite targeted --probe tests/game/logic/ui-examples.browser.mjs --viewport 390x844`。`--viewport` 设置真实浏览器 CSS 视口；平台刘海和胶囊数据由探针模拟，结束后恢复。
 

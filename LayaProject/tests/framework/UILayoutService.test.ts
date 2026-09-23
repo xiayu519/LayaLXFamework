@@ -107,41 +107,12 @@ describe("UILayoutService", () => {
         expect(local.safeArea).toEqual({ x: 10, y: 0, width: 590, height: 1180 });
         expect(local.topSafeArea).toEqual({ x: 10, y: 28, width: 590, height: 1152 });
     });
-    it.each(["fullscreen", "center-popup"] as const)("adapts all retained empty slots for %s", async mode => {
-        root.width = stage.width = 720; root.height = stage.height = 1280;
-        vi.stubGlobal("Laya", { GWidget: FakeWidget, GRoot: { inst: root }, stage });
-        const { UILayoutService } = await import("../../src/framework/presentation/ui/UILayoutService");
-        const layout = new UILayoutService(createPlatform({ width: 720, height: 1280,
-            safeArea: { x: 20, y: 40, width: 680, height: 1200 },
-            topRightAvoidance: { x: 600, y: 48, width: 100, height: 32 },
-        }));
-        const pane = sized(new FakeWidget(), 720, 1280);
-        const background = pane.addNamedChild("full", sized(new FakeWidget(), 720, 1280));
-        const safe = pane.addNamedChild("safeContent", sized(new FakeWidget(), 720, 1280));
-        const top = safe.addNamedChild("top", sized(new FakeWidget(), 720, 0));
-        const full = safe.addNamedChild("full", sized(new FakeWidget(), 720, 1280));
-        const mid = safe.addNamedChild("mid", sized(new FakeWidget(), 560, 390));
-        const bottom = safe.addNamedChild("bottom", sized(new FakeWidget(), 720, 0));
-        const window = new FakeWindow(pane);
-        layout.apply(window as unknown as Laya.GWindow, mode);
-        expect(top).toMatchObject({ y: 48, height: 0, width: 680 });
-        expect(bottom).toMatchObject({ y: 1200, height: 0, width: 680 });
-        expect(full).toMatchObject({ x: 0, y: 48, width: 680, height: 1152, scaleX: 1, scaleY: 1 });
-        expect(mid).toMatchObject({ width: 560, height: 390, x: 60, scaleX: 1 });
-        expect(mid.y).toBe(mode === "fullscreen" ? 405 : 429);
-        root.width = stage.width = 540; root.height = stage.height = 960;
-        layout.apply(window as unknown as Laya.GWindow, mode);
-        expect(background).toMatchObject({ width: 540, height: 960 });
-        expect(top.height).toBe(0); expect(bottom.height).toBe(0);
-        expect(full).toMatchObject({ y: 38, width: 510, height: 862, scaleX: 1 });
-    });
-    it("stretches safeContent/full between moving top and bottom without scaling list content", async () => {
+    it("moves only top for fullscreen safe-area adaptation", async () => {
         root.width = stage.width = 720; root.height = stage.height = 1280;
         vi.stubGlobal("Laya", { GWidget: FakeWidget, GRoot: { inst: root }, stage, Event: { RESIZE: "resize" } });
-        const viewport = {
-            width: 720, height: 1280,
+        const viewport = { width: 720, height: 1280,
             safeArea: { x: 20, y: 40, width: 680, height: 1200 },
-            topRightAvoidance: { x: 580, y: 48, width: 120, height: 32 },
+            topRightAvoidance: { x: 600, y: 48, width: 100, height: 32 },
         };
         const { UILayoutService } = await import("../../src/framework/presentation/ui/UILayoutService");
         const layout = new UILayoutService(createPlatform(viewport));
@@ -149,26 +120,52 @@ describe("UILayoutService", () => {
         const background = pane.addNamedChild("full", sized(new FakeWidget(), 720, 1280));
         const safe = pane.addNamedChild("safeContent", sized(new FakeWidget(), 720, 1280));
         const top = safe.addNamedChild("top", sized(new FakeWidget(), 720, 184));
-        const full = safe.addNamedChild("full", sized(new FakeWidget(), 720, 888));
+        const full = safe.addNamedChild("full", sized(new FakeWidget(), 680, 888));
+        const mid = safe.addNamedChild("mid", sized(new FakeWidget(), 560, 390));
         const bottom = safe.addNamedChild("bottom", sized(new FakeWidget(), 720, 208));
+        Object.assign(full, { x: 20, y: 184 });
+        Object.assign(mid, { x: 80, y: 445 });
+        Object.assign(bottom, { x: 0, y: 1072 });
         const window = new FakeWindow(pane);
-        const check = () => {
-            layout.apply(window as unknown as Laya.GWindow, "fullscreen");
-            expect(full).toMatchObject({ x: 0, y: top.y + top.height, width: safe.width, scaleX: 1, scaleY: 1 });
-            expect(full.y + full.height).toBeCloseTo(bottom.y);
-            expect(background).toMatchObject({ x: 0, y: 0, width: stage.width, height: stage.height });
-            return full.height;
+        const checkFixedSlots = (): void => {
+            expect(full).toMatchObject({ x: 20, y: 184, width: 680, height: 888, scaleX: 1, scaleY: 1 });
+            expect(mid).toMatchObject({ x: 80, y: 445, width: 560, height: 390, scaleX: 1, scaleY: 1 });
+            expect(bottom).toMatchObject({ x: 0, y: 1072, width: 720, height: 208, scaleX: 1, scaleY: 1 });
         };
-        const initial = check();
+
+        layout.apply(window as unknown as Laya.GWindow, "fullscreen");
+        expect(safe).toMatchObject({ x: 0, y: 0, width: 720, height: 1280 });
+        expect(top).toMatchObject({ x: 20, y: 88, width: 680, height: 184 });
+        expect(background).toMatchObject({ x: 0, y: 0, width: 720, height: 1280 });
+        checkFixedSlots();
+
         viewport.topRightAvoidance.y += 32;
-        expect(check()).toBeCloseTo(initial - 32);
+        layout.apply(window as unknown as Laya.GWindow, "fullscreen");
+        expect(top.y).toBe(120);
+        checkFixedSlots();
+
         root.height = stage.height = viewport.height = 960;
         viewport.safeArea.height = 880;
-        expect(check()).toBeCloseTo(initial - 352);
-        root.height = stage.height = viewport.height = 1280;
-        viewport.safeArea.height = 1200;
-        viewport.topRightAvoidance.y -= 32;
-        expect(check()).toBeCloseTo(initial);
+        layout.apply(window as unknown as Laya.GWindow, "fullscreen");
+        expect(safe).toMatchObject({ x: 0, y: 0, width: 720, height: 960 });
+        expect(background).toMatchObject({ x: 0, y: 0, width: 720, height: 960 });
+        checkFixedSlots();
+    });
+    it("does not offset top when the platform reports no safe-area geometry", async () => {
+        root.width = stage.width = 640; root.height = stage.height = 480;
+        vi.stubGlobal("Laya", { GWidget: FakeWidget, GRoot: { inst: root }, stage });
+        const { UILayoutService } = await import("../../src/framework/presentation/ui/UILayoutService");
+        const layout = new UILayoutService(createPlatform({ width: 640, height: 480 }));
+        const pane = sized(new FakeWidget(), 640, 480);
+        const safe = pane.addNamedChild("safeContent", sized(new FakeWidget(), 640, 480));
+        const top = safe.addNamedChild("top", sized(new FakeWidget(), 640, 64));
+        const full = safe.addNamedChild("full", sized(new FakeWidget(), 640, 340));
+        Object.assign(full, { x: 0, y: 47 });
+
+        layout.apply(new FakeWindow(pane) as unknown as Laya.GWindow, "fullscreen");
+
+        expect(top).toMatchObject({ x: 0, y: 0, width: 640, height: 64 });
+        expect(full).toMatchObject({ x: 0, y: 47, width: 640, height: 340 });
     });
     it("requires popup mid, fits all its contents uniformly and restores the design size", async () => {
         root.width = stage.width = 400; root.height = stage.height = 600;
@@ -216,7 +213,7 @@ describe("UILayoutService", () => {
         expect(safeContent).toMatchObject({ x: 0, y: 0, width: 720, height: 1280 });
     });
 
-    it("uses the live GRoot size and applies safe top, middle, and bottom slots", async () => {
+    it("uses the live GRoot size and applies the safe area only to top", async () => {
         root.width = stage.width = 750;
         root.height = stage.height = 1624;
         vi.stubGlobal("Laya", {
@@ -247,14 +244,14 @@ describe("UILayoutService", () => {
         expect(window).toMatchObject({ x: 0, y: 0, width: 750, height: 1624 });
         expect(pane).toMatchObject({ x: 0, y: 0, width: 750, height: 1624 });
         expect(fullBleed).toMatchObject({ x: 0, y: 0, width: 750, height: 1624 });
-        expect(safeContent).toMatchObject({ x: 0, y: 88, width: 750, height: 1468 });
-        expect(top).toMatchObject({ x: 0, y: 80, width: 750, height: 100 });
-        expect(middle).toMatchObject({ x: 73, y: 549, width: 604, height: 370 });
-        expect(bottom).toMatchObject({ x: 0, y: 1348, width: 750, height: 120 });
+        expect(safeContent).toMatchObject({ x: 0, y: 0, width: 750, height: 1624 });
+        expect(top).toMatchObject({ x: 0, y: 168, width: 750, height: 100 });
+        expect(middle).toMatchObject({ x: 0, y: 0, width: 604, height: 370, scaleX: 1, scaleY: 1 });
+        expect(bottom).toMatchObject({ x: 0, y: 0, width: 750, height: 120 });
         expect(layout.snapshot().topSafeArea.y).toBe(168);
     });
 
-    it("uniformly scales middle content to fit a narrow safe area", async () => {
+    it("preserves authored middle coordinates across fullscreen resizes", async () => {
         root.width = stage.width = 540;
         root.height = stage.height = 960;
         vi.stubGlobal("Laya", {
@@ -269,62 +266,17 @@ describe("UILayoutService", () => {
         const pane = sized(new FakeWidget(), 720, 1280);
         const safeContent = pane.addNamedChild("safeContent", sized(new FakeWidget(), 720, 1280));
         const middle = safeContent.addNamedChild("mid", sized(new FakeWidget(), 604, 370));
+        Object.assign(middle, { x: 58, y: 455 });
         const window = new FakeWindow(pane);
 
         layout.apply(window as unknown as Laya.GWindow, "fullscreen");
 
-        const expectedScale = 540 / 604;
-        expect(middle).toMatchObject({ width: 604, height: 370, x: 0 });
-        expect(middle.scaleX).toBeCloseTo(expectedScale);
-        expect(middle.scaleY).toBeCloseTo(expectedScale);
-        expect(middle.y).toBeCloseTo((960 - 370 * expectedScale) / 2);
+        expect(middle).toMatchObject({ width: 604, height: 370, x: 58, y: 455, scaleX: 1, scaleY: 1 });
 
         root.width = stage.width = 720;
         root.height = stage.height = 1280;
         layout.apply(window as unknown as Laya.GWindow, "fullscreen");
         expect(middle).toMatchObject({ width: 604, height: 370, x: 58, y: 455, scaleX: 1, scaleY: 1 });
-    });
-
-    it("keeps a centered middle clear of top and bottom slots across short screens and capsule changes", async () => {
-        root.width = stage.width = 720;
-        root.height = stage.height = 960;
-        vi.stubGlobal("Laya", {
-            GWidget: FakeWidget, GRoot: { inst: root }, stage, Event: { RESIZE: "resize" },
-        });
-        const viewport = {
-            width: 720, height: 960,
-            safeArea: { x: 0, y: 40, width: 720, height: 880 },
-            topRightAvoidance: { x: 540, y: 48, width: 160, height: 64 },
-        };
-        const { UILayoutService } = await import("../../src/framework/presentation/ui/UILayoutService");
-        const layout = new UILayoutService(createPlatform(viewport));
-        const pane = sized(new FakeWidget(), 720, 1280);
-        const safe = pane.addNamedChild("safeContent", sized(new FakeWidget(), 720, 1280));
-        const top = safe.addNamedChild("top", sized(new FakeWidget(), 720, 184));
-        const middle = safe.addNamedChild("mid", sized(new FakeWidget(), 640, 680));
-        const bottom = safe.addNamedChild("bottom", sized(new FakeWidget(), 720, 208));
-        const window = new FakeWindow(pane);
-        const check = (): void => {
-            layout.apply(window as unknown as Laya.GWindow, "fullscreen");
-            expect(middle.y).toBeGreaterThanOrEqual(top.y + top.height - 0.001);
-            expect(middle.y + middle.height * middle.scaleY).toBeLessThanOrEqual(bottom.y + 0.001);
-            expect(middle.y + middle.height * middle.scaleY / 2).toBeCloseTo(layout.snapshot().safeArea.height / 2);
-            expect(middle.x + middle.width * middle.scaleX / 2).toBeCloseTo(safe.width / 2);
-            expect(middle.scaleX).toBe(middle.scaleY);
-            expect(middle.scaleX).toBeGreaterThan(0);
-            expect(top.height).toBe(184);
-            expect(bottom.y + bottom.height).toBe(layout.snapshot().safeArea.height);
-        };
-
-        check();
-        expect(middle.scaleY).toBeLessThan(1);
-        viewport.topRightAvoidance.y = 88;
-        check();
-        root.height = stage.height = viewport.height = 1600;
-        viewport.safeArea.height = 1520;
-        check();
-        expect(middle.scaleY).toBe(1);
-        expect(middle).toMatchObject({ width: 640, height: 680 });
     });
 
     it("reflows from a stage resize and centers popups inside the safe area", async () => {
@@ -353,13 +305,15 @@ describe("UILayoutService", () => {
         layout.apply(window as unknown as Laya.GWindow, "center-popup");
 
         expect(window).toMatchObject({ x: 0, y: 0, width: 1000, height: 1800 });
-        expect(mid).toMatchObject({ x: 180, y: 600, width: 600, height: 400 });
+        expect(mid).toMatchObject({ x: 200, y: 700, width: 600, height: 400 });
         stage.resize(800, 1600);
         expect(layout.snapshot().viewport).toMatchObject({ width: 800, height: 1600 });
         expect(layout.snapshot().safeArea.x).toBe(16);
         expect(layout.snapshot().safeArea.y).toBeCloseTo(88.889);
         expect(layout.snapshot().safeArea.width).toBe(768);
         expect(layout.snapshot().safeArea.height).toBeCloseTo(1422.222);
+        layout.apply(window as unknown as Laya.GWindow, "center-popup");
+        expect(mid).toMatchObject({ x: 100, y: 600, width: 600, height: 400 });
         expect(snapshots).toEqual([1000, 800]);
         layout.stop();
         stage.resize(700, 1400);
