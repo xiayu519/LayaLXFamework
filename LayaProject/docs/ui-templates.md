@@ -106,6 +106,11 @@ session.lifetime.defer(() => list.off(Laya.UIEvent.ClickItem, view, select));
 2026-09-10 固定骨架验证（原生页面与场景归属改造前的历史基线）：扫描全部 8 个窗口及窗口模板，节点完整且顺序一致。typecheck、67 项相关单测、架构/资源布局检查和 16 个层级资产的官方解析通过；Skill 静态检查、5 个路由案例和独立制作 FullscreenMid 的执行检查通过。LayaAir 3.4.1 原地构建、100 次 UI/Pool 循环、8 种浏览器分辨率 × 4 组安全区均通过。背包列表实例化 6–13 个显示项，行高始终为 88、标题字号为 22；通用列表和三列网格随 full 视口分别实例化 11–18、21–36 个显示项。全屏 mid 在同一实例上居中、缩小并恢复，空槽位不阻挡原生点击。覆盖 Mask 堆叠/关闭开关、弹窗 mid 动画、关闭钩子、池回收及动画期间 resize，无 404、运行时错误或停机 owner 残留。
 
 另通过 CDP 连续切换实际 CSS 视口 390×844 → 600×800 → 320×568 → 390×844，验证同一全屏 mid 窗口的布局与按钮点击，并检查背包、中央面板和弹窗截图。以上为 Windows Headless Chromium / SwiftShader 结果；刘海与胶囊数据为模拟输入，未代替小游戏真机、macOS 或目标 GPU 验收。
+
+2026-09-23 当前源码基线 `96cdc66`（包含 `ef1053e` 的 UI 布局改动）实测：`npm run test:headless -- --suite framework --probe tests/game/logic/ui-templates.browser.mjs` 在当前项目原地完成 LayaAir 3.4.1 Web 构建，发布包检查、framework 探针和 UI 模板探针全部通过。framework 探针覆盖响应式布局、绑定隔离与取消、弹窗顺序，以及 100 次 UI/Pool 循环；模板探针覆盖 100 项列表、虚拟列表与网格、8 次窗口重开、弹窗取消与关闭，以及 4 组安全区输入。浏览器正常停机，无运行时错误。
+
+同一构建随后运行 `node tests/game/logic/ui-examples-resolutions.mjs`，8 个 CSS 视口 `320x568`、`360x640`、`375x667`、`390x844`、`412x915`、`600x800`、`768x1024`、`1280x720` 全部通过；每个视口均检查普通、刘海/胶囊、侧边内边距及恢复布局。此记录仅证明上述 Windows Headless Chromium / SwiftShader 和模拟安全区场景；小游戏真机、macOS 与目标 GPU 仍需各自验收。
+
 ## 编辑器配置显示
 
 UIViewLifecycle 的选项以中文显示，资产仍保存原有字符串或数值：窗口布局为“全屏 / 居中弹窗”，层级为“背景层 / 页面层 / 常驻信息层 / 弹窗层 / 引导层 / 提示层 / 系统层”，实例为“单实例 / 多实例”，关闭处理为“销毁 / 隐藏并缓存”。
