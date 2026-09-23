@@ -10,7 +10,7 @@
 ## Cost and model compatibility
 
 - 项目不在 `.codex/config.toml` 指定模型或 reasoning effort；开发者的客户端选择优先，Skill 和任务过程不自动切换。兼容评测目标独立维护在 [policy.json](../evals/policy.json)，不能覆盖日常选择。
-- 正式兼容基线为 GPT-5.6 Sol 的 `medium/high/xhigh`。普通、复杂、最高复杂度任务可分别优先考虑这三档，但只是开发者选择建议，不是任务内路由；其他模型或档位可以使用，不冒充已验证范围。
+- 正式评测基线为 GPT-6 Sol 的 `high/xhigh`。`high` 推荐执行，`xhigh` 推荐大型、复杂任务的分析；这是用户选择建议，不是任务内路由。用户选用其他模型或档位时照常完成任务，只在兼容报告中区分实测范围。
 - 文本预算在 [policy.json](../evals/policy.json) 单点维护，按 bytes/字符检查冗余，不能冒充 token 计量或逼迫省略关键条件。公共与游戏 description 分开预算；按需读取内容。
 - 优先并行独立读取与检查；依赖步骤顺序执行。委派需有独立输入、输出和可核查结果，收益应覆盖交接成本；不按文件数或团队人数凑代理。
 
@@ -28,7 +28,7 @@
 
 ## Official references
 
-- [GPT-5.6 Sol capabilities](https://developers.openai.com/api/docs/models/gpt-5.6-sol)
+- [GPT-6 Sol capabilities](https://developers.openai.com/api/docs/models/gpt-6-sol)
 - [Codex models and reasoning](https://learn.chatgpt.com/docs/models)
 - [Configuration precedence](https://learn.chatgpt.com/docs/config-file/config-basic)
 - [AGENTS discovery](https://learn.chatgpt.com/docs/agent-configuration/agents-md)

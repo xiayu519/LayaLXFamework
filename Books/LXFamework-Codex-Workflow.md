@@ -1,6 +1,6 @@
 # LXFamework Codex 开发工作流
 
-本工作流以 GPT-5.6 Sol 的 `medium/high/xhigh` 为正式兼容基线，共用同一套 Skill、授权边界和验收标准。项目不在 [config.toml](../LayaProject/.codex/config.toml) 指定开发者模型或 reasoning effort，当前客户端选择优先，Skill 和任务过程不自动切换；其他模型和档位可以使用，不属于现行兼容结论。
+本工作流以 GPT-6 Sol 的 `high/xhigh` 为推荐评测基线，共用同一套 Skill、授权边界和验收标准。项目不在 [config.toml](../LayaProject/.codex/config.toml) 指定开发者模型或 reasoning effort，用户当前选择优先，Skill 和任务过程不自动切换；其他模型和档位照常完成任务，兼容报告只陈述实际验收范围。
 
 ## 仓库与工作目录
 
@@ -37,7 +37,7 @@ Codex 对两类文件采用不同的官方发现顺序：`AGENTS.md` 从 Git 根
 
 ## 模型与成本
 
-Sol 兼容范围为 `medium/high/xhigh`：普通执行可优先选择 `medium`，复杂任务选择 `high`，最高复杂度任务选择 `xhigh`。这是开发者开始任务时的选择建议，不是代理自动路由，也不承诺三档有相同的一次成功率。项目不禁止 `low`、`max`、Ultra 或其他模型，只不把它们计入当前兼容结论。
+GPT-6 Sol 的推荐评测范围为 `high/xhigh`：执行任务可优先选择 `high`，大型、复杂任务的分析可选择 `xhigh`。这是开发者开始任务时的选择建议，不是代理自动路由；用户明确选择其他模型或强度时保持该选择。两档的兼容性和成本结论只依据各自的实际验收。
 
 先减少无关读取、重复指令和重复验证，再考虑档位成本。文本长度只是冗余检查，不等于 token；兼容模型、档位和评测阈值集中在 [policy.json](../LayaProject/.agents/skills/codex-workflow/evals/policy.json)，与开发者配置分离，公共与游戏 Skill description 分开计量。只有真实比较任务质量、总 token 与耗时后才声称性价比改善。
 
@@ -77,7 +77,7 @@ Windows 与 macOS 共用同一套 AGENTS、Skills 和 npm 命令。GitHub Action
 
 模型调用只用于模型/CLI 迁移、AGENTS、Skill 决策/description 或路由变化的验收，详见 [工作流评测](../LayaProject/.agents/skills/codex-workflow/references/evaluation.md)。`test:skill-routing -- --case <id>` 可重复选择受影响正负例，`--group verification` 专测过量/不足验证；无参数才跑全套。所有规则与案例改完后一次性执行所选模型评测；日常开发和中间状态不反复跑。分类测试与实际执行分别报告，普通排版、展示 YAML 或无语义脚本变化只跑确定性检查。
 
-当前分类、真实执行证据和成本计量限制统一记录在 [Sol 工作流兼容验收](../LayaProject/docs/sol-workflow-validation.md)，不在使用手册中重复维护成绩。此前 GPT-6 迁移结果保留在 [历史验收](../LayaProject/docs/gpt6-workflow-validation.md)。
+当前分类、真实执行证据和成本计量限制统一记录在 [GPT-6 Sol 工作流兼容验收](../LayaProject/docs/gpt6-sol-workflow-validation.md)，不在使用手册中重复维护成绩。此前 GPT-5.6 Sol 和 GPT-6 Astra 的结果分别保留在 [旧 Sol 验收](../LayaProject/docs/sol-workflow-validation.md) 与 [历史 GPT-6 验收](../LayaProject/docs/gpt6-workflow-validation.md)。
 
 后续按影响选择检查、探针分组和模型案例筛选的证据见 [验证粒度优化验收](../LayaProject/docs/verification-scope-validation.md)。
 
@@ -93,11 +93,11 @@ World、UI、事件归属判据与近期代码同步的验证见 [归属工作�
 
 Codex 官方 [Memories](https://learn.chatgpt.com/docs/customization/memories) 位于用户目录 `~/.codex/memories/`，由客户端在启用后后台生成；与仓库记忆可互补。项目不自动启停官方记忆、不手改其生成状态或同步两套目录。项目必守规则继续放在 AGENTS/Skill/版本化文档，不依赖个人记忆维持约束。
 
-本次冲突清理、检索回归与独立执行证据见 [项目记忆验收](../LayaProject/docs/project-memory-validation.md)。
+此前的冲突清理、检索回归与独立执行证据见 [项目记忆验收](../LayaProject/docs/project-memory-validation.md)；本轮有效记忆校对结果见 [GPT-6 Sol 工作流兼容验收](../LayaProject/docs/gpt6-sol-workflow-validation.md)。
 
 ## 依据
 
-- [OpenAI：GPT-5.6 Sol 模型能力](https://developers.openai.com/api/docs/models/gpt-5.6-sol)
+- [OpenAI：GPT-6 Sol 模型能力](https://developers.openai.com/api/docs/models/gpt-6-sol)
 - [OpenAI：Codex 模型与强度](https://learn.chatgpt.com/docs/models)
 - [OpenAI：Codex AGENTS.md 分层项目指令](https://learn.chatgpt.com/docs/agent-configuration/agents-md)
 - [OpenAI：Codex 项目配置层级](https://learn.chatgpt.com/docs/config-file/config-basic)

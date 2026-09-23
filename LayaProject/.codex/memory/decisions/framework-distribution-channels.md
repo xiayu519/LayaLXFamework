@@ -4,7 +4,7 @@ scope: framework-distribution
 description: 下游以显式 release 或 snapshot 双轨同步框架；两者都锁定不可变 commit，只有 release 要求 SemVer Tag。
 trigger: 发布框架、同步下游、修改 framework lock、channel 策略或上游完整性校验时。
 status: active
-last_verified: 2026-09-05
+last_verified: 2026-09-23
 source: code-verified
 ---
 
@@ -20,7 +20,7 @@ source: code-verified
 - `--channel main` 是 snapshot 模式，只在下游显式执行同步时解析 channel 最新提交；lock 固定当时的 commit，之后不会随 channel 自动漂移。
 - lock v2 记录 `source.mode`、`source.ref`、`commit`、`manifestVersion`、manifest 哈希和逐文件哈希；校验器继续兼容既有 release lock v1。
 - snapshot 上游校验检出 lock 中的 commit，并要求该 commit 仍可从 channel 到达；用于同步的 channel 禁止 force-push。
-- managed files 在两种模式下都保持下游只读；同步步骤与按影响验收以 [当前发行规则](../../../.agents/skills/framework-sync/references/distribution.md) 为准。
+- 下游可在已选定的当前项目修改 managed files；lock 继续记录上次同步来源，完整性检查只提示本地差异。同步覆盖差异须另行确认；步骤与按影响验收以 [当前发行规则](../../../.agents/skills/framework-sync/references/distribution.md) 为准。
 
 ## Consequences
 

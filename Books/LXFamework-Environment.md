@@ -21,7 +21,7 @@ LayaAirIDE 只在人工编辑 `.ls/.lh` 或明确要求 GUI 验证时需要；�
 
 ## Codex 与工作流评测
 
-使用 Codex 工作流前，在本机准备可访问所选模型的客户端与登录态；模型和 reasoning effort 由开发者选择，项目 [config.toml](../LayaProject/.codex/config.toml) 不覆盖这两项。工作流以 Sol `medium/high/xhigh` 为兼容基线，档位建议、工作目录和任务入口见 [开发工作流](LXFamework-Codex-Workflow.md)。本机登录信息不写入仓库。
+使用 Codex 工作流前，在本机准备可访问所选模型的客户端与登录态；模型和 reasoning effort 由开发者选择，项目 [config.toml](../LayaProject/.codex/config.toml) 不覆盖这两项。工作流以 GPT-6 Sol `high/xhigh` 为推荐评测基线，档位建议、工作目录和任务入口见 [开发工作流](LXFamework-Codex-Workflow.md)。本机登录信息不写入仓库。
 
 仅在需要模型评测时运行 `npm run test:skill-routing`，复用本地 Codex CLI 登录态，不需要 `CODEX_API_KEY`。评测使用的固定 CLI 版本和预算统一见 [policy.json](../LayaProject/.agents/skills/codex-workflow/evals/policy.json)；运行条件、临时覆盖与失败处理见 [评测说明](../LayaProject/.agents/skills/codex-workflow/references/evaluation.md)。该版本约束针对评测复现，不是日常客户端的版本锁定；普通游戏开发不重复调用模型评测。
 

@@ -3,9 +3,9 @@ import { evaluationPolicy, evaluationArguments, assertUsage, assertToolFreeTrans
 
 describe("evaluation policy", () => {
     const settings = {
-        codexCliVersion: "0.153.2",
-        compatibility: { model: "gpt-5.6-sol", defaultEffort: "medium", efforts: ["medium", "high", "xhigh"] },
-        routing: { inputTokens: 100, outputTokens: { medium: 100, high: 150, xhigh: 200 }, timeoutMs: 1000 },
+        codexCliVersion: "0.156.1",
+        compatibility: { model: "gpt-6-sol", defaultEffort: "high", efforts: ["high", "xhigh"] },
+        routing: { inputTokens: 100, outputTokens: { high: 150, xhigh: 200 }, timeoutMs: 1000 },
     };
     it("rejects tool use that could read expected answers or mutate state", () => {
         const completed = { type: "turn.completed", usage: { input_tokens: 1, output_tokens: 1 } };
@@ -17,7 +17,7 @@ describe("evaluation policy", () => {
         expect(() => assertToolFreeTranscript([completed, completed])).toThrow();
     });
     it("uses the compatibility baseline or explicit evaluation overrides", () => {
-        expect(evaluationPolicy(settings)).toEqual({ model: "gpt-5.6-sol", effort: "medium" });
+        expect(evaluationPolicy(settings)).toEqual({ model: "gpt-6-sol", effort: "high" });
         expect(evaluationPolicy(settings, { LX_CODEX_EVAL_MODEL: "chosen-model", LX_CODEX_EVAL_EFFORT: "xhigh" }))
             .toEqual({ model: "chosen-model", effort: "xhigh" });
         expect(() => evaluationPolicy(settings, { LX_CODEX_EVAL_MODEL: "bad model" })).toThrow();
@@ -29,14 +29,14 @@ describe("evaluation policy", () => {
         }
         expect(() => assertUsage({ input_tokens: 10, output_tokens: 10 }, 10, 10)).not.toThrow();
     });
-    it.each(["medium", "high", "xhigh"])("passes the supported %s without changing the model", (effort) => {
+    it.each(["high", "xhigh"])("passes the supported %s without changing the model", (effort) => {
         const policy = evaluationPolicy(settings, { LX_CODEX_EVAL_EFFORT: effort });
-        expect(policy).toEqual({ model: "gpt-5.6-sol", effort });
+        expect(policy).toEqual({ model: "gpt-6-sol", effort });
         const args = evaluationArguments(policy, "schema path.json", "output path.json");
         expect(args).toContain(`model_reasoning_effort="${effort}"`);
         expect(args.slice(-5)).toEqual(["--output-schema", "schema path.json", "--output-last-message", "output path.json", "-"]);
     });
-    it.each(["none", "minimal", "low", "light", "max", "ultra"])("rejects unsupported compatibility effort %s before invoking the model", (effort) => {
+    it.each(["none", "minimal", "low", "medium", "light", "max", "ultra"])("rejects unsupported compatibility effort %s before invoking the model", (effort) => {
         expect(() => evaluationPolicy(settings, { LX_CODEX_EVAL_EFFORT: effort })).toThrow(/Invalid evaluation effort/);
     });
     it("rejects incomplete or invalid budgets before invoking the CLI", () => {
@@ -54,6 +54,6 @@ describe("evaluation policy", () => {
                 outputTokens: { ...settings.routing.outputTokens, [effort]: 0 } } })).toThrow();
         }
         expect(() => validateEvaluationSettings({ ...settings,
-            compatibility: { ...settings.compatibility, efforts: ["low", "medium", "high", "xhigh"] } })).toThrow();
+            compatibility: { ...settings.compatibility, efforts: ["medium", "high", "xhigh"] } })).toThrow();
     });
 });

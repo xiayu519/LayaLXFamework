@@ -6,9 +6,9 @@ LayaLXFamework 是基于 **LayaAir 3.4.1** 的 2D 游戏客户端框架，提供
 
 ## Codex 开发工作流
 
-项目 Codex 工作流以 GPT-5.6 Sol 的 `medium/high/xhigh` 为正式兼容基线，共用 Skill、授权边界与验收标准；普通、复杂和最高复杂度任务可分别优先考虑三档。项目不指定开发者的模型或 reasoning effort，当前客户端选择优先，工作流不自动切换。
+项目 Codex 工作流以 GPT-6 Sol 的 `high/xhigh` 为推荐评测基线，共用 Skill、授权边界与验收标准；执行推荐 `high`，大型复杂任务的分析推荐 `xhigh`。项目不指定开发者的模型或 reasoning effort，用户当前选择优先，工作流不自动切换。
 
-任务按需加载领域知识、检索有效项目记忆，并按风险选择验证，减少无关上下文和重复检查。使用方式见 [开发工作流](Books/LXFamework-Codex-Workflow.md)，分类评测、实际执行样例及未验证项见 [Sol 兼容验收](LayaProject/docs/sol-workflow-validation.md)。兼容不代表三档能力或一次成功率相同；其他模型和档位可以使用，不属于当前验证结论。
+任务按需加载领域知识、检索有效项目记忆，并按风险选择验证，减少无关上下文和重复检查。使用方式见 [开发工作流](Books/LXFamework-Codex-Workflow.md)，分类评测、实际执行样例及未验证项见 [GPT-6 Sol 工作流验收](LayaProject/docs/gpt6-sol-workflow-validation.md)。兼容不代表两档能力或一次成功率相同；其他模型和档位可以使用，不属于当前验证结论。
 
 ## 环境与打开方式
 

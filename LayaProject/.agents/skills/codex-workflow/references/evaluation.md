@@ -14,11 +14,11 @@
 
 验证选择只注入现行规则中相关的验证章节，不附带模型介绍、官方链接或环境安装说明；章节缺失直接报错。
 
-正式兼容模型、默认评测 effort 与支持档位从 [policy.json](../evals/policy.json) 读取，不写入开发者的 `.codex/config.toml`。专项比较可用 `LX_CODEX_EVAL_MODEL` / `LX_CODEX_EVAL_EFFORT` 显式覆盖，但覆盖结果不自动成为正式兼容证据。每次单轮、原地、ephemeral、read-only，由本地已登录 Codex CLI 执行；不要求 API key。
+正式兼容模型、默认评测 effort 与支持档位从 [policy.json](../evals/policy.json) 读取，不写入开发者的 `.codex/config.toml`。专项比较可用 `LX_CODEX_EVAL_MODEL` / `LX_CODEX_EVAL_EFFORT` 显式覆盖，但覆盖结果不自动成为正式兼容证据，也不影响日常会话选择。每次单轮、原地、ephemeral、read-only，由本地已登录 Codex CLI 执行；不要求 API key。
 
 CLI 版本和后置 token/超时阈值位于 [policy.json](../evals/policy.json)。仅在兼容性失败或明确升级客户端时改变版本。拒绝工具调用，expected 不放进提示；输出须精确覆盖选中的 [cases.json](../evals/cases.json) 与 [verification-cases.json](../evals/verification-cases.json)，缺失、多余或重复结果均失败。先记录 usage 再检查预算；预算是运行后失败阈值，不是服务端花费上限。子集通过不得宣称全套通过。
 
-模型迁移先保留旧规则建立目标模型基线，再测新规则的日常档位。Sol 支持范围的首次迁移检查 `medium/high/xhigh` 各一次；后续只复验受影响档位。不同案例数量的 token 不作直接效率比较，记录完成质量、耗时与 token，不能仅凭便宜宣布更优。
+模型迁移先保留旧规则建立目标模型基线，再测新规则的目标档位。GPT-6 Sol 的首次兼容检查 `high/xhigh` 各一次；后续只复验受影响档位。不同案例数量的 token 不作直接效率比较，记录完成质量、耗时与 token，不能仅凭便宜宣布更优。
 
 ## Execution evidence
 
@@ -28,7 +28,7 @@ CLI 版本和后置 token/超时阈值位于 [policy.json](../evals/policy.json)
 
 覆盖本次风险：已授权局部实现、普通纠正、只读诊断、共享边界、命名游戏路径、最小验证、历史记忆与显式模型选择。实际开发以开发者当前选择为准；失败保留证据，定位后只重测受影响案例。使用客户端而非文本声称实际模型/强度；不能用另一档位的成功代替失败档位。
 
-首次兼容验收为 `medium/high/xhigh` 各保留与复杂度相称的真实执行样例，不要求三档有相同成功率。涉及 Laya 的产物必须进入真实引擎探针。当前发布输入未变且已有本轮构建证据时，可通过 `node tools/test-browser.mjs --suite targeted --probe <module.mjs>` 加载临时产物，不逐例重建或附带无关探针。模块约定见 [Headless verification](../../laya-headless/references/verification.md)。
+首次兼容验收为 `high/xhigh` 各保留与复杂度相称的真实执行样例，不要求两档有相同成功率。涉及 Laya 的产物必须进入真实引擎探针。当前发布输入未变且已有本轮构建证据时，可通过 `node tools/test-browser.mjs --suite targeted --probe <module.mjs>` 加载临时产物，不逐例重建或附带无关探针。模块约定见 [Headless verification](../../laya-headless/references/verification.md)。
 
 工具权限失败与业务失败分别记录；进程 exit 0 或代理说完成都不是验收证据。不能为跑通评测放宽权限。只有拿到完整 usage 才报告总 token；缺失时明确不可计量，禁止用分类 token 代替执行成本。
 

@@ -1,6 +1,6 @@
 # GPT-6 工作流迁移验收
 
-> 这是 2026-09-08 的历史迁移记录，不代表当前模型配置或兼容范围。现行结果见 [Sol 工作流兼容验收](sol-workflow-validation.md)。
+> 这是 2026-09-08 的 GPT-6 Astra 历史迁移记录，不代表当前推荐评测基线。现行结果见 [GPT-6 Sol 工作流兼容验收](gpt6-sol-workflow-validation.md)。
 
 日期：2026-09-08。环境：Windows、Node v24.14.0、本地已登录 Codex CLI 0.153.2。范围：Codex 配置、规则、Skill、记忆检索、验证工具及上游同步契约；未修改游戏/引擎实现。
 

@@ -39,9 +39,9 @@ export function validateEvaluationSettings(settings) {
         throw new Error("Invalid compatibility model in evaluation policy.");
     }
     const efforts = compatibility?.efforts;
-    if (!Array.isArray(efforts) || JSON.stringify(efforts) !== JSON.stringify(["medium", "high", "xhigh"])
+    if (!Array.isArray(efforts) || JSON.stringify(efforts) !== JSON.stringify(["high", "xhigh"])
         || !efforts.includes(compatibility.defaultEffort)) {
-        throw new Error("Compatibility efforts must be medium, high and xhigh with a supported default.");
+        throw new Error("Compatibility efforts must be high and xhigh with a supported default.");
     }
     for (const effort of efforts) {
         assertUsage({ input_tokens: 0, output_tokens: 0 }, settings.routing?.inputTokens,

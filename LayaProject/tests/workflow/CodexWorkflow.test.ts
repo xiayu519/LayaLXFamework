@@ -35,12 +35,15 @@ describe("Codex workflow policy", () => {
             "utf8",
         );
         expect(localRunner).toContain("@openai/codex@${settings.codexCliVersion}");
-        const args = evaluationArguments({ model: "selected-model", effort: "medium" }, "schema", "output");
+        const args = evaluationArguments({ model: "selected-model", effort: "high" }, "schema", "output");
         expect(args).toContain("--ephemeral");
         expect(args).toContain("--ignore-user-config");
         expect(args.slice(args.indexOf("--sandbox"), args.indexOf("--sandbox") + 2)).toEqual(["--sandbox", "read-only"]);
         expect(localRunner).toContain("CODEX_API_KEY is not required");
         expect(localRunner).toContain("../Books/LXFamework-Environment.md");
+
+        const projectConfig = readFileSync(".codex/config.toml", "utf8");
+        expect(projectConfig).not.toMatch(/^\s*(?:model|model_reasoning_effort|plan_mode_reasoning_effort)\s*=/m);
     });
 
     it("keeps GitHub limited to the framework sync contract", () => {
